@@ -1,0 +1,22 @@
+# dependencies
+node_modules/
+
+# database (local SQLite files — never commit user data)
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# build / tooling
+dist/
+*.tsbuildinfo
+.vercel
+
+# logs
+*.log
+npm-debug.log*
