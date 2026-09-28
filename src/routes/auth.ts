@@ -13,13 +13,15 @@ const limiter = rateLimit("auth", 20, 15 * 60_000);
 const registerSchema = z.object({
   email: z.string().email("value is not a valid email"),
   password: z.string().min(8, "password must be at least 8 characters"),
+  first_name: z.string().trim().min(1, "first name is required").max(80).optional(),
+  last_name: z.string().trim().min(1, "last name is required").max(80).optional(),
   timezone: z.string().optional(),
 });
 
 authRouter.post("/register", limiter, async (req, res, next) => {
   try {
     const body = registerSchema.parse(req.body);
-    const result = await auth.register(body.email, body.password, body.timezone);
+    const result = await auth.register(body.email, body.password, body.timezone, body.first_name, body.last_name);
     ok(res, "Account created — check your email for the verification link", { ...result, requires_verification: true }, 201);
   } catch (e) {
     next(e);

@@ -28,12 +28,19 @@ export function issueTokens(userId: string) {
   return { access_token: signAccessToken(userId, sid), refresh_token: signRefreshToken(userId, sid), token_type: "bearer" };
 }
 
-export async function register(email: string, password: string, timezone?: string) {
+export async function register(email: string, password: string, timezone?: string, firstName?: string, lastName?: string) {
   const existing = await get("SELECT id FROM users WHERE email = ?", email.toLowerCase());
   if (existing) throw conflict("An account with this email already exists");
   const id = newId();
   const token = randomBytes(24).toString("hex");
   const now = nowIso();
+  // names go straight into the profile identity block (§19.3 keys) so the topbar,
+  // autofill and CV blocks all see them from the first session
+  const identity = JSON.stringify({
+    first_name: firstName ?? "",
+    last_name: lastName ?? "",
+    full_name: [firstName, lastName].filter(Boolean).join(" "),
+  });
   await run(
     `INSERT INTO users (id, email, password_hash, provider, verified, verification_token, timezone, created_at, updated_at)
      VALUES (?, ?, ?, 'email', 0, ?, ?, ?, ?)`,
@@ -47,7 +54,7 @@ export async function register(email: string, password: string, timezone?: strin
   );
   // local mode: no SMTP — the token is surfaced to the dev console + returned in dev (§31.1 MailPit equivalent)
   console.log(`[auth] verification link for ${email}: /auth/verify-email?token=${token}`);
-  await run(`INSERT INTO profiles (id, user_id, identity, prefs, aliases, version, updated_at) VALUES (?, ?, '{}', '{}', '{}', 1, ?)`, newId(), id, now);
+  await run(`INSERT INTO profiles (id, user_id, identity, prefs, aliases, version, updated_at) VALUES (?, ?, ?, '{}', '{}', 1, ?)`, newId(), id, identity, now);
   const user = (await get("SELECT * FROM users WHERE id = ?", id))!;
   return { user: publicUser(user), verification_token: token, ...issueTokens(id) };
 }
