@@ -16,7 +16,7 @@ export interface CVBlock {
   groups?: string[];
 }
 
-export function listCVs(userId: string, filter: { archetype?: string; category?: string } = {}) {
+export async function listCVs(userId: string, filter: { archetype?: string; category?: string } = {}) {
   const where = ["user_id = ?"];
   const args: any[] = [userId];
   if (filter.archetype) {
@@ -27,7 +27,7 @@ export function listCVs(userId: string, filter: { archetype?: string; category?:
     where.push("career_category = ?");
     args.push(filter.category);
   }
-  const rows = all<any>(`SELECT * FROM cvs WHERE ${where.join(" AND ")} ORDER BY updated_at DESC`, ...args);
+  const rows = await all<any>(`SELECT * FROM cvs WHERE ${where.join(" AND ")} ORDER BY updated_at DESC`, ...args);
   return rows.map(shape);
 }
 
@@ -38,8 +38,8 @@ const shape = (r: any) => ({
   lineage: parseJson(r.lineage, {}),
 });
 
-export function getCV(userId: string, id: string) {
-  const r = get("SELECT * FROM cvs WHERE id = ? AND user_id = ?", id, userId);
+export async function getCV(userId: string, id: string) {
+  const r = await get("SELECT * FROM cvs WHERE id = ? AND user_id = ?", id, userId);
   if (!r) throw notFound("CV");
   return shape(r);
 }
@@ -54,11 +54,11 @@ export interface CreateCVInput {
   profile_id?: string | null;
 }
 
-export function createCV(userId: string, input: CreateCVInput) {
-  const profile = get("SELECT id FROM profiles WHERE user_id = ?", userId);
+export async function createCV(userId: string, input: CreateCVInput) {
+  const profile = await get("SELECT id FROM profiles WHERE user_id = ?", userId);
   const id = newId();
   const now = nowIso();
-  run(
+  await run(
     `INSERT INTO cvs (id, user_id, profile_id, name, archetype, career_category, targeting, blocks, template_id, lineage, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?)`,
     id,
@@ -68,7 +68,7 @@ export function createCV(userId: string, input: CreateCVInput) {
     input.archetype ?? "opening",
     input.career_category ?? "software_engineering",
     JSON.stringify(input.targeting ?? {}),
-    JSON.stringify(input.blocks ?? defaultBlocks(userId)),
+    JSON.stringify(input.blocks ?? (await defaultBlocks(userId))),
     input.template_id ?? null,
     now,
     now
@@ -77,11 +77,11 @@ export function createCV(userId: string, input: CreateCVInput) {
 }
 
 /** A sensible default CV assembled from the profile (§24.1 — CVs are views over profile data). */
-function defaultBlocks(userId: string): CVBlock[] {
-  const profile = get<any>("SELECT * FROM profiles WHERE user_id = ?", userId);
+async function defaultBlocks(userId: string): Promise<CVBlock[]> {
+  const profile = await get<any>("SELECT * FROM profiles WHERE user_id = ?", userId);
   const identity: any = profile ? parseJson(profile.identity, {}) : {};
-  const exps = profile ? all<any>("SELECT * FROM profile_experiences WHERE profile_id = ? ORDER BY sort_order", profile.id) : [];
-  const edu = profile ? all<any>("SELECT * FROM profile_education WHERE profile_id = ? ORDER BY sort_order", profile.id) : [];
+  const exps = profile ? await all<any>("SELECT * FROM profile_experiences WHERE profile_id = ? ORDER BY sort_order", profile.id) : [];
+  const edu = profile ? await all<any>("SELECT * FROM profile_education WHERE profile_id = ? ORDER BY sort_order", profile.id) : [];
   const blocks: CVBlock[] = [];
   if (identity.pitch || identity.headline) blocks.push({ type: "summary", source: "local", text: identity.pitch ?? identity.headline });
   if (exps.length) blocks.push({ type: "experience", source: "profile" });
@@ -90,8 +90,8 @@ function defaultBlocks(userId: string): CVBlock[] {
   return blocks;
 }
 
-export function updateCV(userId: string, id: string, patch: Partial<CreateCVInput>) {
-  const existing = get("SELECT * FROM cvs WHERE id = ? AND user_id = ?", id, userId);
+export async function updateCV(userId: string, id: string, patch: Partial<CreateCVInput>) {
+  const existing = await get("SELECT * FROM cvs WHERE id = ? AND user_id = ?", id, userId);
   if (!existing) throw notFound("CV");
   const sets: string[] = ["updated_at = ?"];
   const args: any[] = [nowIso()];
@@ -119,22 +119,22 @@ export function updateCV(userId: string, id: string, patch: Partial<CreateCVInpu
     sets.push("template_id = ?");
     args.push(patch.template_id);
   }
-  run(`UPDATE cvs SET ${sets.join(", ")} WHERE id = ? AND user_id = ?`, ...args, id, userId);
+  await run(`UPDATE cvs SET ${sets.join(", ")} WHERE id = ? AND user_id = ?`, ...args, id, userId);
   return getCV(userId, id);
 }
 
-export function deleteCV(userId: string, id: string) {
-  const n = run("DELETE FROM cvs WHERE id = ? AND user_id = ?", id, userId);
+export async function deleteCV(userId: string, id: string) {
+  const n = await run("DELETE FROM cvs WHERE id = ? AND user_id = ?", id, userId);
   if (!n) throw notFound("CV");
   return { deleted: true };
 }
 
 /** Fork with lineage (§20.1 variants). */
-export function duplicateCV(userId: string, id: string, name?: string) {
-  const src = getCV(userId, id);
+export async function duplicateCV(userId: string, id: string, name?: string) {
+  const src = await getCV(userId, id);
   const newCvId = newId();
   const now = nowIso();
-  run(
+  await run(
     `INSERT INTO cvs (id, user_id, profile_id, name, archetype, career_category, targeting, blocks, template_id, lineage, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     newCvId,
@@ -157,10 +157,10 @@ export function duplicateCV(userId: string, id: string, name?: string) {
  * ATS + JD match report (§20.1 / §24.1): parse-ability, keyword coverage, missing keywords.
  * Never fabricates — "add missing keyword" suggestions are advisory.
  */
-export function matchCV(userId: string, cvId: string, postingId?: string) {
-  const cv = getCV(userId, cvId);
-  const skills = skillNames(userId);
-  const posting = postingId ? get<any>("SELECT * FROM job_postings WHERE id = ? AND user_id = ?", postingId, userId) : null;
+export async function matchCV(userId: string, cvId: string, postingId?: string) {
+  const cv = await getCV(userId, cvId);
+  const skills = await skillNames(userId);
+  const posting = postingId ? await get<any>("SELECT * FROM job_postings WHERE id = ? AND user_id = ?", postingId, userId) : null;
   const jdKeywords: string[] = posting ? parseJson(posting.jd_keywords, []) : [];
   const cvText = [cv.blocks.map((b: CVBlock) => `${b.text ?? ""} ${(b.bullets ?? []).join(" ")} ${(b.groups ?? []).join(" ")}`).join(" "), ...skills, cv.name].join(" ").toLowerCase();
 
@@ -179,10 +179,10 @@ export function matchCV(userId: string, cvId: string, postingId?: string) {
     { key: "has_experience", label: "Experience section", ok: sectionTypes.has("experience"), fix: "Add at least one experience block" },
     { key: "has_skills", label: "Skills section (keyword-friendly)", ok: sectionTypes.has("skills"), fix: "Add a skills group — ATS parsers look for it" },
     { key: "length", label: "Length ≤ 2 pages worth of text", ok: cvText.length < 6000, fix: "Trim older roles or bullets" },
-    { key: "contact", label: "Contact block present", ok: skills.length >= 0 && !!(profileHasContact(userId)), fix: "Add email/phone to your profile" },
+    { key: "contact", label: "Contact block present", ok: skills.length >= 0 && !!(await profileHasContact(userId)), fix: "Add email/phone to your profile" },
   ];
   const coverage = jdKeywords.length ? Math.round((matched.length / jdKeywords.length) * 100) : null;
-  const signals = profileSignals(userId);
+  const signals = await profileSignals(userId);
   const jdScore = posting
     ? scorePosting(signals, { title: posting.title, description: posting.description, companyName: posting.company_name, seniority: posting.seniority, remote: !!posting.remote, location: posting.location, salaryMin: posting.salary_min, salaryMax: posting.salary_max, postedAt: posting.posted_at })
     : null;
@@ -200,17 +200,17 @@ export function matchCV(userId: string, cvId: string, postingId?: string) {
   };
 }
 
-function profileHasContact(userId: string) {
-  const p = get<any>("SELECT identity FROM profiles WHERE user_id = ?", userId);
+async function profileHasContact(userId: string) {
+  const p = await get<any>("SELECT identity FROM profiles WHERE user_id = ?", userId);
   if (!p) return false;
   const id = parseJson(p.identity, {} as any);
   return !!id.email || !!id.phone;
 }
 
 /** Which CV should be suggested for a posting (§24.1 version targeting). */
-export function suggestCVs(userId: string, postingId?: string) {
-  const cvs = listCVs(userId);
-  const posting = postingId ? get<any>("SELECT * FROM job_postings WHERE id = ? AND user_id = ?", postingId, userId) : null;
+export async function suggestCVs(userId: string, postingId?: string) {
+  const cvs = await listCVs(userId);
+  const posting = postingId ? await get<any>("SELECT * FROM job_postings WHERE id = ? AND user_id = ?", postingId, userId) : null;
   if (!posting) return cvs.map((c) => ({ cv: c, match: null }));
   const jd = new Set(tokenize(`${posting.title} ${parseJson<string[]>(posting.jd_keywords, []).join(" ")}`));
   return cvs
@@ -227,7 +227,7 @@ export function suggestCVs(userId: string, postingId?: string) {
 
 /* ----------------------------- templates ----------------------------- */
 
-export function listTemplates(userId: string, filter: { kind?: string; archetype?: string } = {}) {
+export async function listTemplates(userId: string, filter: { kind?: string; archetype?: string } = {}) {
   const where = ["user_id = ?"];
   const args: any[] = [userId];
   if (filter.kind) {
@@ -238,13 +238,13 @@ export function listTemplates(userId: string, filter: { kind?: string; archetype
     where.push("archetype = ?");
     args.push(filter.archetype);
   }
-  return all(`SELECT * FROM templates WHERE ${where.join(" AND ")} ORDER BY created_at DESC`, ...args).map((r: any) => ({ ...r, variables: parseJson(r.variables, []) }));
+  return (await all(`SELECT * FROM templates WHERE ${where.join(" AND ")} ORDER BY created_at DESC`, ...args)).map((r: any) => ({ ...r, variables: parseJson(r.variables, []) }));
 }
 
-export function createTemplate(userId: string, t: { kind: string; archetype: string; name: string; subject?: string; body: string; variables?: string[] }) {
+export async function createTemplate(userId: string, t: { kind: string; archetype: string; name: string; subject?: string; body: string; variables?: string[] }) {
   const id = newId();
   const now = nowIso();
-  run(
+  await run(
     `INSERT INTO templates (id, user_id, kind, archetype, name, subject, body, variables, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     userId,
@@ -260,10 +260,10 @@ export function createTemplate(userId: string, t: { kind: string; archetype: str
   return get("SELECT * FROM templates WHERE id = ?", id);
 }
 
-export function updateTemplate(userId: string, id: string, patch: any) {
-  const t = get("SELECT * FROM templates WHERE id = ? AND user_id = ?", id, userId);
+export async function updateTemplate(userId: string, id: string, patch: any) {
+  const t = await get("SELECT * FROM templates WHERE id = ? AND user_id = ?", id, userId);
   if (!t) throw notFound("Template");
-  run(
+  await run(
     "UPDATE templates SET name = ?, subject = ?, body = ?, variables = ?, updated_at = ? WHERE id = ?",
     patch.name ?? t.name,
     patch.subject ?? t.subject,
@@ -275,8 +275,8 @@ export function updateTemplate(userId: string, id: string, patch: any) {
   return get("SELECT * FROM templates WHERE id = ?", id);
 }
 
-export function deleteTemplate(userId: string, id: string) {
-  const n = run("DELETE FROM templates WHERE id = ? AND user_id = ?", id, userId);
+export async function deleteTemplate(userId: string, id: string) {
+  const n = await run("DELETE FROM templates WHERE id = ? AND user_id = ?", id, userId);
   if (!n) throw notFound("Template");
   return { deleted: true };
 }

@@ -12,10 +12,10 @@ const searchLimiter = rateLimit("search", 30, 60_000);
 
 const toArray = (v: any): string[] | undefined => (v == null ? undefined : Array.isArray(v) ? v.map(String) : String(v).split(",").map((s) => s.trim()).filter(Boolean));
 
-jobRouter.get("/search", searchLimiter, (req: AuthedRequest, res, next) => {
+jobRouter.get("/search", searchLimiter, async (req: AuthedRequest, res, next) => {
   try {
     const q = req.query as any;
-    const result = jobs.searchJobs(req.userId!, {
+    const result = await jobs.searchJobs(req.userId!, {
       q: q.q,
       location: q.location,
       remote: q.remote,
@@ -35,9 +35,9 @@ jobRouter.get("/search", searchLimiter, (req: AuthedRequest, res, next) => {
   }
 });
 
-jobRouter.get("/sources", (_req, res, next) => {
+jobRouter.get("/sources", async (_req, res, next) => {
   try {
-    ok(res, "Source health", { items: sourceHealth() });
+    ok(res, "Source health", { items: await sourceHealth() });
   } catch (e) {
     next(e);
   }
@@ -58,24 +58,24 @@ jobRouter.post("/refresh", searchLimiter, async (req: AuthedRequest, res, next) 
 jobRouter.get("/ingest/status", async (req: AuthedRequest, res, next) => {
   try {
     // await-free status: last known source rows
-    ok(res, "Ingestion status", { sources: sourceHealth() });
+    ok(res, "Ingestion status", { sources: await sourceHealth() });
   } catch (e) {
     next(e);
   }
 });
 
-jobRouter.get("/:id", (req: AuthedRequest, res, next) => {
+jobRouter.get("/:id", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Posting retrieved", jobs.getJob(req.userId!, String(req.params.id)));
+    ok(res, "Posting retrieved", await jobs.getJob(req.userId!, String(req.params.id)));
   } catch (e) {
     next(e);
   }
 });
 
-jobRouter.post("/:id/feedback", (req: AuthedRequest, res, next) => {
+jobRouter.post("/:id/feedback", async (req: AuthedRequest, res, next) => {
   try {
     const body = z.object({ vote: z.enum(["up", "down", "ignore"]) }).parse(req.body);
-    ok(res, "Feedback recorded", jobs.voteJob(req.userId!, String(req.params.id), body.vote));
+    ok(res, "Feedback recorded", await jobs.voteJob(req.userId!, String(req.params.id), body.vote));
   } catch (e) {
     next(e);
   }
@@ -83,24 +83,24 @@ jobRouter.post("/:id/feedback", (req: AuthedRequest, res, next) => {
 
 export const searchRouter = Router();
 searchRouter.use(requireAuth);
-searchRouter.get("/", (req: AuthedRequest, res, next) => {
+searchRouter.get("/", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Saved searches", { items: jobs.listSavedSearches(req.userId!) });
+    ok(res, "Saved searches", { items: await jobs.listSavedSearches(req.userId!) });
   } catch (e) {
     next(e);
   }
 });
-searchRouter.post("/", (req: AuthedRequest, res, next) => {
+searchRouter.post("/", async (req: AuthedRequest, res, next) => {
   try {
     const body = z.object({ name: z.string().min(1), params: z.record(z.any()).default({}) }).parse(req.body);
-    ok(res, "Search saved", jobs.saveSearch(req.userId!, body.name, body.params), 201);
+    ok(res, "Search saved", await jobs.saveSearch(req.userId!, body.name, body.params), 201);
   } catch (e) {
     next(e);
   }
 });
-searchRouter.delete("/:id", (req: AuthedRequest, res, next) => {
+searchRouter.delete("/:id", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Search deleted", jobs.deleteSavedSearch(req.userId!, String(req.params.id)));
+    ok(res, "Search deleted", await jobs.deleteSavedSearch(req.userId!, String(req.params.id)));
   } catch (e) {
     next(e);
   }

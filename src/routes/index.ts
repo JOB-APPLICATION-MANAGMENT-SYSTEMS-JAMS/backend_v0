@@ -31,10 +31,10 @@ apiRouter.use("/inbox", inboxRouter);
 apiRouter.use("/analytics", analyticsRouter);
 apiRouter.use("/streaks", streakRouter);
 // PUT /goals (§33.2) — separate mount so the path matches the spec exactly
-apiRouter.put("/goals", requireAuth, (req: AuthedRequest, res, next) => {
+apiRouter.put("/goals", requireAuth, async (req: AuthedRequest, res, next) => {
   try {
     const body = z.object({ goal: z.number().min(1).max(500), timezone: z.string().optional() }).parse(req.body);
-    ok(res, "Goal updated", setGoal(req.userId!, body.goal, body.timezone));
+    ok(res, "Goal updated", await setGoal(req.userId!, body.goal, body.timezone));
   } catch (e) {
     next(e);
   }
@@ -42,4 +42,10 @@ apiRouter.put("/goals", requireAuth, (req: AuthedRequest, res, next) => {
 apiRouter.use("/export", exportRouter);
 apiRouter.use("/tracking", trackingRouter);
 
-apiRouter.get("/sources", (_req, res) => ok(res, "Source health", { items: sourceHealth() }));
+apiRouter.get("/sources", async (_req, res, next) => {
+  try {
+    ok(res, "Source health", { items: await sourceHealth() });
+  } catch (e) {
+    next(e);
+  }
+});

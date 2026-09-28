@@ -35,14 +35,14 @@ export interface AuthedRequest extends Request {
 }
 
 /** Bearer auth — the frontend proxy injects the header server-side (§41.1), so JS never sees tokens. */
-export function requireAuth(req: AuthedRequest, _res: Response, next: NextFunction) {
+export async function requireAuth(req: AuthedRequest, _res: Response, next: NextFunction) {
   try {
     const header = req.headers.authorization ?? "";
     const token = header.startsWith("Bearer ") ? header.slice(7) : null;
     if (!token) throw unauthenticated();
     const payload = verifyToken(token);
     if (payload.typ !== "access") throw unauthenticated("Access token required");
-    const user = get("SELECT * FROM users WHERE id = ?", payload.sub);
+    const user = await get("SELECT * FROM users WHERE id = ?", payload.sub);
     if (!user) throw unauthenticated();
     if (user.suspended) throw new AppError("SUSPENDED", 403, "Account suspended", null, { fields: { is_suspended: true, email: user.email } });
     req.userId = payload.sub;
@@ -54,14 +54,14 @@ export function requireAuth(req: AuthedRequest, _res: Response, next: NextFuncti
 }
 
 /** Optional auth — used by endpoints that behave differently when signed in. */
-export function optionalAuth(req: AuthedRequest, _res: Response, next: NextFunction) {
+export async function optionalAuth(req: AuthedRequest, _res: Response, next: NextFunction) {
   const header = req.headers.authorization ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : null;
   if (token) {
     try {
       const payload = verifyToken(token);
       req.userId = payload.sub;
-      req.user = get("SELECT * FROM users WHERE id = ?", payload.sub);
+      req.user = await get("SELECT * FROM users WHERE id = ?", payload.sub);
     } catch {
       /* ignore — optional */
     }

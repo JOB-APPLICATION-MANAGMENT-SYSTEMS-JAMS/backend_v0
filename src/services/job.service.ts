@@ -20,11 +20,11 @@ export interface SearchParams {
 }
 
 /** Search: pre-filter in SQL → score+explain in Python-space → facets → paginate (§34.2). */
-export function searchJobs(userId: string, p: SearchParams) {
+export async function searchJobs(userId: string, p: SearchParams) {
   const t0 = Date.now();
   const page = Math.max(1, Number(p.page ?? 1));
   const pageSize = Math.min(100, Math.max(1, Number(p.page_size ?? 20)));
-  const signals = profileSignals(userId);
+  const signals = await profileSignals(userId);
 
   const where: string[] = ["user_id = ?"];
   const args: any[] = [userId];
@@ -72,17 +72,17 @@ export function searchJobs(userId: string, p: SearchParams) {
   }
 
   const baseWhere = [...where, ...excludeClauses].join(" AND ");
-  const total = get<{ n: number }>(`SELECT count(*) AS n FROM job_postings WHERE ${baseWhere}`, ...args)!.n;
+  const total = (await get<{ n: number }>(`SELECT count(*) AS n FROM job_postings WHERE ${baseWhere}`, ...args))!.n;
 
   const orderBy = p.sort === "recent" ? "posted_at DESC, created_at DESC" : "score DESC NULLS LAST, posted_at DESC";
-  const rows = all<any>(
+  const rows = await all<any>(
     `SELECT * FROM job_postings WHERE ${baseWhere} ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
     ...args,
     pageSize,
     (page - 1) * pageSize
   );
 
-  const votes = new Map(all<any>("SELECT posting_id, vote FROM job_votes WHERE user_id = ?", userId).map((r) => [r.posting_id, r.vote]));
+  const votes = new Map((await all<any>("SELECT posting_id, vote FROM job_votes WHERE user_id = ?", userId)).map((r) => [r.posting_id, r.vote]));
 
   const items = rows.map((r) => {
     const appliedOrIgnored = ["applied", "ignore"].includes(votes.get(r.id) ?? "");
@@ -123,7 +123,7 @@ export function searchJobs(userId: string, p: SearchParams) {
   });
 
   // facets computed on the filtered set (before pagination)
-  const facetRows = all<any>(`SELECT source, remote, seniority, career_category FROM job_postings WHERE ${baseWhere}`, ...args);
+  const facetRows = await all<any>(`SELECT source, remote, seniority, career_category FROM job_postings WHERE ${baseWhere}`, ...args);
   const facets = { source: {} as Record<string, number>, remote: {} as Record<string, number>, seniority: {} as Record<string, number>, category: {} as Record<string, number> };
   for (const r of facetRows) {
     facets.source[r.source] = (facets.source[r.source] ?? 0) + 1;
@@ -142,10 +142,10 @@ export function searchJobs(userId: string, p: SearchParams) {
   };
 }
 
-export function getJob(userId: string, id: string) {
-  const r = get("SELECT * FROM job_postings WHERE id = ? AND user_id = ?", id, userId);
+export async function getJob(userId: string, id: string) {
+  const r = await get("SELECT * FROM job_postings WHERE id = ? AND user_id = ?", id, userId);
   if (!r) throw notFound("Posting");
-  const signals = profileSignals(userId);
+  const signals = await profileSignals(userId);
   const fresh = scorePosting(signals, {
     title: r.title,
     description: r.description,
@@ -157,15 +157,15 @@ export function getJob(userId: string, id: string) {
     salaryMax: r.salary_max,
     postedAt: r.posted_at,
   });
-  const vote = get("SELECT vote FROM job_votes WHERE user_id = ? AND posting_id = ?", userId, id);
+  const vote = await get("SELECT vote FROM job_votes WHERE user_id = ? AND posting_id = ?", userId, id);
   return { ...r, explain: fresh.explain, score: fresh.score, vote: vote?.vote ?? null, keywords: parseJson(r.jd_keywords, []) };
 }
 
-export function voteJob(userId: string, id: string, vote: "up" | "down" | "ignore") {
-  const job = get("SELECT id FROM job_postings WHERE id = ? AND user_id = ?", id, userId);
+export async function voteJob(userId: string, id: string, vote: "up" | "down" | "ignore") {
+  const job = await get("SELECT id FROM job_postings WHERE id = ? AND user_id = ?", id, userId);
   if (!job) throw notFound("Posting");
   if (vote === "up" || vote === "down") {
-    run(
+    await run(
       `INSERT INTO job_votes (id, user_id, posting_id, vote, created_at) VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(user_id, posting_id) DO UPDATE SET vote = excluded.vote, created_at = excluded.created_at`,
       newId(),
@@ -175,8 +175,8 @@ export function voteJob(userId: string, id: string, vote: "up" | "down" | "ignor
       nowIso()
     );
   } else {
-    run("DELETE FROM job_votes WHERE user_id = ? AND posting_id = ?", userId, id);
-    run(
+    await run("DELETE FROM job_votes WHERE user_id = ? AND posting_id = ?", userId, id);
+    await run(
       `INSERT INTO job_votes (id, user_id, posting_id, vote, created_at) VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(user_id, posting_id) DO UPDATE SET vote = excluded.vote`,
       newId(),
@@ -189,16 +189,16 @@ export function voteJob(userId: string, id: string, vote: "up" | "down" | "ignor
   return { ok: true, vote };
 }
 
-export function listSavedSearches(userId: string) {
+export async function listSavedSearches(userId: string) {
   return all("SELECT * FROM saved_searches WHERE user_id = ? ORDER BY created_at DESC", userId);
 }
-export function saveSearch(userId: string, name: string, params: any) {
+export async function saveSearch(userId: string, name: string, params: any) {
   const id = newId();
-  run("INSERT INTO saved_searches (id, user_id, name, params, created_at) VALUES (?, ?, ?, ?, ?)", id, userId, name, JSON.stringify(params), nowIso());
+  await run("INSERT INTO saved_searches (id, user_id, name, params, created_at) VALUES (?, ?, ?, ?, ?)", id, userId, name, JSON.stringify(params), nowIso());
   return get("SELECT * FROM saved_searches WHERE id = ?", id);
 }
-export function deleteSavedSearch(userId: string, id: string) {
-  const n = run("DELETE FROM saved_searches WHERE id = ? AND user_id = ?", id, userId);
+export async function deleteSavedSearch(userId: string, id: string) {
+  const n = await run("DELETE FROM saved_searches WHERE id = ? AND user_id = ?", id, userId);
   if (!n) throw notFound("Saved search");
   return { deleted: true };
 }

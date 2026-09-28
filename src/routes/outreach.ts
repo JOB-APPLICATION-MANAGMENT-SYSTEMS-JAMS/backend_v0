@@ -10,10 +10,10 @@ import type { Classification } from "../services/classify.service";
 export const outreachRouter = Router();
 outreachRouter.use(requireAuth);
 
-outreachRouter.get("/", (req: AuthedRequest, res, next) => {
+outreachRouter.get("/", async (req: AuthedRequest, res, next) => {
   try {
     const q = req.query as any;
-    ok(res, "Outreach retrieved", { items: out.listOutreach(req.userId!, { state: q.state, app_id: q.app_id }) });
+    ok(res, "Outreach retrieved", { items: await out.listOutreach(req.userId!, { state: q.state, app_id: q.app_id }) });
   } catch (e) {
     next(e);
   }
@@ -28,54 +28,54 @@ const createSchema = z.object({
   step_no: z.number().optional(),
 });
 
-outreachRouter.post("/", (req: AuthedRequest, res, next) => {
+outreachRouter.post("/", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Draft created", out.createOutreach(req.userId!, createSchema.parse(req.body) as any), 201);
+    ok(res, "Draft created", await out.createOutreach(req.userId!, createSchema.parse(req.body) as any), 201);
   } catch (e) {
     next(e);
   }
 });
 
-outreachRouter.get("/cadence", (req: AuthedRequest, res, next) => {
+outreachRouter.get("/cadence", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Cadence health", out.cadenceHealth(req.userId!));
+    ok(res, "Cadence health", await out.cadenceHealth(req.userId!));
   } catch (e) {
     next(e);
   }
 });
 
-outreachRouter.get("/:id", (req: AuthedRequest, res, next) => {
+outreachRouter.get("/:id", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Outreach retrieved", out.getOutreach(req.userId!, String(req.params.id)));
+    ok(res, "Outreach retrieved", await out.getOutreach(req.userId!, String(req.params.id)));
   } catch (e) {
     next(e);
   }
 });
 
-outreachRouter.put("/:id", (req: AuthedRequest, res, next) => {
+outreachRouter.put("/:id", async (req: AuthedRequest, res, next) => {
   try {
     const patch = z.object({ subject: z.string().optional(), body: z.string().optional(), scheduled_at: z.string().optional(), state: z.string().optional() }).parse(req.body);
-    ok(res, "Outreach updated", out.updateOutreach(req.userId!, String(req.params.id), patch));
+    ok(res, "Outreach updated", await out.updateOutreach(req.userId!, String(req.params.id), patch));
   } catch (e) {
     next(e);
   }
 });
 
-outreachRouter.post("/:id/send", (req: AuthedRequest, res, next) => {
+outreachRouter.post("/:id/send", async (req: AuthedRequest, res, next) => {
   try {
     const body = z.object({ via: z.enum(["gmail_open", "smtp"]).default("gmail_open"), confirm: z.boolean().default(false) }).parse(req.body ?? {});
-    ok(res, "Send prepared — confirm in your mail client", out.sendOutreach(req.userId!, String(req.params.id), body));
+    ok(res, "Send prepared — confirm in your mail client", await out.sendOutreach(req.userId!, String(req.params.id), body));
   } catch (e) {
     next(e);
   }
 });
 
-outreachRouter.put("/:id/sequence", (req: AuthedRequest, res, next) => {
+outreachRouter.put("/:id/sequence", async (req: AuthedRequest, res, next) => {
   try {
     const body = z.object({ steps: z.array(z.object({ delay_days: z.number(), subject: z.string(), body: z.string(), enabled: z.boolean().optional() })) }).parse(req.body);
-    const msg = out.getOutreach(req.userId!, String(req.params.id));
+    const msg = await out.getOutreach(req.userId!, String(req.params.id));
     if (!msg.app_id) return ok(res, "Sequence requires an application", { steps: [] });
-    ok(res, "Sequence updated", out.setSequence(req.userId!, msg.app_id, body.steps));
+    ok(res, "Sequence updated", await out.setSequence(req.userId!, msg.app_id, body.steps));
   } catch (e) {
     next(e);
   }
@@ -85,20 +85,19 @@ outreachRouter.put("/:id/sequence", (req: AuthedRequest, res, next) => {
 export const mailboxRouter = Router();
 mailboxRouter.use(requireAuth);
 
-mailboxRouter.get("/", (req: AuthedRequest, res, next) => {
+mailboxRouter.get("/", async (req: AuthedRequest, res, next) => {
   try {
-    const rows = get(`SELECT id, kind, address, open_tracking, last_synced_at FROM mailboxes WHERE user_id = ?`, req.userId!) as any;
+    const rows = (await get(`SELECT id, kind, address, open_tracking, last_synced_at FROM mailboxes WHERE user_id = ?`, req.userId!)) as any;
     ok(res, "Mailboxes", { items: rows ? [rows] : [], connected: !!rows });
   } catch (e) {
     next(e);
   }
-});
-
-mailboxRouter.post("/", (req: AuthedRequest, res, next) => {
+});mailboxRouter.post("/", async (req: AuthedRequest, res, next) => {
   try {
     const body = z.object({ kind: z.enum(["imap", "gmail"]).default("imap"), address: z.string().email(), config: z.record(z.any()).default({}), open_tracking: z.boolean().default(false) }).parse(req.body);
+
     const id = newId();
-    run(
+    await run(
       `INSERT INTO mailboxes (id, user_id, kind, address, config, open_tracking, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       id,
       req.userId!,
@@ -130,7 +129,7 @@ inboxRouter.use(requireAuth);
  * Ingest an inbound message — the free stand-in for IMAP polling: fixtures, MailPit-captured
  * mail, or a future worker all funnel through the same classification pipeline (§36.2).
  */
-inboxRouter.post("/messages", (req: AuthedRequest, res, next) => {
+inboxRouter.post("/messages", async (req: AuthedRequest, res, next) => {
   try {
     const body = z
       .object({
@@ -144,32 +143,32 @@ inboxRouter.post("/messages", (req: AuthedRequest, res, next) => {
         thread_subject: z.string().optional(),
       })
       .parse(req.body);
-    ok(res, "Message ingested", out.ingestInbound(req.userId!, body as any), 201);
+    ok(res, "Message ingested", await out.ingestInbound(req.userId!, body as any), 201);
   } catch (e) {
     next(e);
   }
 });
 
-inboxRouter.get("/threads", (req: AuthedRequest, res, next) => {
+inboxRouter.get("/threads", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Threads", { items: out.listThreads(req.userId!) });
+    ok(res, "Threads", { items: await out.listThreads(req.userId!) });
   } catch (e) {
     next(e);
   }
 });
 
-inboxRouter.get("/threads/:id", (req: AuthedRequest, res, next) => {
+inboxRouter.get("/threads/:id", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Thread", out.getThread(req.userId!, String(req.params.id)));
+    ok(res, "Thread", await out.getThread(req.userId!, String(req.params.id)));
   } catch (e) {
     next(e);
   }
 });
 
-inboxRouter.post("/threads/:id/classify", (req: AuthedRequest, res, next) => {
+inboxRouter.post("/threads/:id/classify", async (req: AuthedRequest, res, next) => {
   try {
     const body = z.object({ message_id: z.string(), classification: z.enum(["interested", "interview_invite", "rejected", "auto_reply", "ooo", "bounce", "neutral"]) }).parse(req.body);
-    ok(res, "Classification corrected", out.classifyMessage(req.userId!, body.message_id, body.classification as Classification));
+    ok(res, "Classification corrected", await out.classifyMessage(req.userId!, body.message_id, body.classification as Classification));
   } catch (e) {
     next(e);
   }
@@ -179,19 +178,25 @@ inboxRouter.post("/threads/:id/classify", (req: AuthedRequest, res, next) => {
 export const trackingRouter = Router();
 
 /** 1×1 open pixel — unguessable token, no PII in URL (§36.4), opt-in per mailbox. */
-trackingRouter.get("/pixel/:token.gif", (req, res) => {
+trackingRouter.get("/pixel/:token.gif", async (req, res) => {
   const t = String(req.params.token);
-  run("UPDATE outreach_messages SET opens = opens + 1 WHERE tracking_token = ?", t);
+  try {
+    await run("UPDATE outreach_messages SET opens = opens + 1 WHERE tracking_token = ?", t);
+  } catch {}
   const gif = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
   res.setHeader("Content-Type", "image/gif");
   res.setHeader("Cache-Control", "no-store");
   res.send(gif);
 });
 
-trackingRouter.get("/click/:token", (req, res) => {
+trackingRouter.get("/click/:token", async (req, res) => {
   const t = String(req.params.token);
-  run("UPDATE outreach_messages SET clicks = clicks + 1 WHERE tracking_token = ?", t);
-  const msg = get("SELECT app_id FROM outreach_messages WHERE tracking_token = ?", t) as any;
-  const dest = msg?.app_id ? (get("SELECT url FROM applications WHERE id = ?", msg.app_id) as any)?.url : null;
-  res.redirect(302, dest ?? "/");
+  try {
+    await run("UPDATE outreach_messages SET clicks = clicks + 1 WHERE tracking_token = ?", t);
+    const msg = (await get("SELECT app_id FROM outreach_messages WHERE tracking_token = ?", t)) as any;
+    const dest = msg?.app_id ? ((await get("SELECT url FROM applications WHERE id = ?", msg.app_id)) as any)?.url : null;
+    res.redirect(302, dest ?? "/");
+  } catch {
+    res.redirect(302, "/");
+  }
 });

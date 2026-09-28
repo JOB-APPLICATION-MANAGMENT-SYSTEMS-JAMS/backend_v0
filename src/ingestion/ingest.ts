@@ -18,8 +18,8 @@ export interface IngestResult {
 /** Pull from every enabled source, normalise, dedupe across sources, score for this profile (§34.1). */
 export async function ingestAll(userId: string, opts: { sources?: string[] } = {}): Promise<IngestResult> {
   const t0 = Date.now();
-  const signals = profileSignals(userId);
-  const enabled = opts.sources?.length ? opts.sources : all<{ name: string; enabled: number }>("SELECT name, enabled FROM sources WHERE enabled = 1").map((s) => s.name);
+  const signals = await profileSignals(userId);
+  const enabled = opts.sources?.length ? opts.sources : (await all<{ name: string; enabled: number }>("SELECT name, enabled FROM sources WHERE enabled = 1")).map((s) => s.name);
   const sources_ok: string[] = [];
   const sources_failed: { source: string; error: string }[] = [];
   let inserted = 0;
@@ -27,12 +27,12 @@ export async function ingestAll(userId: string, opts: { sources?: string[] } = {
   let refreshed = 0;
 
   const existingKeys = new Map(
-    all<{ id: string; dedupe_key: string; first_seen_at: string; source: string; external_id: string }>(
+    (await all<{ id: string; dedupe_key: string; first_seen_at: string; source: string; external_id: string }>(
       "SELECT id, dedupe_key, first_seen_at, source, external_id FROM job_postings WHERE user_id = ?",
       userId
-    ).map((r) => [`${r.source}:${r.external_id}`, r])
+    )).map((r) => [`${r.source}:${r.external_id}`, r])
   );
-  const keySeen = new Set(all<{ dedupe_key: string }>("SELECT dedupe_key FROM job_postings WHERE user_id = ? AND created_at >= ?", userId, new Date(Date.now() - 30 * 86_400_000).toISOString()).map((r) => r.dedupe_key));
+  const keySeen = new Set((await all<{ dedupe_key: string }>("SELECT dedupe_key FROM job_postings WHERE user_id = ? AND created_at >= ?", userId, new Date(Date.now() - 30 * 86_400_000).toISOString())).map((r) => r.dedupe_key));
 
   for (const src of SOURCES) {
     if (!enabled.includes(src.name)) continue;
@@ -63,7 +63,7 @@ export async function ingestAll(userId: string, opts: { sources?: string[] } = {
           postedAt: n.posted_at,
         });
         const keywords = n.keywords?.length ? n.keywords : extractKeywords(`${n.title} ${n.description ?? ""}`);
-        run(
+        await run(
           `INSERT INTO job_postings (id, user_id, company_name, source, external_id, title, location, remote, salary_min, salary_max, currency,
              seniority, employment_type, career_category, description, jd_keywords, url, posted_at, first_seen_at, last_seen_at, score, explain, dedupe_key, status, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
@@ -97,7 +97,7 @@ export async function ingestAll(userId: string, opts: { sources?: string[] } = {
         found++;
       }
       sources_ok.push(src.name);
-      run(
+      await run(
         `INSERT INTO sources (name, enabled, last_run_at, items_found, error_streak, last_error) VALUES (?, 1, ?, ?, 0, NULL)
          ON CONFLICT(name) DO UPDATE SET last_run_at = excluded.last_run_at, items_found = excluded.items_found, error_streak = 0, last_error = NULL`,
         src.name,
@@ -106,7 +106,7 @@ export async function ingestAll(userId: string, opts: { sources?: string[] } = {
       );
     } catch (e: any) {
       sources_failed.push({ source: src.name, error: String(e.message ?? e) });
-      run(
+      await run(
         `INSERT INTO sources (name, enabled, last_run_at, items_found, error_streak, last_error) VALUES (?, 1, NULL, 0, 1, ?)
          ON CONFLICT(name) DO UPDATE SET error_streak = sources.error_streak + 1, last_error = excluded.last_error`,
         src.name,
@@ -116,14 +116,14 @@ export async function ingestAll(userId: string, opts: { sources?: string[] } = {
   }
 
   // expire postings not seen in 14d (§34.1)
-  run("UPDATE job_postings SET status = 'expired' WHERE user_id = ? AND last_seen_at < ? AND status = 'open'", userId, new Date(Date.now() - 14 * 86_400_000).toISOString());
+  await run("UPDATE job_postings SET status = 'expired' WHERE user_id = ? AND last_seen_at < ? AND status = 'open'", userId, new Date(Date.now() - 14 * 86_400_000).toISOString());
 
   return { sources_ok, sources_failed, inserted, deduped, refreshed, took_ms: Date.now() - t0 };
 }
 
 /** Source health (debug page visibility, §34.1). */
-export function sourceHealth() {
-  const rows = all("SELECT * FROM sources ORDER BY name");
+export async function sourceHealth() {
+  const rows = await all<any>("SELECT * FROM sources ORDER BY name");
   const known = SOURCES.map((s) => s.name);
   for (const name of known) if (!rows.find((r: any) => r.name === name)) rows.push({ name, enabled: 1, last_run_at: null, items_found: 0, error_streak: 0, last_error: null });
   return rows;

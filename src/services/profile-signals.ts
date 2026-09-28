@@ -2,16 +2,16 @@ import { all, get, parseJson } from "../core/db";
 import type { ProfileSignals } from "./scoring.service";
 
 /** Project the stored profile into the scoring engine's input shape (§34.4). */
-export function profileSignals(userId: string): ProfileSignals {
-  const p = get("SELECT * FROM profiles WHERE user_id = ?", userId);
-  const user = get("SELECT * FROM users WHERE id = ?", userId);
+export async function profileSignals(userId: string): Promise<ProfileSignals> {
+  const p = await get("SELECT * FROM profiles WHERE user_id = ?", userId);
+  const user = await get("SELECT * FROM users WHERE id = ?", userId);
   const identity: any = p ? parseJson(p.identity, {}) : {};
   const prefs: any = p ? parseJson(p.prefs, {}) : {};
   const skills = p
-    ? all<{ name: string; is_top5: number }>("SELECT name, is_top5 FROM profile_skills WHERE profile_id = ? ORDER BY is_top5 DESC", p.id)
+    ? await all<{ name: string; is_top5: number }>("SELECT name, is_top5 FROM profile_skills WHERE profile_id = ? ORDER BY is_top5 DESC", p.id)
     : [];
   const tiers: Record<string, "dream" | "reach" | "safety"> = {};
-  for (const c of all<any>("SELECT lower(name) AS n, tier FROM companies WHERE user_id = ?", userId)) tiers[c.n] = c.tier;
+  for (const c of await all<any>("SELECT lower(name) AS n, tier FROM companies WHERE user_id = ?", userId)) tiers[c.n] = c.tier;
   return {
     skills: skills.map((s) => s.name),
     topSkills: skills.filter((s) => s.is_top5).map((s) => s.name),

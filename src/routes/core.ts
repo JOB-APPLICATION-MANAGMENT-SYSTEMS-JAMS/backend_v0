@@ -11,9 +11,9 @@ import { rateLimit } from "../core/middleware";
 export const profileRouter = Router();
 profileRouter.use(requireAuth);
 
-profileRouter.get("/", (req: AuthedRequest, res, next) => {
+profileRouter.get("/", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Profile retrieved", profile.getProfile(req.userId!));
+    ok(res, "Profile retrieved", await profile.getProfile(req.userId!));
   } catch (e) {
     next(e);
   }
@@ -41,18 +41,18 @@ const profileSchema = z.object({
     .optional(),
 });
 
-profileRouter.put("/", (req: AuthedRequest, res, next) => {
+profileRouter.put("/", async (req: AuthedRequest, res, next) => {
   try {
     const body = profileSchema.parse(req.body);
-    ok(res, "Profile saved", profile.updateProfile(req.userId!, body));
+    ok(res, "Profile saved", await profile.updateProfile(req.userId!, body));
   } catch (e) {
     next(e);
   }
 });
 
-profileRouter.get("/completeness", (req: AuthedRequest, res, next) => {
+profileRouter.get("/completeness", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Completeness", profile.completeness(req.userId!));
+    ok(res, "Completeness", await profile.completeness(req.userId!));
   } catch (e) {
     next(e);
   }
@@ -62,10 +62,10 @@ profileRouter.get("/completeness", (req: AuthedRequest, res, next) => {
 export const cvRouter = Router();
 cvRouter.use(requireAuth);
 
-cvRouter.get("/", (req: AuthedRequest, res, next) => {
+cvRouter.get("/", async (req: AuthedRequest, res, next) => {
   try {
     const q = req.query as any;
-    ok(res, "CVs retrieved", { items: cv.listCVs(req.userId!, { archetype: q.archetype, category: q.category }) });
+    ok(res, "CVs retrieved", { items: await cv.listCVs(req.userId!, { archetype: q.archetype, category: q.category }) });
   } catch (e) {
     next(e);
   }
@@ -80,68 +80,68 @@ const cvSchema = z.object({
   template_id: z.string().nullish(),
 });
 
-cvRouter.post("/", (req: AuthedRequest, res, next) => {
+cvRouter.post("/", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "CV created", cv.createCV(req.userId!, cvSchema.parse(req.body) as any), 201);
+    ok(res, "CV created", await cv.createCV(req.userId!, cvSchema.parse(req.body) as any), 201);
   } catch (e) {
     next(e);
   }
 });
 
-cvRouter.get("/:id", (req: AuthedRequest, res, next) => {
+cvRouter.get("/:id", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "CV retrieved", cv.getCV(req.userId!, String(req.params.id)));
+    ok(res, "CV retrieved", await cv.getCV(req.userId!, String(req.params.id)));
   } catch (e) {
     next(e);
   }
 });
 
-cvRouter.put("/:id", (req: AuthedRequest, res, next) => {
+cvRouter.put("/:id", async (req: AuthedRequest, res, next) => {
   try {
     const patch = cvSchema.partial().extend({ blocks: z.array(z.record(z.any())).optional() }).parse(req.body);
-    ok(res, "CV updated", cv.updateCV(req.userId!, String(req.params.id), patch as any));
+    ok(res, "CV updated", await cv.updateCV(req.userId!, String(req.params.id), patch as any));
   } catch (e) {
     next(e);
   }
 });
 
-cvRouter.delete("/:id", (req: AuthedRequest, res, next) => {
+cvRouter.delete("/:id", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "CV deleted", cv.deleteCV(req.userId!, String(req.params.id)));
+    ok(res, "CV deleted", await cv.deleteCV(req.userId!, String(req.params.id)));
   } catch (e) {
     next(e);
   }
 });
 
-cvRouter.post("/:id/duplicate", (req: AuthedRequest, res, next) => {
+cvRouter.post("/:id/duplicate", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "CV duplicated", cv.duplicateCV(req.userId!, String(req.params.id), req.body?.name), 201);
+    ok(res, "CV duplicated", await cv.duplicateCV(req.userId!, String(req.params.id), req.body?.name), 201);
   } catch (e) {
     next(e);
   }
 });
 
-cvRouter.get("/:id/match", (req: AuthedRequest, res, next) => {
+cvRouter.get("/:id/match", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Match report", cv.matchCV(req.userId!, String(req.params.id), req.query.posting_id as string | undefined));
+    ok(res, "Match report", await cv.matchCV(req.userId!, String(req.params.id), req.query.posting_id as string | undefined));
   } catch (e) {
     next(e);
   }
 });
 
-cvRouter.get("/:id/suggest", (req: AuthedRequest, res, next) => {
+cvRouter.get("/:id/suggest", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "CV suggestions", cv.suggestCVs(req.userId!, req.query.posting_id as string | undefined));
+    ok(res, "CV suggestions", await cv.suggestCVs(req.userId!, req.query.posting_id as string | undefined));
   } catch (e) {
     next(e);
   }
 });
 
 /** Print-ready A4 HTML — the browser's print pipeline (Chromium) renders the PDF (§24.1). */
-cvRouter.get("/:id/html", (req: AuthedRequest, res, next) => {
+cvRouter.get("/:id/html", async (req: AuthedRequest, res, next) => {
   try {
-    const c = cv.getCV(req.userId!, String(req.params.id));
-    const p = profile.getProfile(req.userId!);
+    const c = await cv.getCV(req.userId!, String(req.params.id));
+    const p = await profile.getProfile(req.userId!);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(renderCvHtml(c, p));
   } catch (e) {
@@ -281,34 +281,34 @@ ${body}
 export const templateRouter = Router();
 templateRouter.use(requireAuth);
 
-templateRouter.get("/", (req: AuthedRequest, res, next) => {
+templateRouter.get("/", async (req: AuthedRequest, res, next) => {
   try {
     const q = req.query as any;
-    ok(res, "Templates retrieved", { items: cv.listTemplates(req.userId!, { kind: q.kind, archetype: q.archetype }) });
+    ok(res, "Templates retrieved", { items: await cv.listTemplates(req.userId!, { kind: q.kind, archetype: q.archetype }) });
   } catch (e) {
     next(e);
   }
 });
-templateRouter.post("/", (req: AuthedRequest, res, next) => {
+templateRouter.post("/", async (req: AuthedRequest, res, next) => {
   try {
     const body = z
       .object({ kind: z.enum(["cv", "email"]), archetype: z.enum(["opening", "pitch"]), name: z.string().min(1), subject: z.string().nullish(), body: z.string(), variables: z.array(z.string()).optional() })
       .parse(req.body);
-    ok(res, "Template created", cv.createTemplate(req.userId!, body as any), 201);
+    ok(res, "Template created", await cv.createTemplate(req.userId!, body as any), 201);
   } catch (e) {
     next(e);
   }
 });
-templateRouter.put("/:id", (req: AuthedRequest, res, next) => {
+templateRouter.put("/:id", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Template updated", cv.updateTemplate(req.userId!, String(req.params.id), req.body));
+    ok(res, "Template updated", await cv.updateTemplate(req.userId!, String(req.params.id), req.body));
   } catch (e) {
     next(e);
   }
 });
-templateRouter.delete("/:id", (req: AuthedRequest, res, next) => {
+templateRouter.delete("/:id", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Template deleted", cv.deleteTemplate(req.userId!, String(req.params.id)));
+    ok(res, "Template deleted", await cv.deleteTemplate(req.userId!, String(req.params.id)));
   } catch (e) {
     next(e);
   }
@@ -365,15 +365,15 @@ captureRouter.post("/", captureLimiter, async (req: AuthedRequest, res, next) =>
 export const autofillRouter = Router();
 autofillRouter.use(requireAuth);
 
-autofillRouter.get("/schema", (req: AuthedRequest, res, next) => {
+autofillRouter.get("/schema", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Autofill schema", autofill.autofillSchema(req.userId!));
+    ok(res, "Autofill schema", await autofill.autofillSchema(req.userId!));
   } catch (e) {
     next(e);
   }
 });
 
-autofillRouter.post("/match", (req: AuthedRequest, res, next) => {
+autofillRouter.post("/match", async (req: AuthedRequest, res, next) => {
   try {
     const body = z
       .object({
@@ -381,7 +381,7 @@ autofillRouter.post("/match", (req: AuthedRequest, res, next) => {
         fields: z.array(z.object({ name: z.string().optional(), id: z.string().optional(), label: z.string().optional(), autocomplete: z.string().optional(), placeholder: z.string().optional(), type: z.string().optional(), section: z.string().optional() })),
       })
       .parse(req.body);
-    ok(res, "Field mappings", autofill.matchFields(req.userId!, body.host, body.fields));
+    ok(res, "Field mappings", await autofill.matchFields(req.userId!, body.host, body.fields));
   } catch (e) {
     next(e);
   }
@@ -400,17 +400,17 @@ autofillRouter.post("/confirm", (req: AuthedRequest, res, next) => {
 export const companyRouter = Router();
 companyRouter.use(requireAuth);
 
-companyRouter.get("/", (req: AuthedRequest, res, next) => {
+companyRouter.get("/", async (req: AuthedRequest, res, next) => {
   try {
     const q = req.query as any;
-    ok(res, "Companies retrieved", { items: captureSvc.listCompanies(req.userId!, { tier: q.tier, q: q.q }) });
+    ok(res, "Companies retrieved", { items: await captureSvc.listCompanies(req.userId!, { tier: q.tier, q: q.q }) });
   } catch (e) {
     next(e);
   }
 });
-companyRouter.get("/:id", (req: AuthedRequest, res, next) => {
+companyRouter.get("/:id", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Company retrieved", captureSvc.getCompany(req.userId!, String(req.params.id)));
+    ok(res, "Company retrieved", await captureSvc.getCompany(req.userId!, String(req.params.id)));
   } catch (e) {
     next(e);
   }

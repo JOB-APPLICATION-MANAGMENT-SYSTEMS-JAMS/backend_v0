@@ -29,7 +29,7 @@ authRouter.post("/register", limiter, async (req, res, next) => {
 authRouter.post("/login", limiter, async (req, res, next) => {
   try {
     const body = z.object({ email: z.string().email(), password: z.string() }).parse(req.body);
-    const user = get("SELECT * FROM users WHERE email = ?", body.email.toLowerCase());
+    const user = await get("SELECT * FROM users WHERE email = ?", body.email.toLowerCase());
     if (user && !user.verified) {
       // rich 403 that drives UI state (§4.3 pattern, with a machine code)
       await auth.login(body.email, body.password); // validates password first
@@ -55,38 +55,38 @@ authRouter.post("/refresh", limiter, (req, res, next) => {
   }
 });
 
-authRouter.post("/verify-email", (req, res, next) => {
+authRouter.post("/verify-email", async (req, res, next) => {
   try {
     const token = z.object({ token: z.string() }).parse(req.body).token;
-    ok(res, "Email verified — you can sign in now", auth.verifyEmail(token));
+    ok(res, "Email verified — you can sign in now", await auth.verifyEmail(token));
   } catch (e) {
     next(e);
   }
 });
 
-authRouter.post("/resend-verification", limiter, (req, res, next) => {
+authRouter.post("/resend-verification", limiter, async (req, res, next) => {
   try {
     const body = z.object({ email: z.string().email() }).parse(req.body);
-    ok(res, "If that account exists, a new link was sent", auth.resendVerification(body.email));
+    ok(res, "If that account exists, a new link was sent", await auth.resendVerification(body.email));
   } catch (e) {
     next(e);
   }
 });
 
 /** Local-mode convenience: read the latest verification token (dev console equivalent of MailPit). */
-authRouter.get("/dev-token", (req, res, next) => {
+authRouter.get("/dev-token", async (req, res, next) => {
   try {
     const email = z.object({ email: z.string().email() }).parse(req.query).email;
-    const user = get("SELECT email, verification_token, verified FROM users WHERE email = ?", email.toLowerCase());
+    const user = await get("SELECT email, verification_token, verified FROM users WHERE email = ?", email.toLowerCase());
     ok(res, "dev", { email, verified: !!user?.verified, verification_token: user?.verification_token ?? null });
   } catch (e) {
     next(e);
   }
 });
 
-authRouter.get("/me", requireAuth, (req: AuthedRequest, res, next) => {
+authRouter.get("/me", requireAuth, async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Current user", auth.me(req.userId!));
+    ok(res, "Current user", await auth.me(req.userId!));
   } catch (e) {
     next(e);
   }

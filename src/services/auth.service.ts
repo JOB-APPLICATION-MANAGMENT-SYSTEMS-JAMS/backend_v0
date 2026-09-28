@@ -29,12 +29,12 @@ export function issueTokens(userId: string) {
 }
 
 export async function register(email: string, password: string, timezone?: string) {
-  const existing = get("SELECT id FROM users WHERE email = ?", email.toLowerCase());
+  const existing = await get("SELECT id FROM users WHERE email = ?", email.toLowerCase());
   if (existing) throw conflict("An account with this email already exists");
   const id = newId();
   const token = randomBytes(24).toString("hex");
   const now = nowIso();
-  run(
+  await run(
     `INSERT INTO users (id, email, password_hash, provider, verified, verification_token, timezone, created_at, updated_at)
      VALUES (?, ?, ?, 'email', 0, ?, ?, ?, ?)`,
     id,
@@ -47,13 +47,13 @@ export async function register(email: string, password: string, timezone?: strin
   );
   // local mode: no SMTP — the token is surfaced to the dev console + returned in dev (§31.1 MailPit equivalent)
   console.log(`[auth] verification link for ${email}: /auth/verify-email?token=${token}`);
-  run(`INSERT INTO profiles (id, user_id, identity, prefs, aliases, version, updated_at) VALUES (?, ?, '{}', '{}', '{}', 1, ?)`, newId(), id, now);
-  const user = get("SELECT * FROM users WHERE id = ?", id)!;
+  await run(`INSERT INTO profiles (id, user_id, identity, prefs, aliases, version, updated_at) VALUES (?, ?, '{}', '{}', '{}', 1, ?)`, newId(), id, now);
+  const user = (await get("SELECT * FROM users WHERE id = ?", id))!;
   return { user: publicUser(user), verification_token: token, ...issueTokens(id) };
 }
 
 export async function login(email: string, password: string) {
-  const user = get("SELECT * FROM users WHERE email = ?", email.toLowerCase());
+  const user = await get("SELECT * FROM users WHERE email = ?", email.toLowerCase());
   if (!user || !user.password_hash || !(await verifyPassword(password, user.password_hash))) throw invalidCredentials();
   if (!user.verified) {
     // rich 403 that drives UI state (§4.3) — machine code + fields for the login form branch
@@ -67,27 +67,27 @@ export async function login(email: string, password: string) {
   return { user: publicUser(user), ...issueTokens(user.id) };
 }
 
-export function verifyEmail(token: string) {
-  const user = get("SELECT * FROM users WHERE verification_token = ?", token);
+export async function verifyEmail(token: string) {
+  const user = await get("SELECT * FROM users WHERE verification_token = ?", token);
   if (!user) throw notFound("Verification token");
-  run("UPDATE users SET verified = 1, verification_token = NULL, updated_at = ? WHERE id = ?", nowIso(), user.id);
-  return publicUser(get("SELECT * FROM users WHERE id = ?", user.id)!);
+  await run("UPDATE users SET verified = 1, verification_token = NULL, updated_at = ? WHERE id = ?", nowIso(), user.id);
+  return publicUser((await get("SELECT * FROM users WHERE id = ?", user.id))!);
 }
 
-export function resendVerification(email: string) {
-  const user = get("SELECT * FROM users WHERE email = ?", email.toLowerCase());
+export async function resendVerification(email: string) {
+  const user = await get("SELECT * FROM users WHERE email = ?", email.toLowerCase());
   if (!user) return { sent: true }; // do not leak existence
   const token = randomBytes(24).toString("hex");
-  run("UPDATE users SET verification_token = ?, updated_at = ? WHERE id = ?", token, nowIso(), user.id);
+  await run("UPDATE users SET verification_token = ?, updated_at = ? WHERE id = ?", token, nowIso(), user.id);
   console.log(`[auth] verification link for ${email}: /auth/verify-email?token=${token}`);
   return { sent: true, verification_token: token };
 }
 
-export function me(userId: string) {
-  const user = get("SELECT * FROM users WHERE id = ?", userId);
+export async function me(userId: string) {
+  const user = await get("SELECT * FROM users WHERE id = ?", userId);
   if (!user) throw notFound("User");
-  const profile = get("SELECT * FROM profiles WHERE user_id = ?", userId);
-  const counts = get(
+  const profile = await get("SELECT * FROM profiles WHERE user_id = ?", userId);
+  const counts = await get(
     `SELECT (SELECT count(*) FROM applications WHERE user_id = ?) AS applications,
             (SELECT count(*) FROM cvs WHERE user_id = ?) AS cvs,
             (SELECT count(*) FROM job_postings WHERE user_id = ?) AS postings`,
@@ -103,6 +103,6 @@ export function refresh(refreshToken: string) {
   return { refresh_token: refreshToken };
 }
 
-export function listUsersForDebug() {
-  return all("SELECT id, email, verified, created_at FROM users ORDER BY created_at DESC LIMIT 20").map(publicUser);
+export async function listUsersForDebug() {
+  return (await all("SELECT id, email, verified, created_at FROM users ORDER BY created_at DESC LIMIT 20")).map(publicUser);
 }

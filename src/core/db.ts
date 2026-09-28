@@ -1,46 +1,154 @@
-import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
+import type { DatabaseSync } from "node:sqlite";
+import pg from "pg";
 import { config } from "./config";
-import { SCHEMA } from "../db/schema";
+import { SCHEMA, SCHEMA_PG } from "../db/schema";
 
 export type Row = Record<string, any>;
 
-/** Single source of truth: SQLite file — same SQL shapes as the Postgres blueprint (§32). */
-const dir = path.dirname(config.dbPath);
-fs.mkdirSync(dir, { recursive: true });
+/**
+ * Dual-driver data layer.
+ *
+ * - `sqlite` (default): local dev & tests — node:sqlite file, zero setup, same as before.
+ * - `postgres`: set `DATABASE_URL` (Neon/Supabase) — used on serverless hosts like
+ *   Vercel where the filesystem is ephemeral and a file DB would vanish.
+ *
+ * Every helper is async so one codebase serves both: on the sqlite path the promise
+ * resolves immediately. Queries use `?` placeholders and are rewritten to `$1..$n`
+ * for Postgres inside the driver.
+ */
+const pgUrl = process.env.DATABASE_URL?.trim();
+export const driver: "postgres" | "sqlite" = pgUrl ? "postgres" : "sqlite";
 
-export const db = new DatabaseSync(config.dbPath);
-db.exec("PRAGMA journal_mode = WAL;");
-db.exec("PRAGMA foreign_keys = ON;");
-db.exec(SCHEMA);
+let pgPoolPromise: Promise<pg.Pool> | null = null;
+let sqlitePromise: Promise<DatabaseSync> | null = null;
+
+function getPool(): Promise<pg.Pool> {
+  if (!pgPoolPromise) {
+    pgPoolPromise = (async () => {
+      const pool = new pg.Pool({
+        connectionString: pgUrl,
+        max: 3,
+        idleTimeoutMillis: 30_000,
+        connectionTimeoutMillis: 15_000,
+        // Neon terminates idle connections and requires TLS; sslmode=require in the URL
+        ...(pgUrl?.includes("sslmode=require") ? { ssl: { rejectUnauthorized: false } } : {}),
+      });
+      await pool.query(SCHEMA_PG); // idempotent CREATE IF NOT EXISTS — one round-trip per cold start
+      return pool;
+    })();
+    pgPoolPromise.catch(() => {
+      pgPoolPromise = null;
+    });
+  }
+  return pgPoolPromise;
+}
+
+async function getSqlite(): Promise<DatabaseSync> {
+  if (!sqlitePromise) {
+    sqlitePromise = (async () => {
+      // lazy: serverless hosts never touch node:sqlite when DATABASE_URL is set
+      const { DatabaseSync } = await import("node:sqlite");
+      const dir = path.dirname(config.dbPath);
+      fs.mkdirSync(dir, { recursive: true });
+      const db = new DatabaseSync(config.dbPath);
+      db.exec("PRAGMA journal_mode = WAL;");
+      db.exec("PRAGMA foreign_keys = ON;");
+      db.exec(SCHEMA);
+      return db;
+    })();
+    sqlitePromise.catch(() => {
+      sqlitePromise = null;
+    });
+  }
+  return sqlitePromise;
+}
+
+/** `?` placeholders → `$1..$n`, skipping question marks inside string literals. */
+function toPg(sql: string): string {
+  let out = "";
+  let n = 0;
+  let inStr = false;
+  for (let i = 0; i < sql.length; i++) {
+    const ch = sql[i];
+    if (ch === "'") inStr = !inStr;
+    if (ch === "?" && !inStr) {
+      out += `$${++n}`;
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
+/** Uniform param shapes for both drivers (schema booleans are INTEGER columns). */
+function norm(params: any[]): any[] {
+  return params.map((p) => (p === undefined ? null : typeof p === "boolean" ? (p ? 1 : 0) : p));
+}
 
 /** Positional-parameter SELECT returning every row. */
-export function all<T = Row>(sql: string, ...params: any[]): T[] {
-  return db.prepare(sql).all(...params) as T[];
+export async function all<T = Row>(sql: string, ...params: any[]): Promise<T[]> {
+  if (driver === "postgres") {
+    const pool = await getPool();
+    return (await pool.query(toPg(sql), norm(params))).rows as T[];
+  }
+  return (await getSqlite()).prepare(sql).all(...norm(params)) as T[];
 }
 
 /** Positional-parameter SELECT returning the first row or undefined. */
-export function get<T = Row>(sql: string, ...params: any[]): T | undefined {
-  return db.prepare(sql).get(...params) as T | undefined;
+export async function get<T = Row>(sql: string, ...params: any[]): Promise<T | undefined> {
+  if (driver === "postgres") {
+    const pool = await getPool();
+    return (await pool.query(toPg(sql), norm(params))).rows[0] as T | undefined;
+  }
+  return (await getSqlite()).prepare(sql).get(...norm(params)) as T | undefined;
 }
 
 /** INSERT/UPDATE/DELETE — returns changes count. */
-export function run(sql: string, ...params: any[]): number {
-  const res = db.prepare(sql).run(...params);
+export async function run(sql: string, ...params: any[]): Promise<number> {
+  if (driver === "postgres") {
+    const pool = await getPool();
+    return (await pool.query(toPg(sql), norm(params))).rowCount ?? 0;
+  }
+  const res = (await getSqlite()).prepare(sql).run(...norm(params));
   return Number(res.changes);
 }
 
 /** Execute many statements (DDL/seeds). */
-export function exec(sql: string): void {
-  db.exec(sql);
+export async function exec(sql: string): Promise<void> {
+  if (driver === "postgres") {
+    await (await getPool()).query(sql);
+    return;
+  }
+  (await getSqlite()).exec(sql);
 }
 
-/** Run fn inside a transaction (nested calls join the outer transaction). */
-export function tx<T>(fn: () => T): T {
+/** Run fn inside a transaction (sqlite: same connection; postgres: dedicated client). */
+export async function tx<T>(fn: () => T | Promise<T>): Promise<T> {
+  if (driver === "postgres") {
+    const pool = await getPool();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const out = await fn();
+      await client.query("COMMIT");
+      return out;
+    } catch (e) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {
+        /* already rolled back */
+      }
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+  const db = await getSqlite();
   db.exec("BEGIN");
   try {
-    const out = fn();
+    const out = await fn();
     db.exec("COMMIT");
     return out;
   } catch (e) {

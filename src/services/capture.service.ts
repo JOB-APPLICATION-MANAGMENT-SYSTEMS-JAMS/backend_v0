@@ -172,10 +172,10 @@ export async function previewCapture(userId: string, url: string, htmlText?: str
   };
 }
 
-function upsertPosting(userId: string, url: string, parsed: ParsedPosting, source: string) {
-  const signals = profileSignals(userId);
+async function upsertPosting(userId: string, url: string, parsed: ParsedPosting, source: string) {
+  const signals = await profileSignals(userId);
   const externalId = Buffer.from(url).toString("base64url").slice(0, 40);
-  const existing = get("SELECT id FROM job_postings WHERE user_id = ? AND source = ? AND external_id = ?", userId, source, externalId);
+  const existing = await get("SELECT id FROM job_postings WHERE user_id = ? AND source = ? AND external_id = ?", userId, source, externalId);
   const id = existing?.id ?? newId();
   const scored = scorePosting(signals, {
     title: parsed.title,
@@ -191,7 +191,7 @@ function upsertPosting(userId: string, url: string, parsed: ParsedPosting, sourc
   const dedupeKey = `${parsed.title.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim()}|${parsed.company.toLowerCase()}|${(parsed.location ?? "").toLowerCase()}`;
   const now = nowIso();
   if (existing) {
-    run(
+    await run(
       "UPDATE job_postings SET title = ?, company_name = ?, description = ?, jd_keywords = ?, salary_min = ?, salary_max = ?, score = ?, explain = ?, last_seen_at = ? WHERE id = ?",
       parsed.title,
       parsed.company,
@@ -205,7 +205,7 @@ function upsertPosting(userId: string, url: string, parsed: ParsedPosting, sourc
       id
     );
   } else {
-    run(
+    await run(
       `INSERT INTO job_postings (id, user_id, company_name, source, external_id, title, location, remote, salary_min, salary_max, currency, career_category, description, jd_keywords, url, posted_at, first_seen_at, last_seen_at, score, explain, dedupe_key, status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'software_engineering', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
       id,
@@ -264,13 +264,13 @@ export async function capture(userId: string, input: CaptureInput) {
     if (!parsed.salary_min) warnings.push("salary not found — add manually");
   }
 
-  const upserted = upsertPosting(userId, input.url, parsed, input.source === "paste" ? "manual" : input.source);
+  const upserted = await upsertPosting(userId, input.url, parsed, input.source === "paste" ? "manual" : input.source);
   const action = input.action ?? "create_draft";
   let application_id: string | null = null;
 
   if (action !== "log_only") {
     const { createApplication, changeStatus } = await import("./application.service");
-    const app = createApplication(userId, {
+    const app = await createApplication(userId, {
       company_name: parsed.company,
       posting_id: upserted.posting_id,
       kind: "application",
@@ -281,14 +281,14 @@ export async function capture(userId: string, input: CaptureInput) {
       capture: { ...parsed, captured_via: input.source, captured_at: nowIso(), form_fields: page.form_fields ?? [] },
     }, input.source === "extension" ? "extension" : "user");
     application_id = app.id;
-    if (action === "mark_submitted") changeStatus(userId, app.id, "applied");
+    if (action === "mark_submitted") await changeStatus(userId, app.id, "applied");
   }
 
   return { application_id, posting_id: upserted.posting_id, parsed: { ...parsed, ...{ warnings: [] } }, warnings, score: upserted.score };
 }
 
 /** Companies (CRM lite) for the pitch-target path (§19.1 mode 2). */
-export function listCompanies(userId: string, filter: { tier?: string; q?: string } = {}) {
+export async function listCompanies(userId: string, filter: { tier?: string; q?: string } = {}) {
   const where = ["user_id = ?"];
   const args: any[] = [userId];
   if (filter.tier) {
@@ -299,7 +299,7 @@ export function listCompanies(userId: string, filter: { tier?: string; q?: strin
     where.push("lower(name) LIKE ?");
     args.push(`%${filter.q.toLowerCase()}%`);
   }
-  const rows = all<any>(
+  const rows = await all<any>(
     `SELECT c.*, (SELECT count(*) FROM applications WHERE company_id = c.id) AS applications,
             (SELECT count(*) FROM contacts WHERE company_id = c.id) AS contacts
      FROM companies c WHERE ${where.join(" AND ")} ORDER BY c.name ASC`,
@@ -309,13 +309,13 @@ export function listCompanies(userId: string, filter: { tier?: string; q?: strin
   return rows.map((r) => ({ ...r, stack: parseJson(r.stack, []) }));
 }
 
-export function getCompany(userId: string, id: string) {
-  const c = get("SELECT * FROM companies WHERE id = ? AND user_id = ?", id, userId);
+export async function getCompany(userId: string, id: string) {
+  const c = await get("SELECT * FROM companies WHERE id = ? AND user_id = ?", id, userId);
   if (!c) throw notFound("Company");
   return {
     ...c,
     stack: parseJson(c.stack, []),
-    contacts: all<any>("SELECT * FROM contacts WHERE company_id = ? AND user_id = ?", id, userId),
-    applications: all<any>("SELECT * FROM applications WHERE company_id = ? AND user_id = ? ORDER BY created_at DESC", id, userId),
+    contacts: await all<any>("SELECT * FROM contacts WHERE company_id = ? AND user_id = ?", id, userId),
+    applications: await all<any>("SELECT * FROM applications WHERE company_id = ? AND user_id = ? ORDER BY created_at DESC", id, userId),
   };
 }

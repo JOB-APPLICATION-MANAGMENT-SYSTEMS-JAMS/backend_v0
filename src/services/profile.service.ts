@@ -24,18 +24,18 @@ export interface EducationInput {
   end_date?: string | null;
 }
 
-function ensureProfile(userId: string) {
-  let p = get("SELECT * FROM profiles WHERE user_id = ?", userId);
+async function ensureProfile(userId: string) {
+  let p = await get("SELECT * FROM profiles WHERE user_id = ?", userId);
   if (!p) {
     const id = newId();
-    run(`INSERT INTO profiles (id, user_id, identity, prefs, aliases, version, updated_at) VALUES (?, ?, '{}', '{}', '{}', 1, ?)`, id, userId, nowIso());
-    p = get("SELECT * FROM profiles WHERE user_id = ?", userId)!;
+    await run(`INSERT INTO profiles (id, user_id, identity, prefs, aliases, version, updated_at) VALUES (?, ?, '{}', '{}', '{}', 1, ?)`, id, userId, nowIso());
+    p = (await get("SELECT * FROM profiles WHERE user_id = ?", userId))!;
   }
   return p;
 }
 
-export function getProfile(userId: string) {
-  const p = ensureProfile(userId);
+export async function getProfile(userId: string) {
+  const p = await ensureProfile(userId);
   return {
     id: p.id,
     identity: parseJson(p.identity, {}),
@@ -43,22 +43,22 @@ export function getProfile(userId: string) {
     aliases: parseJson(p.aliases, {}),
     version: p.version,
     updated_at: p.updated_at,
-    skills: all("SELECT * FROM profile_skills WHERE profile_id = ? ORDER BY sort_order, name", p.id),
-    experiences: all<any>("SELECT * FROM profile_experiences WHERE profile_id = ? ORDER BY sort_order", p.id).map((e) => ({
+    skills: await all("SELECT * FROM profile_skills WHERE profile_id = ? ORDER BY sort_order, name", p.id),
+    experiences: (await all<any>("SELECT * FROM profile_experiences WHERE profile_id = ? ORDER BY sort_order", p.id)).map((e) => ({
       ...e,
       bullets: parseJson(e.bullets, []),
     })),
-    education: all("SELECT * FROM profile_education WHERE profile_id = ? ORDER BY sort_order", p.id),
+    education: await all("SELECT * FROM profile_education WHERE profile_id = ? ORDER BY sort_order", p.id),
   };
 }
 
-export function updateProfile(
+export async function updateProfile(
   userId: string,
   input: { identity?: any; prefs?: any; aliases?: any; skills?: SkillInput[]; experiences?: ExperienceInput[]; education?: EducationInput[] }
 ) {
-  const p = ensureProfile(userId);
+  const p = await ensureProfile(userId);
   if (input.identity || input.prefs || input.aliases) {
-    run(
+    await run(
       `UPDATE profiles SET identity = ?, prefs = ?, aliases = ?, version = version + 1, updated_at = ? WHERE id = ?`,
       JSON.stringify(input.identity ?? parseJson(p.identity, {})),
       JSON.stringify(input.prefs ?? parseJson(p.prefs, {})),
@@ -68,9 +68,9 @@ export function updateProfile(
     );
   }
   if (input.skills) {
-    run("DELETE FROM profile_skills WHERE profile_id = ?", p.id);
-    input.skills.forEach((s, i) =>
-      run(
+    await run("DELETE FROM profile_skills WHERE profile_id = ?", p.id);
+    for (const [i, s] of input.skills.entries()) {
+      await run(
         `INSERT INTO profile_skills (id, profile_id, name, level, years, is_top5, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         newId(),
         p.id,
@@ -79,13 +79,13 @@ export function updateProfile(
         s.years ?? null,
         s.is_top5 ? 1 : 0,
         i
-      )
-    );
+      );
+    }
   }
   if (input.experiences) {
-    run("DELETE FROM profile_experiences WHERE profile_id = ?", p.id);
-    input.experiences.forEach((e, i) =>
-      run(
+    await run("DELETE FROM profile_experiences WHERE profile_id = ?", p.id);
+    for (const [i, e] of input.experiences.entries()) {
+      await run(
         `INSERT INTO profile_experiences (id, profile_id, company, title, start_date, end_date, location, bullets, sort_order)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         newId(),
@@ -97,13 +97,13 @@ export function updateProfile(
         e.location ?? null,
         JSON.stringify(e.bullets ?? []),
         i
-      )
-    );
+      );
+    }
   }
   if (input.education) {
-    run("DELETE FROM profile_education WHERE profile_id = ?", p.id);
-    input.education.forEach((e, i) =>
-      run(
+    await run("DELETE FROM profile_education WHERE profile_id = ?", p.id);
+    for (const [i, e] of input.education.entries()) {
+      await run(
         `INSERT INTO profile_education (id, profile_id, school, degree, field, start_date, end_date, sort_order)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         newId(),
@@ -114,15 +114,15 @@ export function updateProfile(
         e.start_date ?? null,
         e.end_date ?? null,
         i
-      )
-    );
+      );
+    }
   }
   return getProfile(userId);
 }
 
 /** Completeness ring (§19.3): weighted checklist + suggestions. */
-export function completeness(userId: string) {
-  const p = getProfile(userId);
+export async function completeness(userId: string) {
+  const p = await getProfile(userId);
   const id: any = p.identity ?? {};
   const pr: any = p.prefs ?? {};
   const checks: { key: string; label: string; weight: number; done: boolean; hint?: string }[] = [
@@ -146,8 +146,8 @@ export function completeness(userId: string) {
   return { score, checks, suggestions: checks.filter((c) => !c.done && c.hint).map((c) => ({ label: c.label, hint: c.hint })) };
 }
 
-export function skillNames(userId: string): string[] {
-  const p = get("SELECT id FROM profiles WHERE user_id = ?", userId);
+export async function skillNames(userId: string): Promise<string[]> {
+  const p = await get("SELECT id FROM profiles WHERE user_id = ?", userId);
   if (!p) return [];
-  return all<{ name: string }>("SELECT name FROM profile_skills WHERE profile_id = ? ORDER BY is_top5 DESC", p.id).map((r) => r.name);
+  return (await all<{ name: string }>("SELECT name FROM profile_skills WHERE profile_id = ? ORDER BY is_top5 DESC", p.id)).map((r) => r.name);
 }

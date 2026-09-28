@@ -9,10 +9,10 @@ applicationRouter.use(requireAuth);
 
 const toArray = (v: any): string[] | undefined => (v == null ? undefined : Array.isArray(v) ? v.map(String) : String(v).split(",").map((s) => s.trim()).filter(Boolean));
 
-applicationRouter.get("/", (req: AuthedRequest, res, next) => {
+applicationRouter.get("/", async (req: AuthedRequest, res, next) => {
   try {
     const q = req.query as any;
-    const result = apps.listApplications(req.userId!, {
+    const result = await apps.listApplications(req.userId!, {
       status: toArray(q.status),
       kind: q.kind,
       company_id: q.company_id,
@@ -48,79 +48,79 @@ const createSchema = z.object({
   next_action_at: z.string().nullish(),
 });
 
-applicationRouter.post("/", (req: AuthedRequest, res, next) => {
+applicationRouter.post("/", async (req: AuthedRequest, res, next) => {
   try {
     const body = createSchema.parse(req.body);
-    ok(res, "Application created", apps.createApplication(req.userId!, body as any), 201);
+    ok(res, "Application created", await apps.createApplication(req.userId!, body as any), 201);
   } catch (e) {
     next(e);
   }
 });
 
-applicationRouter.get("/follow-ups", (req: AuthedRequest, res, next) => {
+applicationRouter.get("/follow-ups", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Follow-up chips", { items: apps.followUpChips(req.userId!) });
+    ok(res, "Follow-up chips", { items: await apps.followUpChips(req.userId!) });
   } catch (e) {
     next(e);
   }
 });
 
-applicationRouter.post("/bulk-status", (req: AuthedRequest, res, next) => {
+applicationRouter.post("/bulk-status", async (req: AuthedRequest, res, next) => {
   try {
     const body = z.object({ ids: z.array(z.string()).min(1), status: z.enum(apps.STATUSES as unknown as [string, ...string[]]) }).parse(req.body);
-    ok(res, "Bulk status applied", apps.bulkStatus(req.userId!, body.ids, body.status as any));
+    ok(res, "Bulk status applied", await apps.bulkStatus(req.userId!, body.ids, body.status as any));
   } catch (e) {
     next(e);
   }
 });
 
-applicationRouter.get("/:id", (req: AuthedRequest, res, next) => {
+applicationRouter.get("/:id", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Application retrieved", apps.getApplication(req.userId!, String(req.params.id)));
+    ok(res, "Application retrieved", await apps.getApplication(req.userId!, String(req.params.id)));
   } catch (e) {
     next(e);
   }
 });
 
-applicationRouter.put("/:id", (req: AuthedRequest, res, next) => {
+applicationRouter.put("/:id", async (req: AuthedRequest, res, next) => {
   try {
     const patch = createSchema.partial().extend({ status: z.enum(apps.STATUSES as unknown as [string, ...string[]]).optional(), status_at: z.string().optional() }).parse(req.body);
-    ok(res, "Application updated", apps.updateApplication(req.userId!, String(req.params.id), patch as any));
+    ok(res, "Application updated", await apps.updateApplication(req.userId!, String(req.params.id), patch as any));
   } catch (e) {
     next(e);
   }
 });
 
-applicationRouter.delete("/:id", (req: AuthedRequest, res, next) => {
+applicationRouter.delete("/:id", async (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Application deleted", apps.deleteApplication(req.userId!, String(req.params.id)));
+    ok(res, "Application deleted", await apps.deleteApplication(req.userId!, String(req.params.id)));
   } catch (e) {
     next(e);
   }
 });
 
-applicationRouter.post("/:id/status", (req: AuthedRequest, res, next) => {
+applicationRouter.post("/:id/status", async (req: AuthedRequest, res, next) => {
   try {
     const body = z.object({ status: z.enum(apps.STATUSES as unknown as [string, ...string[]]), at: z.string().optional() }).parse(req.body);
-    ok(res, `Status → ${body.status}`, apps.changeStatus(req.userId!, String(req.params.id), body.status as any, body.at));
+    ok(res, `Status → ${body.status}`, await apps.changeStatus(req.userId!, String(req.params.id), body.status as any, body.at));
   } catch (e) {
     next(e);
   }
 });
 
-applicationRouter.get("/:id/events", (req: AuthedRequest, res, next) => {
+applicationRouter.get("/:id/events", async (req: AuthedRequest, res, next) => {
   try {
-    const app = apps.getApplication(req.userId!, String(req.params.id));
+    const app = await apps.getApplication(req.userId!, String(req.params.id));
     ok(res, "Timeline", { items: app.events });
   } catch (e) {
     next(e);
   }
 });
 
-applicationRouter.post("/:id/notes", (req: AuthedRequest, res, next) => {
+applicationRouter.post("/:id/notes", async (req: AuthedRequest, res, next) => {
   try {
     const body = z.object({ note: z.string().min(1) }).parse(req.body);
-    ok(res, "Note added", apps.addNote(req.userId!, String(req.params.id), body.note));
+    ok(res, "Note added", await apps.addNote(req.userId!, String(req.params.id), body.note));
   } catch (e) {
     next(e);
   }

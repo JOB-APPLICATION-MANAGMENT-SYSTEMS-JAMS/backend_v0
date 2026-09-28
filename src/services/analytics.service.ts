@@ -3,7 +3,7 @@ import { bucketKey, localDayIso, periodRange, type Period } from "../util/date";
 import { config } from "../core/config";
 import { today as streakToday } from "./streak.service";
 
-const tzOf = (userId: string) => get<{ timezone: string }>("SELECT timezone FROM users WHERE id = ?", userId)?.timezone ?? config.timezone;
+const tzOf = async (userId: string) => (await get<{ timezone: string }>("SELECT timezone FROM users WHERE id = ?", userId))?.timezone ?? config.timezone;
 
 type Metric = { value: number; prev: number; delta_pct: number | null; unit?: string };
 
@@ -15,8 +15,8 @@ const kpi = (value: number, prev: number, unit?: string): Metric => ({
   ...(unit ? { unit } : {}),
 });
 
-function countsFor(userId: string, from: string, to: string) {
-  const row = get<any>(
+async function countsFor(userId: string, from: string, to: string) {
+  const row = (await get<any>(
     `SELECT
       (SELECT count(*) FROM applications WHERE user_id = ? AND kind = 'application' AND applied_at >= ? AND applied_at < ?) AS applied,
       (SELECT count(*) FROM applications WHERE user_id = ? AND kind = 'pitch' AND applied_at >= ? AND applied_at < ?) AS pitched,
@@ -32,31 +32,31 @@ function countsFor(userId: string, from: string, to: string) {
     userId, from, to,
     userId, from, to,
     userId, from, to
-  )!;
+  ))!;
   const sent = row.applied + row.pitched;
   // response rate is cohort-based: of what you SENT this window, how much was ever answered —
   // event-based replies (to older applications) could push it past 100% (§22.3 donut).
-  const cohort = get<any>(
+  const cohort = (await get<any>(
     `SELECT count(*) AS sent,
             sum(CASE WHEN replied_at IS NOT NULL THEN 1 ELSE 0 END) AS replied
        FROM applications
       WHERE user_id = ? AND kind IN ('application','pitch')
         AND applied_at >= ? AND applied_at < ?`,
     userId, from, to
-  )!;
+  ))!;
   const response_rate = cohort.sent ? Number(((cohort.replied / cohort.sent) * 100).toFixed(1)) : 0;
   return { ...row, sent, response_rate };
 }
 
 /** KPI wall payload (§33.3) — value + prev + delta in one round-trip (§37.4). */
-export function summary(userId: string, period: Period = "week") {
-  const tz = tzOf(userId);
+export async function summary(userId: string, period: Period = "week") {
+  const tz = await tzOf(userId);
   const { from, to, prevFrom, prevTo } = periodRange(period, tz);
-  const cur = countsFor(userId, from, to);
-  const prev = countsFor(userId, prevFrom, prevTo);
+  const cur = await countsFor(userId, from, to);
+  const prev = await countsFor(userId, prevFrom, prevTo);
 
-  const t = streakToday(userId);
-  const medianReply = medianTimeToReply(userId);
+  const t = await streakToday(userId);
+  const medianReply = await medianTimeToReply(userId);
   return {
     period,
     range: { from, to, prev_from: prevFrom, prev_to: prevTo },
@@ -71,14 +71,14 @@ export function summary(userId: string, period: Period = "week") {
       response_rate: kpi(cur.response_rate, prev.response_rate, "%"),
       streak: t,
     },
-    funnel: funnelCounts(userId, from, to),
+    funnel: await funnelCounts(userId, from, to),
     median_time_to_reply_days: medianReply.p50,
     p90_time_to_reply_days: medianReply.p90,
   };
 }
 
-export function medianTimeToReply(userId: string): { p50: number | null; p90: number | null } {
-  const rows = all<{ first_reply_days: number }>(
+export async function medianTimeToReply(userId: string): Promise<{ p50: number | null; p90: number | null }> {
+  const rows = await all<{ first_reply_days: number }>(
     "SELECT first_reply_days FROM applications WHERE user_id = ? AND first_reply_days IS NOT NULL ORDER BY first_reply_days ASC",
     userId
   );
@@ -94,10 +94,10 @@ export function medianTimeToReply(userId: string): { p50: number | null; p90: nu
  * outcome measured *within that same cohort* — so bands stay ≤ applied and
  * “% reached a human” can never exceed 100% (independent window-events could, e.g. 114%).
  */
-export function funnelCounts(userId: string, from?: string, to?: string) {
+export async function funnelCounts(userId: string, from?: string, to?: string) {
   const f = from ?? "1970-01-01";
   const t = to ?? "2999-01-01";
-  const row = get<any>(
+  const row = (await get<any>(
     `WITH cohort AS (
        SELECT id, status, replied_at FROM applications
        WHERE user_id = ? AND kind = 'application'
@@ -111,7 +111,7 @@ export function funnelCounts(userId: string, from?: string, to?: string) {
        (SELECT count(*) FROM cohort WHERE status IN ('interview','offer') OR EXISTS (SELECT 1 FROM application_events e WHERE e.app_id = cohort.id AND e.type IN ('interview','offer'))) AS interview,
        (SELECT count(*) FROM cohort WHERE status = 'offer' OR EXISTS (SELECT 1 FROM application_events e WHERE e.app_id = cohort.id AND e.type = 'offer')) AS offer`,
     userId, f, t
-  )!;
+  ))!;
   return [
     { key: "applied", label: "Applications", count: row.applied },
     { key: "ghosted", label: "Ghosted / no reply", count: row.ghosted },
@@ -123,11 +123,11 @@ export function funnelCounts(userId: string, from?: string, to?: string) {
 }
 
 /** Timeseries over application_events (§37.3) — bucketed in the profile timezone. */
-export function timeseries(userId: string, metric: "applied" | "replied" | "ghosted" | "rejected" | "interview" | "offer" = "applied", bucket: Period = "day", from?: string) {
-  const tz = tzOf(userId);
+export async function timeseries(userId: string, metric: "applied" | "replied" | "ghosted" | "rejected" | "interview" | "offer" = "applied", bucket: Period = "day", from?: string) {
+  const tz = await tzOf(userId);
   const start = from ?? new Date(Date.now() - (bucket === "day" ? 30 : bucket === "week" ? 84 : bucket === "month" ? 365 : 1460) * 86_400_000).toISOString();
   const map = new Map<string, number>();
-  const rows =
+  const rows = await (
     metric === "applied"
       ? all<any>("SELECT applied_at AS at FROM applications WHERE user_id = ? AND applied_at IS NOT NULL AND applied_at >= ?", userId, start)
       : metric === "replied"
@@ -139,7 +139,8 @@ export function timeseries(userId: string, metric: "applied" | "replied" | "ghos
               userId,
               metric,
               start
-            );
+            )
+  );
   for (const r of rows) {
     if (!r.at) continue;
     const key = bucketKey(r.at, bucket, tz);
@@ -149,10 +150,10 @@ export function timeseries(userId: string, metric: "applied" | "replied" | "ghos
 }
 
 /** GitHub-style heatmap intensity (§22.3): 366 days from streak_events. */
-export function heatmap(userId: string, year?: number) {
-  const tz = tzOf(userId);
+export async function heatmap(userId: string, year?: number) {
+  const tz = await tzOf(userId);
   const y = year ?? Number(localDayIso(new Date(), tz).slice(0, 4));
-  const rows = all<any>("SELECT day, applications, goal, hit, streak_value FROM streak_events WHERE user_id = ? AND day LIKE ?", userId, `${y}-%`);
+  const rows = await all<any>("SELECT day, applications, goal, hit, streak_value FROM streak_events WHERE user_id = ? AND day LIKE ?", userId, `${y}-%`);
   return {
     year: y,
     days: rows.map((r) => ({ day: r.day, count: r.applications, goal: r.goal, hit: !!r.hit, streak: r.streak_value })),
@@ -160,7 +161,7 @@ export function heatmap(userId: string, year?: number) {
 }
 
 /** “What's working” (§22.3): funnels by source/company/cv/template/category. */
-export function breakdown(userId: string, by: "source" | "company" | "cv" | "template" | "category" = "source", from?: string) {
+export async function breakdown(userId: string, by: "source" | "company" | "cv" | "template" | "category" = "source", from?: string) {
   const start = from ?? new Date(Date.now() - 365 * 86_400_000).toISOString();
   const col =
     by === "company"
@@ -172,7 +173,7 @@ export function breakdown(userId: string, by: "source" | "company" | "cv" | "tem
           : by === "category"
             ? "kind"
             : "source";
-  const rows = all<any>(
+  const rows = await all<any>(
     `SELECT COALESCE(${col}, 'unknown') AS key,
             count(*) AS sent,
             sum(CASE WHEN replied_at IS NOT NULL THEN 1 ELSE 0 END) AS replied,
@@ -195,11 +196,11 @@ export function breakdown(userId: string, by: "source" | "company" | "cv" | "tem
 }
 
 /** Time-to-reply histogram with p50/p90 (§22.3). */
-export function timeToReplyHistogram(userId: string) {
-  const vals = all<{ first_reply_days: number }>(
+export async function timeToReplyHistogram(userId: string) {
+  const vals = (await all<{ first_reply_days: number }>(
     "SELECT first_reply_days FROM applications WHERE user_id = ? AND first_reply_days IS NOT NULL",
     userId
-  ).map((r) => Number(r.first_reply_days));
+  )).map((r) => Number(r.first_reply_days));
   const buckets = [0, 0, 0, 0, 0, 0, 0, 0]; // 0-2,2-4,4-7,7-10,10-14,14-21,21-30,30+
   for (const v of vals) {
     if (v < 2) buckets[0]++;

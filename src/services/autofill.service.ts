@@ -57,8 +57,8 @@ const AUTOCOMPLETE_MAP: Record<string, { key: string; confidence: number }> = {
 };
 
 /** What the extension can read: field keys + aliases + visibility flags (§35 GET /autofill/schema). */
-export function autofillSchema(userId: string) {
-  const p = get<any>("SELECT * FROM profiles WHERE user_id = ?", userId);
+export async function autofillSchema(userId: string) {
+  const p = await get<any>("SELECT * FROM profiles WHERE user_id = ?", userId);
   const identity: any = p ? parseJson(p.identity, {}) : {};
   const aliases: any = p ? parseJson(p.aliases, {}) : {};
   const merged: Record<string, string[]> = {};
@@ -110,11 +110,11 @@ export function similarity(a: string, b: string): number {
 const isPassword = (f: DetectedField) => /password|passwd|pwd/i.test(`${f.name ?? ""} ${f.id ?? ""} ${f.autocomplete ?? ""} ${f.type ?? ""}`) || f.type === "password";
 
 /** Server-side field matching — easily improved in one place (§35 autofill/match). */
-export function matchFields(userId: string, host: string, fields: DetectedField[]): { mappings: Mapping[]; skipped: string[] } {
-  const schema = autofillSchema(userId);
+export async function matchFields(userId: string, host: string, fields: DetectedField[]): Promise<{ mappings: Mapping[]; skipped: string[] }> {
+  const schema = await autofillSchema(userId);
   const values = new Map(schema.fields.map((f) => [f.key, f.value ?? ""]));
   const history = new Map(
-    all<any>("SELECT field_signature, profile_key FROM field_history WHERE user_id = ? AND host = ?", userId, host).map((h) => [h.field_signature, h.profile_key])
+    (await all<any>("SELECT field_signature, profile_key FROM field_history WHERE user_id = ? AND host = ?", userId, host)).map((h) => [h.field_signature, h.profile_key])
   );
 
   const mappings: Mapping[] = [];
