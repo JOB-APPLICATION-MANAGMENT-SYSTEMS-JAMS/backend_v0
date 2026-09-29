@@ -43459,8 +43459,9 @@ var init_routes = __esm({
     init_zod();
     init_security();
     init_streak_service();
+    init_db();
     apiRouter = (0, import_express7.Router)();
-    apiRouter.get("/healthz", (_req, res) => ok(res, "ok", { status: "up", mode: process.env.MODE ?? "local", time: (/* @__PURE__ */ new Date()).toISOString() }));
+    apiRouter.get("/healthz", (_req, res) => ok(res, "ok", { status: "up", mode: process.env.MODE ?? "local", driver, time: (/* @__PURE__ */ new Date()).toISOString() }));
     apiRouter.use("/auth", authRouter);
     apiRouter.use("/profile", profileRouter);
     apiRouter.use("/cvs", cvRouter);
@@ -43504,6 +43505,9 @@ __export(app_exports, {
 function createApp() {
   const app = (0, import_express8.default)();
   app.disable("x-powered-by");
+  if (process.env.VERCEL && config.jwtSecret === "dev-secret-change-me") {
+    console.warn("[jams] JWT_SECRET is not set \u2014 falling back to the well-known dev secret. Set JWT_SECRET on the deployment.");
+  }
   app.use(
     (0, import_cors.default)({
       origin: config.webOrigin === "*" ? true : config.webOrigin.split(",").map((s) => s.trim()),

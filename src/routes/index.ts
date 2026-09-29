@@ -10,10 +10,13 @@ import { sourceHealth } from "../ingestion/ingest";
 import { z } from "zod";
 import { requireAuth, type AuthedRequest } from "../core/security";
 import { setGoal } from "../services/streak.service";
+import { driver } from "../core/db";
 
 export const apiRouter = Router();
 
-apiRouter.get("/healthz", (_req, res) => ok(res, "ok", { status: "up", mode: process.env.MODE ?? "local", time: new Date().toISOString() }));
+// `driver` is the remote switch for DATABASE_URL: after setting it on the host,
+// healthz must report "postgres" — otherwise traffic is still on ephemeral SQLite.
+apiRouter.get("/healthz", (_req, res) => ok(res, "ok", { status: "up", mode: process.env.MODE ?? "local", driver, time: new Date().toISOString() }));
 
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/profile", profileRouter);
