@@ -16,8 +16,7 @@ data/
 dist/
 *.tsbuildinfo
 .vercel
-# generated serverless bundle (esbuild output of src/serverless.ts)
-/api/index.js
+# rebuilt on every deploy — only the entry needs to exist pre-build
 /api/index.js.map
 
 # logs
