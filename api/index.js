@@ -39441,17 +39441,30 @@ function toPg(sql) {
 function norm(params) {
   return params.map((p) => p === void 0 ? null : typeof p === "boolean" ? p ? 1 : 0 : p);
 }
+function castRows(result) {
+  const fields = result.fields ?? [];
+  for (const row of result.rows) {
+    for (const f of fields) {
+      if ((f.dataTypeID === OID_INT8 || f.dataTypeID === OID_NUMERIC) && typeof row[f.name] === "string") {
+        const n = Number(row[f.name]);
+        if (!Number.isNaN(n)) row[f.name] = n;
+      }
+    }
+  }
+  return result.rows;
+}
 async function all(sql, ...params) {
   if (driver === "postgres") {
     const pool = await getPool();
-    return (await pool.query(toPg(sql), norm(params))).rows;
+    return castRows(await pool.query(toPg(sql), norm(params)));
   }
   return (await getSqlite()).prepare(sql).all(...norm(params));
 }
 async function get(sql, ...params) {
   if (driver === "postgres") {
     const pool = await getPool();
-    return (await pool.query(toPg(sql), norm(params))).rows[0];
+    const rows = castRows(await pool.query(toPg(sql), norm(params)));
+    return rows[0];
   }
   return (await getSqlite()).prepare(sql).get(...norm(params));
 }
@@ -39496,7 +39509,7 @@ async function tx(fn) {
     throw e;
   }
 }
-var pgUrl, driver, pgPoolPromise, sqlitePromise, parseJson;
+var pgUrl, driver, pgPoolPromise, sqlitePromise, OID_INT8, OID_NUMERIC, parseJson;
 var init_db = __esm({
   "src/core/db.ts"() {
     "use strict";
@@ -39507,6 +39520,8 @@ var init_db = __esm({
     driver = pgUrl ? "postgres" : "sqlite";
     pgPoolPromise = null;
     sqlitePromise = null;
+    OID_INT8 = 20;
+    OID_NUMERIC = 1700;
     parseJson = (v, fallback) => {
       if (v == null) return fallback;
       if (typeof v === "object") return v;

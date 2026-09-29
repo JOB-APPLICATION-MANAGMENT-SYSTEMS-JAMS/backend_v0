@@ -87,11 +87,32 @@ function norm(params: any[]): any[] {
   return params.map((p) => (p === undefined ? null : typeof p === "boolean" ? (p ? 1 : 0) : p));
 }
 
+/**
+ * node-postgres returns `int8` (count/sum) and `numeric` (avg) as *strings* — sqlite
+ * returns numbers. Coerce those two OIDs back to JS numbers so query code is
+ * driver-agnostic (`value.toFixed(...)` etc. would otherwise throw on Postgres).
+ * Text/uuid/json columns are left untouched.
+ */
+const OID_INT8 = 20;
+const OID_NUMERIC = 1700;
+export function castRows<T>(result: pg.QueryResult): T[] {
+  const fields = result.fields ?? [];
+  for (const row of result.rows as Row[]) {
+    for (const f of fields) {
+      if ((f.dataTypeID === OID_INT8 || f.dataTypeID === OID_NUMERIC) && typeof row[f.name] === "string") {
+        const n = Number(row[f.name]);
+        if (!Number.isNaN(n)) row[f.name] = n;
+      }
+    }
+  }
+  return result.rows as T[];
+}
+
 /** Positional-parameter SELECT returning every row. */
 export async function all<T = Row>(sql: string, ...params: any[]): Promise<T[]> {
   if (driver === "postgres") {
     const pool = await getPool();
-    return (await pool.query(toPg(sql), norm(params))).rows as T[];
+    return castRows<T>(await pool.query(toPg(sql), norm(params)));
   }
   return (await getSqlite()).prepare(sql).all(...norm(params)) as T[];
 }
@@ -100,7 +121,8 @@ export async function all<T = Row>(sql: string, ...params: any[]): Promise<T[]> 
 export async function get<T = Row>(sql: string, ...params: any[]): Promise<T | undefined> {
   if (driver === "postgres") {
     const pool = await getPool();
-    return (await pool.query(toPg(sql), norm(params))).rows[0] as T | undefined;
+    const rows = castRows<T>(await pool.query(toPg(sql), norm(params)));
+    return rows[0];
   }
   return (await getSqlite()).prepare(sql).get(...norm(params)) as T | undefined;
 }
