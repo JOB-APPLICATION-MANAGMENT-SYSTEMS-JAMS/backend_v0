@@ -43443,7 +43443,7 @@ var init_analytics = __esm({
 });
 
 // src/routes/index.ts
-var import_express7, apiRouter;
+var import_express7, apiRouter, apiIndex;
 var init_routes = __esm({
   "src/routes/index.ts"() {
     "use strict";
@@ -43460,8 +43460,17 @@ var init_routes = __esm({
     init_security();
     init_streak_service();
     init_db();
+    init_config();
     apiRouter = (0, import_express7.Router)();
     apiRouter.get("/healthz", (_req, res) => ok(res, "ok", { status: "up", mode: process.env.MODE ?? "local", driver, time: (/* @__PURE__ */ new Date()).toISOString() }));
+    apiIndex = () => ({
+      name: "JAMS API",
+      version: "0.1.0",
+      mode: config.mode,
+      base: "/api/v1",
+      endpoints: ["/auth", "/profile", "/cvs", "/templates", "/jobs", "/searches", "/applications", "/companies", "/capture", "/autofill", "/outreach", "/mailboxes", "/inbox", "/analytics", "/streaks", "/goals", "/export", "/tracking", "/sources"]
+    });
+    apiRouter.get("/", (_req, res) => res.json(apiIndex()));
     apiRouter.use("/auth", authRouter);
     apiRouter.use("/profile", profileRouter);
     apiRouter.use("/cvs", cvRouter);
@@ -43518,16 +43527,7 @@ function createApp() {
   app.use(requestContext);
   startRateLimitSweeper();
   app.use("/api/v1", apiRouter);
-  app.get(
-    "/",
-    (_req, res) => res.json({
-      name: "JAMS API",
-      version: "0.1.0",
-      mode: config.mode,
-      base: "/api/v1",
-      endpoints: ["/auth", "/profile", "/cvs", "/templates", "/jobs", "/searches", "/applications", "/companies", "/capture", "/autofill", "/outreach", "/mailboxes", "/inbox", "/analytics", "/streaks", "/goals", "/export", "/tracking", "/sources"]
-    })
-  );
+  app.get("/", (_req, res) => res.json(apiIndex()));
   app.use((_req, res) => res.status(404).json({ status: "failure", status_code: 404, message: "Route not found", error: { code: "NOT_FOUND" } }));
   app.use(errorHandler);
   return app;

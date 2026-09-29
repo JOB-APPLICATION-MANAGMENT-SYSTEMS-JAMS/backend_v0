@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { apiRouter } from "./routes/index";
+import { apiRouter, apiIndex } from "./routes/index";
 import { errorHandler } from "./core/errors";
 import { requestContext, startRateLimitSweeper } from "./core/middleware";
 import { config } from "./core/config";
@@ -24,15 +24,7 @@ export function createApp() {
 
   app.use("/api/v1", apiRouter);
   // convenience: docs-style index listing (replaces FastAPI /docs for humans)
-  app.get("/", (_req, res) =>
-    res.json({
-      name: "JAMS API",
-      version: "0.1.0",
-      mode: config.mode,
-      base: "/api/v1",
-      endpoints: ["/auth", "/profile", "/cvs", "/templates", "/jobs", "/searches", "/applications", "/companies", "/capture", "/autofill", "/outreach", "/mailboxes", "/inbox", "/analytics", "/streaks", "/goals", "/export", "/tracking", "/sources"],
-    })
-  );
+  app.get("/", (_req, res) => res.json(apiIndex()));
   app.use((_req, res) => res.status(404).json({ status: "failure", status_code: 404, message: "Route not found", error: { code: "NOT_FOUND" } }));
   app.use(errorHandler);
   return app;

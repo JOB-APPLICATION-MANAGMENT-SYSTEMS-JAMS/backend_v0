@@ -11,12 +11,27 @@ import { z } from "zod";
 import { requireAuth, type AuthedRequest } from "../core/security";
 import { setGoal } from "../services/streak.service";
 import { driver } from "../core/db";
+import { config } from "../core/config";
 
 export const apiRouter = Router();
 
 // `driver` is the remote switch for DATABASE_URL: after setting it on the host,
 // healthz must report "postgres" — otherwise traffic is still on ephemeral SQLite.
 apiRouter.get("/healthz", (_req, res) => ok(res, "ok", { status: "up", mode: process.env.MODE ?? "local", driver, time: new Date().toISOString() }));
+
+/**
+ * API index at GET /api/v1 — in production the public / redirects here
+ * (vercel.json): Vercel's edge fails root-path invocations with
+ * FUNCTION_INVOCATION_FAILED, while every other path serves fine.
+ */
+export const apiIndex = () => ({
+  name: "JAMS API",
+  version: "0.1.0",
+  mode: config.mode,
+  base: "/api/v1",
+  endpoints: ["/auth", "/profile", "/cvs", "/templates", "/jobs", "/searches", "/applications", "/companies", "/capture", "/autofill", "/outreach", "/mailboxes", "/inbox", "/analytics", "/streaks", "/goals", "/export", "/tracking", "/sources"],
+});
+apiRouter.get("/", (_req, res) => res.json(apiIndex()));
 
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/profile", profileRouter);
