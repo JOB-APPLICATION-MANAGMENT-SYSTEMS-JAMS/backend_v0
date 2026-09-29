@@ -1,2 +1,6 @@
 allowBuilds:
   esbuild: true
+# pnpm 10 (what Vercel's build image uses) reads this key instead of allowBuilds —
+# esbuild's postinstall must run there or the bundler binary is missing.
+onlyBuiltDependencies:
+  - esbuild

@@ -16,6 +16,9 @@ data/
 dist/
 *.tsbuildinfo
 .vercel
+# generated serverless bundle (esbuild output of src/serverless.ts)
+/api/index.js
+/api/index.js.map
 
 # logs
 *.log
