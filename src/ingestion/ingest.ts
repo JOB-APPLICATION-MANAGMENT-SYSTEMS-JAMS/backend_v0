@@ -123,7 +123,8 @@ export async function ingestAll(userId: string, opts: { sources?: string[] } = {
 
 /** Source health (debug page visibility, §34.1). */
 export async function sourceHealth() {
-  const rows = await all<any>("SELECT * FROM sources ORDER BY name");
+  // pitch:* rows track Overpass refreshes for the pitch panel; they are not job boards
+  const rows = (await all<any>("SELECT * FROM sources ORDER BY name")).filter((r) => !r.name.startsWith("pitch:"));
   const known = SOURCES.map((s) => s.name);
   for (const name of known) if (!rows.find((r: any) => r.name === name)) rows.push({ name, enabled: 1, last_run_at: null, items_found: 0, error_streak: 0, last_error: null });
   return rows;

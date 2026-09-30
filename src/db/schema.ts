@@ -320,6 +320,22 @@ CREATE TABLE IF NOT EXISTS job_runs (
   created_at TEXT NOT NULL,
   finished_at TEXT
 );
+
+-- pitch targets: Nigerian companies (no open role required) found via OpenStreetMap,
+-- globally cached (no user_id) and refreshed every 24h per city/sector.
+CREATE TABLE IF NOT EXISTS pitch_targets (
+  external_id   TEXT PRIMARY KEY,   -- OSM type/id
+  name          TEXT NOT NULL,
+  sector        TEXT NOT NULL,      -- supermarket | airport | manufacturing | company
+  city          TEXT,
+  website       TEXT,
+  email         TEXT,
+  email_derived INTEGER NOT NULL DEFAULT 0,  -- 1 = info@domain guess, 0 = published
+  phone         TEXT,
+  lat           REAL,
+  lon           REAL,
+  fetched_at    TEXT NOT NULL
+);
 `;
 
 /**

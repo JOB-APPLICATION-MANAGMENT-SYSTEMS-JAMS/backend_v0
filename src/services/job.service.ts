@@ -74,10 +74,29 @@ export async function searchJobs(userId: string, p: SearchParams) {
   const baseWhere = [...where, ...excludeClauses].join(" AND ");
   const total = (await get<{ n: number }>(`SELECT count(*) AS n FROM job_postings WHERE ${baseWhere}`, ...args))!.n;
 
-  const orderBy = p.sort === "recent" ? "posted_at DESC, created_at DESC" : "score DESC NULLS LAST, posted_at DESC";
+  /**
+   * Ranking: stored profile score, plus a Nigeria boost (Lagos/Abuja/Ogun/national
+   * postings surface first, the product's search scope), plus a title-match bump
+   * when a free-text query is present. `score` and the boosts share the 0..100 scale.
+   */
+  const nigeriaMatch =
+    "(lower(COALESCE(location, '')) LIKE '%nigeria%' OR lower(COALESCE(location, '')) LIKE '%lagos%' OR lower(COALESCE(location, '')) LIKE '%abuja%' OR lower(COALESCE(location, '')) LIKE '%ogun%' OR lower(COALESCE(location, '')) LIKE '%ng%')";
+  const orderByArgs: any[] = [];
+  let orderBy: string;
+  if (p.sort === "recent") {
+    orderBy = "posted_at DESC, created_at DESC";
+  } else {
+    let expr = `(COALESCE(score, 0) + CASE WHEN ${nigeriaMatch} THEN 8 ELSE 0 END)`;
+    if (p.q) {
+      expr += ` + CASE WHEN lower(title) LIKE ? THEN 5 ELSE 0 END`;
+      orderByArgs.push(`%${p.q.toLowerCase()}%`);
+    }
+    orderBy = `${expr} DESC NULLS LAST, posted_at DESC`;
+  }
   const rows = await all<any>(
     `SELECT * FROM job_postings WHERE ${baseWhere} ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
     ...args,
+    ...orderByArgs,
     pageSize,
     (page - 1) * pageSize
   );

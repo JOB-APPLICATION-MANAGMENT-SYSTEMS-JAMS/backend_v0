@@ -1,7 +1,8 @@
 import { all, get, run, parseJson } from "../core/db";
 import { AppError, notFound, validation } from "../core/errors";
 import { newId, nowIso } from "../util/id";
-import { config } from "../core/config";
+import { config, smtpReady } from "../core/config";
+import nodemailer from "nodemailer";
 import { mergeTemplate } from "./cv.service";
 import { writeEvent, changeStatus } from "./application.service";
 import { recordEffort } from "./streak.service";
@@ -117,32 +118,129 @@ export async function sendOutreach(userId: string, id: string, opts: { via?: "gm
     console.warn(`[outreach] ${used}/${cap} sends today, approaching cap`);
   }
 
-  if (opts.via === "smtp") {
-    const mailbox = await get("SELECT * FROM mailboxes WHERE user_id = ? LIMIT 1", userId);
-    if (!mailbox) throw new AppError("MAILBOX_NOT_CONNECTED", 403, "No mailbox connected", "connect a mailbox in Settings → Gmail or use Gmail hand-off");
-    throw new AppError(
-      "MAILBOX_NOT_CONNECTED",
-      403,
-      "Direct SMTP sending is not enabled yet",
-      "use via: 'gmail_open' (human presses Send), SMTP send arrives with the mailbox worker"
-    );
-  }
-
   const ctx = await mergeContext(userId, r.app_id, r.contact_id);
   const to = r.contact_id ? (await get<any>("SELECT * FROM contacts WHERE id = ?", r.contact_id))?.email : "";
-  const composeUrl = buildGmailComposeUrl({ to: to ?? "", subject: mergeTemplate(r.subject, ctx), body: mergeTemplate(r.body, ctx) });
-  await run("UPDATE outreach_messages SET state = 'sent_unverified', sent_at = ?, updated_at = ? WHERE id = ?", nowIso(), nowIso(), id);
+
+  let state: "sent" | "sent_unverified";
+  let composeUrl: string | undefined;
+
+  if (opts.via === "smtp") {
+    // direct send: requires SMTP_* env; the human already confirmed via the flag (§26.1)
+    if (!smtpReady()) {
+      throw new AppError(
+        "SMTP_NOT_CONFIGURED",
+        403,
+        "Direct sending is not configured on this deployment",
+        "set SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS (and optionally SMTP_FROM), or send via gmail_open"
+      );
+    }
+    if (!to) throw validation("No recipient email on this message; attach a contact with an email first");
+    const transport = nodemailer.createTransport({
+      host: config.smtp.host,
+      port: config.smtp.port,
+      secure: config.smtp.port === 465,
+      auth: { user: config.smtp.user, pass: config.smtp.pass },
+    });
+    await transport.sendMail({
+      from: config.smtp.from || config.smtp.user,
+      to,
+      subject: mergeTemplate(r.subject, ctx),
+      text: mergeTemplate(r.body, ctx),
+    });
+    state = "sent";
+    await run("UPDATE outreach_messages SET state = 'sent', sent_at = ?, updated_at = ? WHERE id = ?", nowIso(), nowIso(), id);
+  } else {
+    // Gmail hand-off: hand the user a compose tab, they press Send (state stays unverified)
+    composeUrl = buildGmailComposeUrl({ to: to ?? "", subject: mergeTemplate(r.subject, ctx), body: mergeTemplate(r.body, ctx) });
+    state = "sent_unverified";
+    await run("UPDATE outreach_messages SET state = 'sent_unverified', sent_at = ?, updated_at = ? WHERE id = ?", nowIso(), nowIso(), id);
+  }
 
   if (r.app_id) {
-    await writeEvent(r.app_id, "emailed", { actor: "user", payload: { outreach_id: id, via: "gmail_open" } });
+    await writeEvent(r.app_id, "emailed", { actor: "user", payload: { outreach_id: id, via: opts.via === "smtp" ? "smtp" : "gmail_open" } });
     const app = await get<any>("SELECT * FROM applications WHERE id = ?", r.app_id);
     if (app?.kind === "pitch") await recordEffort(userId, 1); // pitched counts as effort (§37.2)
     if (app && app.status === "saved") {
       await run("UPDATE applications SET status = 'applied', applied_at = COALESCE(applied_at, ?), updated_at = ? WHERE id = ?", nowIso(), nowIso(), app.id);
-      await writeEvent(app.id, "applied", { actor: "user", payload: { via: "pitch" } });
+      await writeEvent(app.id, "applied", { actor: "user", payload: { via: app.kind === "pitch" ? "pitch" : "auto_apply" } });
     }
   }
-  return { id, state: "sent_unverified", compose_url: composeUrl, sent_today: used + 1, daily_cap: cap };
+  return { id, state, compose_url: composeUrl, via: opts.via === "smtp" ? "smtp" : "gmail_open", sent_today: used + 1, daily_cap: cap };
+}
+
+/** Pitch template: CV to a company with no open role (§19.1 mode 2). Shared with pitch.service. */
+export const PITCH_SUBJECT = `{{company.name}} x software engineering`;
+export const PITCH_BODY = `Hi {{company.name}} team,
+
+I came across your work and wanted to introduce myself directly, since I did not see an open engineering role on your careers page.
+
+I am a software engineer who builds typed, well-tested product surfaces end to end: web apps, APIs and the automation that saves teams manual work. A few things I could take off your plate:
+
+- internal tools and dashboards for operations, stock or scheduling
+- a proper website / booking flow that your team controls
+- integrations (payments, email, WhatsApp) with monitoring so issues surface early
+
+If useful, my CV and a couple of sample builds are one reply away. Happy to send a short proposal for one concrete improvement you could make this month.
+
+Best regards,
+{{profile.first_name}} {{profile.last_name}}`;
+
+const AUTO_SUBJECT = `Application: {{posting.role}}`;
+const AUTO_BODY = `Hello,
+
+I applied for {{posting.role}} and wanted to make sure my application reached a human directly.
+
+I am a software engineer focused on typed, well-tested product work: web apps, APIs and automation. My CV is attached; happy to walk through a relevant project on a short call.
+
+Thank you for your time,
+{{profile.first_name}} {{profile.last_name}}`;
+
+/**
+ * One-click auto-apply (§25.4): send the application email directly when SMTP is
+ * configured, otherwise fall back to the Gmail hand-off compose tab. When no email
+ * is known for the company, return the posting URL so the human can apply manually:
+ * the open link is never removed, applications and pitches are tracked identically.
+ */
+export async function autoApply(userId: string, appId: string) {
+  const app = await get<any>("SELECT * FROM applications WHERE id = ? AND user_id = ?", appId, userId);
+  if (!app) throw notFound("Application");
+
+  const contact = app.contact_id
+    ? await get<any>("SELECT * FROM contacts WHERE id = ? AND user_id = ?", app.contact_id, userId)
+    : await get<any>("SELECT * FROM contacts WHERE user_id = ? AND company_id IS NOT NULL AND company_id = ? AND email IS NOT NULL LIMIT 1", userId, app.company_id ?? "__none__");
+
+  if (!contact?.email) {
+    return {
+      mode: "open" as const,
+      url: app.url ?? null,
+      reason: "No email found for this company, opened the posting so you can apply manually",
+      tracked: true,
+    };
+  }
+
+  let msg = await get<any>(
+    "SELECT * FROM outreach_messages WHERE user_id = ? AND app_id = ? ORDER BY created_at DESC LIMIT 1",
+    userId,
+    appId
+  );
+  if (!msg) {
+    msg = (await createOutreach(userId, {
+      app_id: appId,
+      contact_id: contact.id,
+      subject: app.kind === "pitch" ? PITCH_SUBJECT : AUTO_SUBJECT,
+      body: app.kind === "pitch" ? PITCH_BODY : AUTO_BODY,
+    })) as any;
+  }
+
+  const direct = smtpReady();
+  const res = await sendOutreach(userId, msg.id, { via: direct ? "smtp" : "gmail_open", confirm: true });
+  return {
+    mode: (direct ? "sent" : "compose") as "sent" | "compose",
+    outreach_id: msg.id,
+    email: contact.email,
+    url: app.url ?? null,
+    ...res,
+  };
 }
 
 export function buildGmailComposeUrl(m: { to: string; cc?: string; subject: string; body: string }) {

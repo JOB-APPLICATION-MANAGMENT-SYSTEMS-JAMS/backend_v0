@@ -199,4 +199,28 @@ const ashby: JobSource = {
   },
 };
 
-export const SOURCES: JobSource[] = [arbeitnow, remotive, remoteok, hackernews, greenhouse, lever, ashby];
+/* ------------------------------ Jobicy (free, no key) ---------------------------- */
+const jobicy: JobSource = {
+  name: "jobicy",
+  fetch: async () => {
+    const data = await getJson("https://jobicy.com/api/v2/remote-jobs?count=50&tag=software-dev");
+    return (data.jobs ?? []).map((j: any): RawPosting => ({
+      source: "jobicy",
+      external_id: String(j.id),
+      title: j.jobTitle,
+      company: j.companyName,
+      location: j.jobGeo || j.jobRegion || "Remote",
+      remote: true,
+      salary_min: j.salaryMin ?? null,
+      salary_max: j.salaryMax ?? null,
+      currency: j.salaryCurrency ?? null,
+      employment_type: j.jobType ?? null,
+      description: `${j.intro ?? ""}\n${(j.description ?? "").replace(/<[^>]+>/g, " ")}`.trim().slice(0, 8000),
+      keywords: (j.tags ?? []).slice(0, 12),
+      url: j.url,
+      posted_at: j.pubDate ?? null,
+    }));
+  },
+};
+
+export const SOURCES: JobSource[] = [arbeitnow, remotive, remoteok, jobicy, hackernews, greenhouse, lever, ashby];

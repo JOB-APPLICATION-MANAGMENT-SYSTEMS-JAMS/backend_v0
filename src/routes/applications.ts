@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ok, fail } from "../core/envelope";
 import { requireAuth, type AuthedRequest } from "../core/security";
 import * as apps from "../services/application.service";
+import * as outreach from "../services/outreach.service";
 
 export const applicationRouter = Router();
 applicationRouter.use(requireAuth);
@@ -94,6 +95,19 @@ applicationRouter.put("/:id", async (req: AuthedRequest, res, next) => {
 applicationRouter.delete("/:id", async (req: AuthedRequest, res, next) => {
   try {
     ok(res, "Application deleted", await apps.deleteApplication(req.userId!, String(req.params.id)));
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * POST /applications/:id/auto-apply — direct send when SMTP is configured, Gmail
+ * hand-off compose otherwise, and the plain open-link fallback when no email is
+ * known. Everything is still recorded as an application (or pitch) either way.
+ */
+applicationRouter.post("/:id/auto-apply", async (req: AuthedRequest, res, next) => {
+  try {
+    ok(res, "Auto-apply processed", await outreach.autoApply(req.userId!, String(req.params.id)));
   } catch (e) {
     next(e);
   }

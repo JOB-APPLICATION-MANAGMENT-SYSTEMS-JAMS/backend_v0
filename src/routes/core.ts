@@ -354,6 +354,8 @@ captureRouter.post("/", captureLimiter, async (req: AuthedRequest, res, next) =>
           })
           .optional(),
         action: z.enum(["log_only", "create_draft", "mark_submitted"]).optional(),
+        kind: z.enum(["application", "pitch"]).optional(),
+        contact_email: z.string().optional(),
       })
       .parse(req.body);
     ok(res, "Captured", await captureSvc.capture(req.userId!, body as any), 201);

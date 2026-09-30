@@ -21,4 +21,19 @@ export const config = {
   followUpWeight: Number(process.env.FOLLOW_UP_WEIGHT ?? 0.25),
   workerIntervalMs: Number(process.env.WORKER_INTERVAL_MS ?? 60_000),
   seedDemo: (process.env.SEED_DEMO ?? "true") !== "false",
+  /**
+   * Direct-send SMTP for auto-apply and one-click pitching. Until these are set the
+   * system falls back to the Gmail hand-off (the human presses Send), which is why
+   * healthz/replies keep working without them.
+   */
+  smtp: {
+    host: process.env.SMTP_HOST ?? "",
+    port: Number(process.env.SMTP_PORT ?? 587),
+    user: process.env.SMTP_USER ?? "",
+    pass: process.env.SMTP_PASS ?? "",
+    from: process.env.SMTP_FROM ?? process.env.SMTP_USER ?? "",
+  },
 };
+
+/** True when direct sending is possible (auto-apply sends without a human press). */
+export const smtpReady = (): boolean => !!(config.smtp.host && config.smtp.user && config.smtp.pass);

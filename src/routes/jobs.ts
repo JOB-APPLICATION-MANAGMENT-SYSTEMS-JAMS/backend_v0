@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ok } from "../core/envelope";
 import { requireAuth, type AuthedRequest } from "../core/security";
 import * as jobs from "../services/job.service";
+import { platformSearches, suggestedQueries } from "../search/social";
 import { ingestAll, sourceHealth } from "../ingestion/ingest";
 import { rateLimit } from "../core/middleware";
 
@@ -59,6 +60,25 @@ jobRouter.get("/ingest/status", async (req: AuthedRequest, res, next) => {
   try {
     // await-free status: last known source rows
     ok(res, "Ingestion status", { sources: await sourceHealth() });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * GET /jobs/social?q=… — prepared social-platform searches (software engineering × Nigeria).
+ * Feeds have no API, so we ship the exact query + URL per platform instead of scraping.
+ */
+jobRouter.get("/social", searchLimiter, (req: AuthedRequest, res, next) => {
+  try {
+    const q = typeof req.query.q === "string" ? req.query.q : undefined;
+    ok(res, "Social search recipes", {
+      base_query: (platformSearches(q)[0]?.query ?? ""),
+      platforms: platformSearches(q),
+      suggestions: suggestedQueries(q),
+      scope: "software engineering roles in Nigeria (Lagos, Abuja, Ogun + nationwide)",
+      email_hint: "Capture any result URL: the preview extracts published emails from the page, which is what you pitch or apply with.",
+    });
   } catch (e) {
     next(e);
   }

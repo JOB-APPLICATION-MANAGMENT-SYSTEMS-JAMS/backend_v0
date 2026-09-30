@@ -19,6 +19,10 @@ export interface CaptureInput {
   html_text?: string;
   action?: "log_only" | "create_draft" | "mark_submitted";
   posting_id?: string;
+  /** pitch = CV to a company with no open role; application = replying to a posting. */
+  kind?: "application" | "pitch";
+  /** recipient lifted from the page (or typed) so auto-apply can actually send. */
+  contact_email?: string;
 }
 
 export interface ParsedPosting {
@@ -116,7 +120,7 @@ function guessCompany(title: string, url: string, html?: string): string {
 }
 
 /** Server-side fetch + parse without saving (paste flow / capture preview). */
-export async function previewCapture(userId: string, url: string, htmlText?: string): Promise<{ parsed: ParsedPosting; warnings: string[] }> {
+export async function previewCapture(userId: string, url: string, htmlText?: string): Promise<{ parsed: ParsedPosting; warnings: string[]; emails: string[] }> {
   let html = htmlText ?? "";
   const warnings: string[] = [];
   if (!html) {
@@ -145,6 +149,14 @@ export async function previewCapture(userId: string, url: string, htmlText?: str
   if (!salary.min) warnings.push("salary not found, add manually");
   const description = (ld?.description ? stripTags(ld.description) : text).slice(0, 8000);
   const keywords = extractKeywords(`${title} ${description}`);
+  // emails are the pitch/apply currency: pull every plausible address from the source page
+  const emails = [
+    ...new Set(
+      (`${html}\n${text}`).toLowerCase().match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/g) ?? []
+    ),
+  ]
+    .filter((e) => !/\.(png|jpe?g|gif|svg|webp|css|js|woff2?|ico)$/.test(e) && !e.includes("sentry") && !e.includes("example.") && !e.includes("noreply") && !e.includes("no-reply"))
+    .slice(0, 5);
   let posted_at: string | null = ld?.datePosted ?? null;
   if (!posted_at) {
     const m = text.match(/posted(?:\s+on)?[:\s]+(\w+\s+\d{1,2},?\s+\d{4}|\d{1,2}\s+\w+\s+\d{4})/i);
@@ -169,6 +181,7 @@ export async function previewCapture(userId: string, url: string, htmlText?: str
       warnings,
     },
     warnings,
+    emails,
   };
 }
 
@@ -270,15 +283,30 @@ export async function capture(userId: string, input: CaptureInput) {
 
   if (action !== "log_only") {
     const { createApplication, changeStatus } = await import("./application.service");
+    let contactId: string | null = null;
+    if (input.contact_email?.trim()) {
+      const email = input.contact_email.trim().toLowerCase();
+      const existingContact = await get("SELECT id FROM contacts WHERE user_id = ? AND lower(email) = ?", userId, email);
+      if (existingContact) contactId = existingContact.id;
+      else {
+        contactId = newId();
+        await run(
+          `INSERT INTO contacts (id, user_id, company_id, name, email, source_note, never_contact, created_at)
+           VALUES (?, ?, NULL, 'Contact', ?, ?, 0, ?)`,
+          contactId, userId, email, `captured from ${new URL(input.url).hostname}`, nowIso()
+        );
+      }
+    }
     const app = await createApplication(userId, {
       company_name: parsed.company,
       posting_id: upserted.posting_id,
-      kind: "application",
+      contact_id: contactId,
+      kind: input.kind ?? "application",
       status: "saved",
       role_title: parsed.title,
       source: input.source,
       url: input.url,
-      capture: { ...parsed, captured_via: input.source, captured_at: nowIso(), form_fields: page.form_fields ?? [] },
+      capture: { ...parsed, captured_via: input.source, captured_at: nowIso(), form_fields: page.form_fields ?? [], contact_email: input.contact_email ?? null },
     }, input.source === "extension" ? "extension" : "user");
     application_id = app.id;
     if (action === "mark_submitted") await changeStatus(userId, app.id, "applied");
