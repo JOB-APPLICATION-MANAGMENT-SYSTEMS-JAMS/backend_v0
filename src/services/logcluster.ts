@@ -19,7 +19,7 @@
  * Parser is deliberately regex-based (no cheerio): tables are flat, cells are
  * `<td><p>text</p></td>` with `&nbsp;` padding and inline links.
  */
-import { all, run } from "../core/db";
+import { all, get, run } from "../core/db";
 import { nowIso } from "../util/id";
 
 export type ListSector =
@@ -275,22 +275,48 @@ export async function discoverListPages(force = false): Promise<ListPage[]> {
       sector: r.sector as ListSector,
     }));
 
+  // a catalog younger than a week is authoritative: the sitemap is only re-read
+  // when the stored one is stale (or on an explicit force), which keeps requests
+  // fast and keeps working from networks that cannot reach sitemap.xml at all
+  const fresh = await get<{ n: number }>(`SELECT count(*) AS n FROM logcluster_pages WHERE discovered_at >= ?`, new Date(Date.now() - 7 * 86_400_000).toISOString());
+  if (!force && (fresh?.n ?? 0) > 0) {
+    const pages = await stored();
+    if (pages.length) {
+      catalogCache = { at: Date.now(), pages };
+      return pages;
+    }
+  }
+
   try {
     const urls: string[] = [];
-    // shards in parallel: one slow shard must not eat the whole function budget
-    const shards = await Promise.allSettled(
-      Array.from({ length: 4 }, (_, i) =>
-        fetch(`https://lca.logcluster.org/sitemap.xml?page=${i + 1}`, { headers: UA, signal: AbortSignal.timeout(25_000) }).then(async (res) =>
-          res.ok ? [...(await res.text()).matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]) : []
-        )
-      )
-    );
+    // shards in parallel: one slow shard must not eat the whole function budget.
+    // The site answers 202 with an empty body when it dislikes the request, so a
+    // shard only counts once it actually contains <loc> entries.
+    const shardUrls = async (n: number): Promise<string[]> => {
+      let lastErr = "";
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const res = await fetch(`https://lca.logcluster.org/sitemap.xml?page=${n}`, { headers: UA, signal: AbortSignal.timeout(25_000) });
+          const xml = await res.text();
+          const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+          if (locs.length) return locs;
+          lastErr = `HTTP ${res.status}, empty`;
+        } catch (e) {
+          lastErr = (e as Error).message;
+        }
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      }
+      throw new Error(`sitemap shard ${n}: ${lastErr}`);
+    };
+    const shards = await Promise.allSettled([1, 2, 3, 4].map((n) => shardUrls(n)));
     for (const s of shards) if (s.status === "fulfilled") urls.push(...s.value);
     if (!urls.length) throw new Error("sitemap unreachable");
     const seen = new Set<string>();
     const pages: ListPage[] = [];
     for (const url of urls) {
-      const slug = url.replace(/^https?:\/\/lca\.logcluster\.org\//, "").replace(/\/$/, "").split("?")[0];
+      // the sitemap emits both apex and www hosts; only the path matters here
+      const slug = url.replace(/^https?:\/\/(www\.)?lca\.logcluster\.org\//i, "").replace(/\/$/, "").split("?")[0];
+      if (!slug || slug.includes("://")) continue;
       if (seen.has(slug)) continue;
       seen.add(slug);
       const page = pageFromSlug(slug);

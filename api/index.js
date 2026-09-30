@@ -55971,22 +55971,40 @@ async function discoverListPages(force = false) {
     country: r.country,
     sector: r.sector
   }));
+  const fresh = await get(`SELECT count(*) AS n FROM logcluster_pages WHERE discovered_at >= ?`, new Date(Date.now() - 7 * 864e5).toISOString());
+  if (!force && (fresh?.n ?? 0) > 0) {
+    const pages = await stored();
+    if (pages.length) {
+      catalogCache = { at: Date.now(), pages };
+      return pages;
+    }
+  }
   try {
     const urls = [];
-    const shards = await Promise.allSettled(
-      Array.from(
-        { length: 4 },
-        (_, i) => fetch(`https://lca.logcluster.org/sitemap.xml?page=${i + 1}`, { headers: UA3, signal: AbortSignal.timeout(25e3) }).then(
-          async (res) => res.ok ? [...(await res.text()).matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]) : []
-        )
-      )
-    );
+    const shardUrls = async (n) => {
+      let lastErr = "";
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const res = await fetch(`https://lca.logcluster.org/sitemap.xml?page=${n}`, { headers: UA3, signal: AbortSignal.timeout(25e3) });
+          const xml = await res.text();
+          const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+          if (locs.length) return locs;
+          lastErr = `HTTP ${res.status}, empty`;
+        } catch (e) {
+          lastErr = e.message;
+        }
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      }
+      throw new Error(`sitemap shard ${n}: ${lastErr}`);
+    };
+    const shards = await Promise.allSettled([1, 2, 3, 4].map((n) => shardUrls(n)));
     for (const s of shards) if (s.status === "fulfilled") urls.push(...s.value);
     if (!urls.length) throw new Error("sitemap unreachable");
     const seen = /* @__PURE__ */ new Set();
     const pages = [];
     for (const url of urls) {
-      const slug = url.replace(/^https?:\/\/lca\.logcluster\.org\//, "").replace(/\/$/, "").split("?")[0];
+      const slug = url.replace(/^https?:\/\/(www\.)?lca\.logcluster\.org\//i, "").replace(/\/$/, "").split("?")[0];
+      if (!slug || slug.includes("://")) continue;
       if (seen.has(slug)) continue;
       seen.add(slug);
       const page = pageFromSlug(slug);
@@ -56814,6 +56832,8 @@ var init_pitch = __esm({
     import_express4 = __toESM(require_express2(), 1);
     init_zod();
     init_envelope();
+    init_db();
+    init_id();
     init_errors2();
     init_security();
     init_pitch_service();
@@ -56930,6 +56950,30 @@ var init_pitch = __esm({
             by_sector: pages.reduce((acc, p) => (acc[p.sector] = (acc[p.sector] ?? 0) + 1, acc), {})
           }
         });
+      } catch (e) {
+        next(e);
+      }
+    });
+    pitchRouter.post("/catalog", async (req, res, next) => {
+      try {
+        const body = external_exports.object({
+          pages: external_exports.array(external_exports.object({ slug: external_exports.string().min(3).max(160), country: external_exports.string().min(2).max(80), sector: external_exports.string().min(2).max(40) })).min(1).max(3e3)
+        }).parse(req.body ?? {});
+        const now = nowIso();
+        let stored = 0;
+        for (const p of body.pages) {
+          if (!LIST_SECTORS.includes(p.sector)) continue;
+          await run(
+            `INSERT INTO logcluster_pages (slug, country, sector, discovered_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(slug) DO UPDATE SET country = excluded.country, sector = excluded.sector, discovered_at = excluded.discovered_at`,
+            p.slug,
+            p.country,
+            p.sector,
+            now
+          );
+          stored++;
+        }
+        ok(res, `${stored} catalog pages stored`, { stored, total: (await get(`SELECT count(*) AS n FROM logcluster_pages`))?.n ?? stored });
       } catch (e) {
         next(e);
       }

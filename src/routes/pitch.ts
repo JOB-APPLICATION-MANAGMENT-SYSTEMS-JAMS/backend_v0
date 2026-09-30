@@ -1,11 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
 import { ok } from "../core/envelope";
+import { get, run } from "../core/db";
+import { nowIso } from "../util/id";
 import { validation } from "../core/errors";
 import { requireAuth, type AuthedRequest } from "../core/security";
 import * as pitch from "../services/pitch.service";
 import { composePitch } from "../services/pitch-rewrite";
-import { startRescan, rescanProgress, discoverListPages, enrichEmails, type ListSector } from "../services/logcluster";
+import { startRescan, rescanProgress, discoverListPages, enrichEmails, LIST_SECTORS, type ListSector } from "../services/logcluster";
 import { saveAttachment, saveCvAttachment } from "../services/attachments";
 
 export const pitchRouter = Router();
@@ -152,6 +154,38 @@ pitchRouter.get("/rescan", async (_req, res, next) => {
         by_sector: pages.reduce<Record<string, number>>((acc, p) => ((acc[p.sector!] = (acc[p.sector!] ?? 0) + 1), acc), {}),
       },
     });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * POST /pitch-targets/catalog {pages} — push a discovered catalog. The sitemap is
+ * not reachable from every network (serverless egress included), so the catalog can
+ * also be seeded from a machine that can read it; later runs load it from the table.
+ */
+pitchRouter.post("/catalog", async (req: AuthedRequest, res, next) => {
+  try {
+    const body = z
+      .object({
+        pages: z
+          .array(z.object({ slug: z.string().min(3).max(160), country: z.string().min(2).max(80), sector: z.string().min(2).max(40) }))
+          .min(1)
+          .max(3000),
+      })
+      .parse(req.body ?? {});
+    const now = nowIso();
+    let stored = 0;
+    for (const p of body.pages) {
+      if (!LIST_SECTORS.includes(p.sector as ListSector)) continue;
+      await run(
+        `INSERT INTO logcluster_pages (slug, country, sector, discovered_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(slug) DO UPDATE SET country = excluded.country, sector = excluded.sector, discovered_at = excluded.discovered_at`,
+        p.slug, p.country, p.sector, now
+      );
+      stored++;
+    }
+    ok(res, `${stored} catalog pages stored`, { stored, total: (await get<{ n: number }>(`SELECT count(*) AS n FROM logcluster_pages`))?.n ?? stored });
   } catch (e) {
     next(e);
   }
