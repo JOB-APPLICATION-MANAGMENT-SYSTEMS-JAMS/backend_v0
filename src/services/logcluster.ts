@@ -261,32 +261,60 @@ export function pageFromSlug(slug: string): ListPage | null {
 }
 
 /**
- * Every contact-list page in the sitemap (4 shards of ~6,400 URLs today).
- * Cached for 12h: discovery is a network round-trip and the catalog rarely moves.
+ * Every contact-list page in the sitemap (4 shards of ~6,400 URLs today), cached
+ * in memory for 12h AND in `logcluster_pages` permanently: on a serverless cold
+ * start the sitemap fetch can time out, and the catalog must still be answerable.
  */
 export async function discoverListPages(force = false): Promise<ListPage[]> {
   if (!force && catalogCache && Date.now() - catalogCache.at < CATALOG_TTL) return catalogCache.pages;
-  const urls: string[] = [];
-  for (let shard = 1; shard <= 8; shard++) {
-    const res = await fetch(`https://lca.logcluster.org/sitemap.xml?page=${shard}`, { headers: UA, signal: AbortSignal.timeout(20_000) });
-    if (!res.ok) break;
-    const xml = await res.text();
-    const found = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-    if (!found.length) break;
-    urls.push(...found);
-    if (found.length < 500 && shard > 1) break; // last shard is short
+
+  const stored = async (): Promise<ListPage[]> =>
+    (await all<{ slug: string; country: string; sector: string }>(`SELECT slug, country, sector FROM logcluster_pages`)).map((r) => ({
+      slug: r.slug,
+      country: r.country,
+      sector: r.sector as ListSector,
+    }));
+
+  try {
+    const urls: string[] = [];
+    // shards in parallel: one slow shard must not eat the whole function budget
+    const shards = await Promise.allSettled(
+      Array.from({ length: 4 }, (_, i) =>
+        fetch(`https://lca.logcluster.org/sitemap.xml?page=${i + 1}`, { headers: UA, signal: AbortSignal.timeout(25_000) }).then(async (res) =>
+          res.ok ? [...(await res.text()).matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]) : []
+        )
+      )
+    );
+    for (const s of shards) if (s.status === "fulfilled") urls.push(...s.value);
+    if (!urls.length) throw new Error("sitemap unreachable");
+    const seen = new Set<string>();
+    const pages: ListPage[] = [];
+    for (const url of urls) {
+      const slug = url.replace(/^https?:\/\/lca\.logcluster\.org\//, "").replace(/\/$/, "").split("?")[0];
+      if (seen.has(slug)) continue;
+      seen.add(slug);
+      const page = pageFromSlug(slug);
+      if (page?.sector) pages.push(page);
+    }
+    if (!pages.length) throw new Error("sitemap yielded no contact lists");
+    for (const p of pages) {
+      await run(
+        `INSERT INTO logcluster_pages (slug, country, sector, discovered_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(slug) DO UPDATE SET country = excluded.country, sector = excluded.sector, discovered_at = excluded.discovered_at`,
+        p.slug, p.country, p.sector!, nowIso()
+      );
+    }
+    catalogCache = { at: Date.now(), pages };
+    return pages;
+  } catch (e) {
+    const fallback = await stored();
+    if (fallback.length) {
+      // serve what we already know rather than failing the request
+      catalogCache = { at: Date.now(), pages: fallback };
+      return fallback;
+    }
+    throw e;
   }
-  const seen = new Set<string>();
-  const pages: ListPage[] = [];
-  for (const url of urls) {
-    const slug = url.replace(/^https?:\/\/lca\.logcluster\.org\//, "").replace(/\/$/, "").split("?")[0];
-    if (seen.has(slug)) continue;
-    seen.add(slug);
-    const page = pageFromSlug(slug);
-    if (page?.sector) pages.push(page);
-  }
-  catalogCache = { at: Date.now(), pages };
-  return pages;
 }
 
 /* ------------------------------ fetch helpers ------------------------------ */

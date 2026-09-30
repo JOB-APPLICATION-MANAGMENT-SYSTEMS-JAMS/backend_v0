@@ -355,6 +355,16 @@ CREATE TABLE IF NOT EXISTS pitch_attachments (
   content_b64  TEXT NOT NULL,
   created_at   TEXT NOT NULL
 );
+
+-- the lca.logcluster.org contact-list catalog (slug → country + sector), discovered
+-- from the sitemap once and then served from here: a cold serverless start must not
+-- depend on fetching 4 x 500KB sitemap shards before it can list what it knows.
+CREATE TABLE IF NOT EXISTS logcluster_pages (
+  slug          TEXT PRIMARY KEY,
+  country       TEXT NOT NULL,
+  sector        TEXT NOT NULL,
+  discovered_at TEXT NOT NULL
+);
 `;
 
 /**

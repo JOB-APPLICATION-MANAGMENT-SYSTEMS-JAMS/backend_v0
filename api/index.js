@@ -39430,6 +39430,16 @@ CREATE TABLE IF NOT EXISTS pitch_attachments (
   content_b64  TEXT NOT NULL,
   created_at   TEXT NOT NULL
 );
+
+-- the lca.logcluster.org contact-list catalog (slug \u2192 country + sector), discovered
+-- from the sitemap once and then served from here: a cold serverless start must not
+-- depend on fetching 4 x 500KB sitemap shards before it can list what it knows.
+CREATE TABLE IF NOT EXISTS logcluster_pages (
+  slug          TEXT PRIMARY KEY,
+  country       TEXT NOT NULL,
+  sector        TEXT NOT NULL,
+  discovered_at TEXT NOT NULL
+);
 `;
     SCHEMA_PG = SCHEMA.replace(
       "INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -55956,27 +55966,53 @@ function pageFromSlug(slug) {
 }
 async function discoverListPages(force = false) {
   if (!force && catalogCache && Date.now() - catalogCache.at < CATALOG_TTL) return catalogCache.pages;
-  const urls = [];
-  for (let shard = 1; shard <= 8; shard++) {
-    const res = await fetch(`https://lca.logcluster.org/sitemap.xml?page=${shard}`, { headers: UA3, signal: AbortSignal.timeout(2e4) });
-    if (!res.ok) break;
-    const xml = await res.text();
-    const found = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-    if (!found.length) break;
-    urls.push(...found);
-    if (found.length < 500 && shard > 1) break;
+  const stored = async () => (await all(`SELECT slug, country, sector FROM logcluster_pages`)).map((r) => ({
+    slug: r.slug,
+    country: r.country,
+    sector: r.sector
+  }));
+  try {
+    const urls = [];
+    const shards = await Promise.allSettled(
+      Array.from(
+        { length: 4 },
+        (_, i) => fetch(`https://lca.logcluster.org/sitemap.xml?page=${i + 1}`, { headers: UA3, signal: AbortSignal.timeout(25e3) }).then(
+          async (res) => res.ok ? [...(await res.text()).matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]) : []
+        )
+      )
+    );
+    for (const s of shards) if (s.status === "fulfilled") urls.push(...s.value);
+    if (!urls.length) throw new Error("sitemap unreachable");
+    const seen = /* @__PURE__ */ new Set();
+    const pages = [];
+    for (const url of urls) {
+      const slug = url.replace(/^https?:\/\/lca\.logcluster\.org\//, "").replace(/\/$/, "").split("?")[0];
+      if (seen.has(slug)) continue;
+      seen.add(slug);
+      const page = pageFromSlug(slug);
+      if (page?.sector) pages.push(page);
+    }
+    if (!pages.length) throw new Error("sitemap yielded no contact lists");
+    for (const p of pages) {
+      await run(
+        `INSERT INTO logcluster_pages (slug, country, sector, discovered_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(slug) DO UPDATE SET country = excluded.country, sector = excluded.sector, discovered_at = excluded.discovered_at`,
+        p.slug,
+        p.country,
+        p.sector,
+        nowIso()
+      );
+    }
+    catalogCache = { at: Date.now(), pages };
+    return pages;
+  } catch (e) {
+    const fallback = await stored();
+    if (fallback.length) {
+      catalogCache = { at: Date.now(), pages: fallback };
+      return fallback;
+    }
+    throw e;
   }
-  const seen = /* @__PURE__ */ new Set();
-  const pages = [];
-  for (const url of urls) {
-    const slug = url.replace(/^https?:\/\/lca\.logcluster\.org\//, "").replace(/\/$/, "").split("?")[0];
-    if (seen.has(slug)) continue;
-    seen.add(slug);
-    const page = pageFromSlug(slug);
-    if (page?.sector) pages.push(page);
-  }
-  catalogCache = { at: Date.now(), pages };
-  return pages;
 }
 async function fetchText(url, timeout = 2e4, tries = 2) {
   let lastErr = null;
