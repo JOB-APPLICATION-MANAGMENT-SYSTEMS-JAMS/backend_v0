@@ -5,7 +5,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseContactList, detectCity, slugName } from "../src/services/logcluster";
+import { parseContactList, detectCity, slugName, pageFromSlug, LIST_SECTORS, LIST_LABELS } from "../src/services/logcluster";
 import { mapFirmographicsRecord, SECTOR_KEYWORDS } from "../src/search/stargate";
 
 /** Mirrors the real logcluster markup: nested <p>, mailto links, &nbsp; padding. */
@@ -146,6 +146,58 @@ test("detectCity reads Nigerian cities from the address, defaults to Nigeria", (
   assert.equal(detectCity("Terminal A, Tincan Island Port, Apapa"), "Apapa");
   assert.equal(detectCity("Somewhere Rural"), "Nigeria");
   assert.equal(slugName("Arik Air!"), "arik-air");
+});
+
+test("catalog: sitemap slugs decode to country + sector, junk pages are skipped", () => {
+  const airline = pageFromSlug("45-nigeria-airport-companies-contact-list")!;
+  assert.equal(airline.country, "Nigeria");
+  assert.equal(airline.sector, "airline");
+
+  const ports = pageFromSlug("44-nigeria-port-and-waterways-company-contact-list")!;
+  assert.equal(ports.sector, "port");
+
+  // multi-word country, singular/plural category spelling, contactlist without hyphen
+  const stLucia = pageFromSlug("45-st-lucia-airport-companies-contact-list")!;
+  assert.equal(stLucia.country, "St Lucia");
+  const lab = pageFromSlug("43-nigeria-laboratory-and-quality-testing-companies-contactlist")!;
+  assert.equal(lab.sector, "laboratory");
+  const mills = pageFromSlug("46-ghana-storage-and-milling-companies-contact-list")!;
+  assert.equal(mills.country, "Ghana");
+  assert.equal(mills.sector, "agriculture");
+
+  // narrative pages (country profile, port assessment) are not contact lists
+  assert.equal(pageFromSlug("1-nigeria-country-profile"), null);
+  assert.equal(pageFromSlug("211-nigeria-port-apapa-lagos-state"), null);
+  assert.equal(pageFromSlug("about-lca-tool"), null);
+
+  // every shipped sector has a label and at least one source page
+  for (const s of LIST_SECTORS) {
+    assert.ok(LIST_LABELS[s], `${s} needs a label`);
+  }
+  assert.ok(LIST_SECTORS.length >= 10, "sector picker should offer many curated lists");
+});
+
+test("mailto-only cells and page-scoped ids keep worldwide rows apart", () => {
+  const html = `
+  <table>
+    <tr><td>SN</td><td>Company Name</td><td>Address</td><td>Website</td><td>Email</td><td>Phone</td></tr>
+    <tr>
+      <td>1</td>
+      <td><p>Hidden Inbox Ltd&nbsp;</p></td>
+      <td><p>12 Example Road, Accra&nbsp;</p></td>
+      <td><p>www.hiddeninbox.example&nbsp;</p></td>
+      <td><p><a href="mailto:hello@hiddeninbox.example">contact form</a>&nbsp;</p></td>
+      <td><p>+233 30 000 0000&nbsp;</p></td>
+    </tr>
+  </table>`;
+  const rows = parseContactList(html, "services", "410-ghana-additional-services-contact-list");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].email, "hello@hiddeninbox.example", "address behind a mailto link is not lost");
+  assert.equal(rows[0].email_derived, 0);
+  assert.ok(rows[0].external_id.startsWith("list:services:410-ghana-additional-services-contact-list:"));
+
+  const ng = parseContactList(html, "services");
+  assert.notEqual(ng[0].external_id, rows[0].external_id, "the same company name on two lists is two rows");
 });
 
 test("mapFirmographicsRecord maps the openapi firstPageRecords shape", () => {

@@ -10,6 +10,7 @@ import { analyticsRouter, streakRouter, exportRouter } from "./analytics";
 import { sourceHealth } from "../ingestion/ingest";
 import { z } from "zod";
 import { requireAuth, type AuthedRequest } from "../core/security";
+import { getAttachment } from "../services/attachments";
 import { setGoal } from "../services/streak.service";
 import { driver } from "../core/db";
 import { config } from "../core/config";
@@ -42,6 +43,22 @@ apiRouter.use("/jobs", jobRouter);
 apiRouter.use("/searches", searchRouter);
 apiRouter.use("/applications", applicationRouter);
 apiRouter.use("/companies", companyRouter);
+/**
+ * Public attachment download, registered BEFORE the authed /pitch-targets router:
+ * the CV or file linked inside a pitch email has to open for the recipient, who has
+ * no account. The id is unguessable, which is the whole access control.
+ */
+apiRouter.get("/pitch-targets/attachments/:id/download", async (req, res, next) => {
+  try {
+    const row = await getAttachment(String(req.params.id));
+    res.setHeader("Content-Type", row.content_type || "application/octet-stream");
+    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(row.filename)}"`);
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.send(Buffer.from(row.content_b64, "base64"));
+  } catch (e) {
+    next(e);
+  }
+});
 apiRouter.use("/pitch-targets", pitchRouter);
 apiRouter.use("/capture", captureRouter);
 apiRouter.use("/autofill", autofillRouter);

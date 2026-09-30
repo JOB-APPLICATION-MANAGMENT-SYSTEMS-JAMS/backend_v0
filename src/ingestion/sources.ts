@@ -1,30 +1,46 @@
 import type { JobSource, RawPosting } from "./base";
 
 const UA = { "User-Agent": "JAMS-Ingest/0.1 (personal job tracker)", Accept: "application/json" };
+const BROWSER_UA = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36", Accept: "*/*" };
 
-async function getJson(url: string, timeout = 9000): Promise<any> {
-  const res = await fetch(url, { headers: UA, signal: AbortSignal.timeout(timeout) });
+async function getJson(url: string, timeout = 9000, headers: Record<string, string> = UA): Promise<any> {
+  const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeout) });
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
   return res.json();
 }
+
+const stripTags = (s: string): string => (s ?? "").replace(/<[^>]+>/g, " ").replace(/&nbsp;?/gi, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
 
 /* ------------------------- Arbeitnow (free, no key) ------------------------- */
 const arbeitnow: JobSource = {
   name: "arbeitnow",
   fetch: async () => {
-    const data = await getJson("https://www.arbeitnow.com/api/job-board-api");
-    return (data.data ?? []).map((j: any): RawPosting => ({
-      source: "arbeitnow",
-      external_id: String(j.slug),
-      title: j.title,
-      company: j.company_name,
-      location: j.location,
-      remote: !!j.remote,
-      employment_type: (j.job_types ?? []).join(", ") || null,
-      description: j.description ?? "",
-      url: j.url,
-      posted_at: j.created_at ? new Date(Number(j.created_at) * 1000).toISOString() : null,
-    }));
+    // the board paginates (100/page, hourly updates): three pages per run keeps the
+    // index fresh without re-reading the whole archive every refresh
+    const out: RawPosting[] = [];
+    for (let page = 1; page <= 3; page++) {
+      const data = await getJson(`https://www.arbeitnow.com/api/job-board-api?page=${page}`);
+      const rows = data.data ?? [];
+      for (const j of rows) {
+        out.push({
+          source: "arbeitnow",
+          external_id: String(j.slug),
+          title: j.title,
+          company: j.company_name,
+          location: j.location,
+          remote: !!j.remote,
+          employment_type: (j.job_types ?? []).join(", ") || null,
+          description: stripTags(j.description ?? "").slice(0, 8000),
+          keywords: (j.tags ?? []).slice(0, 12),
+          url: j.url,
+          posted_at: j.created_at ? new Date(Number(j.created_at) * 1000).toISOString() : null,
+        });
+      }
+      if (rows.length < 100) break;
+      if (page < 3) await new Promise((r) => setTimeout(r, 400));
+    }
+    if (!out.length) throw new Error("arbeitnow: empty response");
+    return out;
   },
 };
 
@@ -74,28 +90,85 @@ const remoteok: JobSource = {
   },
 };
 
-/* ------------------------ Hacker News “Who's hiring” (free) ------------------- */
-const hackernews: JobSource = {
+/* --------------- Hacker News “Who is hiring” thread (free, emails in text) ------ */
+/** Latest monthly “Ask HN: Who is hiring?” thread, else the freshest hiring thread. */
+async function whoIsHiringStoryId(): Promise<string | null> {
+  const data = await getJson(
+    "https://hn.algolia.com/api/v1/search_by_date?query=%22Ask%20HN%3A%20Who%20is%20hiring%3F%22&tags=story&hitsPerPage=20"
+  );
+  const hits = (data.hits ?? []).filter((h: any) => /^Ask HN:\s*Who is hiring/i.test(h.title ?? ""));
+  const fresh = hits.find((h: any) => Date.now() - Date.parse(h.created_at) < 60 * 86_400_000) ?? hits[0];
+  return fresh ? String(fresh.objectID) : null;
+}
+
+const hnComments: JobSource = {
   name: "hn",
   fetch: async () => {
-    const data = await getJson("https://hn.algolia.com/api/v1/search_by_date?query=%22is%20hiring%22&tags=story&hitsPerPage=40");
-    return (data.hits ?? [])
-      .filter((h: any) => h.title && /hiring/i.test(h.title) && h.url)
-      .map((h: any): RawPosting => {
-        const title = h.title.replace(/^(Ask HN|Show HN):\s*/i, "");
-        const company = title.split(/\s+is hiring/i)[0]?.trim() || "Unknown";
-        return {
+    const storyId = await whoIsHiringStoryId();
+    if (!storyId) throw new Error("hn: no hiring thread found");
+    const out: RawPosting[] = [];
+    // comment blocks are `Company | Role | Location | …`; many publish an inbox
+    for (let page = 0; page < 3; page++) {
+      const data = await getJson(`https://hn.algolia.com/api/v1/search?tags=comment,story_${storyId}&hitsPerPage=100&page=${page}`);
+      const hits = data.hits ?? [];
+      for (const h of hits) {
+        const text = stripTags(h.comment_text ?? "");
+        if (text.length < 80) continue; // replies and “interested” one-liners
+        const line = (h.comment_text ?? "").replace(/<[^>]+>/g, "").split("\n")[0].trim();
+        const parts = line.split("|").map((s: string) => s.trim()).filter(Boolean);
+        const company = (parts[0] ?? "Unknown").slice(0, 80);
+        // the location column is the 3rd pipe field; ads that put prose there would
+        // otherwise render a whole paragraph where a city belongs
+        const rawLocation = parts[2] ?? null;
+        const location = rawLocation && rawLocation.length <= 60 && !/[.;:]/.test(rawLocation) ? rawLocation : null;
+        out.push({
           source: "hn",
           external_id: String(h.objectID),
-          title: title.slice(0, 140),
-          company: company.slice(0, 80),
-          location: null,
-          remote: null as any,
-          description: h.story_text ?? "",
-          url: h.url,
+          title: (parts[1] ? `${parts[1]} — ${company}` : line.slice(0, 120)).slice(0, 140),
+          company,
+          location,
+          remote: /remote/i.test(location ?? "") || /remote/i.test(text.slice(0, 300)),
+          description: text.slice(0, 8000),
+          url: `https://news.ycombinator.com/item?id=${h.objectID}`,
           posted_at: h.created_at ?? null,
-        };
-      });
+        });
+      }
+      if (hits.length < 100) break;
+      await new Promise((r) => setTimeout(r, 350));
+    }
+    if (!out.length) throw new Error("hn: thread had no parseable comments");
+    return out;
+  },
+};
+
+/* ------------------ Working Nomads RSS (free, no key) ---------------------- */
+const wwr: JobSource = {
+  name: "wwr",
+  fetch: async () => {
+    const res = await fetch("https://weworkremotely.com/categories/remote-programming-jobs.rss", {
+      headers: BROWSER_UA,
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status} for working nomads rss`);
+    const xml = await res.text();
+    const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((m) => m[1]);
+    return items.map((block, i): RawPosting => {
+      const tag = (name: string) => (block.match(new RegExp(`<${name}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${name}>`)) ?? [])[1]?.trim() ?? "";
+      const title = stripTags(tag("title"));
+      const link = tag("link");
+      const company = title.split(/\s+[–—|]\s+/).slice(-1)[0]?.trim() || "Unknown";
+      return {
+        source: "wwr",
+        external_id: link || `wwr-${i}`,
+        title: title.slice(0, 140),
+        company: company.slice(0, 80),
+        location: "Remote",
+        remote: true,
+        description: stripTags(tag("description")).slice(0, 6000),
+        url: link,
+        posted_at: tag("pubDate") ? new Date(tag("pubDate")).toISOString() : null,
+      };
+    });
   },
 };
 
@@ -203,7 +276,9 @@ const ashby: JobSource = {
 const jobicy: JobSource = {
   name: "jobicy",
   fetch: async () => {
-    const data = await getJson("https://jobicy.com/api/v2/remote-jobs?count=50&tag=software-dev");
+    // the `tag=software-dev` filter now returns zero rows; the unfiltered feed is
+    // still the remote-tech board it always was (and jobicy asks for attribution)
+    const data = await getJson("https://jobicy.com/api/v2/remote-jobs?count=50");
     return (data.jobs ?? []).map((j: any): RawPosting => ({
       source: "jobicy",
       external_id: String(j.id),
@@ -223,4 +298,4 @@ const jobicy: JobSource = {
   },
 };
 
-export const SOURCES: JobSource[] = [arbeitnow, remotive, remoteok, jobicy, hackernews, greenhouse, lever, ashby];
+export const SOURCES: JobSource[] = [arbeitnow, remotive, remoteok, jobicy, hnComments, wwr, greenhouse, lever, ashby];

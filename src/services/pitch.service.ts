@@ -11,21 +11,36 @@
 import { all, get, run } from "../core/db";
 import { notFound, validation } from "../core/errors";
 import { newId, nowIso } from "../util/id";
-import { createOutreach, PITCH_SUBJECT, PITCH_BODY, smtpReadyFor } from "./outreach.service";
-import { LIST_SECTORS, refreshContactList } from "./logcluster";
+import { createOutreach, smtpReadyFor } from "./outreach.service";
+import { LIST_SECTORS, LIST_LABELS, refreshContactList, type ListSector } from "./logcluster";
+import { composePitch } from "./pitch-rewrite";
 import { refreshStargate, stargateEnabled } from "../search/stargate";
 
-export type Sector = "supermarket" | "airport" | "manufacturing" | "company" | "airline" | "port";
+export type Sector =
+  | "supermarket"
+  | "airport"
+  | "manufacturing"
+  | "company"
+  | "bank"
+  | ListSector;
 
-export const SECTORS: Sector[] = ["supermarket", "airport", "manufacturing", "company", "airline", "port"];
+/** OSM-backed sectors first (city-scoped), then every curated nationwide list. */
+export const SECTORS: Sector[] = [
+  "supermarket",
+  "airport",
+  "manufacturing",
+  "company",
+  "bank",
+  ...LIST_SECTORS,
+];
 
 export const SECTOR_LABELS: Record<Sector, string> = {
   supermarket: "Supermarkets & retail",
   airport: "Airports & aviation",
   manufacturing: "Manufacturing & industry",
   company: "Company offices",
-  airline: "Airlines (curated list)",
-  port: "Ports & waterways (curated list)",
+  bank: "Banks & financial services",
+  ...LIST_LABELS,
 };
 
 /** Sectors served by curated contact lists instead of OpenStreetMap (nationwide). */
@@ -47,9 +62,22 @@ const SECTOR_TAGS: Record<Sector, string[]> = {
   airport: [`["aeroway"="aerodrome"]`],
   manufacturing: [`["industrial"="manufacturing"]`, `["industrial"="factory"]`, `["craft"="manufacturer"]`, `["man_made"="factory"]`],
   company: [`["office"="company"]`, `["office"="it"]`, `["office"="telecommunication"]`],
-  // airline/port are curated-list sectors and never reach Overpass; tags kept for completeness
+  // banks publish contact:email and websites on OSM, which is where the inbox comes from
+  bank: [`["amenity"="bank"]`, `["office"="bank"]`, `["office"="financial"]`],
+  // every curated-list sector below is served by lca.logcluster.org, never Overpass;
+  // tags are kept only so the Record<Sector, string[]> shape stays honest
   airline: [`["office"="airline"]`],
   port: [`["landuse"="port"]`, `["harbour"="yes"]`],
+  government: [`["office"="government"]`],
+  humanitarian: [`["office"="ngo"]`, `["amenity"="social_facility"]`],
+  laboratory: [`["amenity"="laboratory"]`, `["healthcare"="laboratory"]`],
+  fuel: [`["amenity"="fuel"]`],
+  transporter: [`["office"="transportation"]`],
+  railway: [`["railway"="station"]`],
+  waste: [`["amenity"="recycling"]`, `["shop"="trash_disposal"]`],
+  supplier: [`["office"="company"]`],
+  services: [`["office"="service"]`],
+  agriculture: [`["landuse"="farm"]`, `["shop"="farm"]`],
 };
 
 /** Build the Overpass QL for a city/sector pair. Pure, so tests can assert it. */
@@ -288,6 +316,13 @@ export async function searchPitchTargets(p: PitchSearchParams = {}) {
   };
 }
 
+/** Raw target row, shared by prepare and the rewrite endpoint. */
+export async function targetByExternalId(externalId: string) {
+  const target = await get<any>(`SELECT * FROM pitch_targets WHERE external_id = ?`, externalId);
+  if (!target) throw notFound("Pitch target");
+  return target;
+}
+
 /**
  * One click: company + contact + pitch application + outreach draft, ready to send.
  * Everything stays a draft until the send endpoint is called (§26.1 confirm rule).
@@ -323,13 +358,22 @@ export async function preparePitch(userId: string, externalId: string) {
 
   const appId = newId();
   const now = nowIso();
+  // category-aware wording: the sector decides the hooks, value props and register,
+  // the external id seeds the variant so every target starts from a stable text
+  const composed = await composePitch({
+    kind: "pitch",
+    category: target.sector,
+    company: target.name,
+    city: target.city,
+    seed: target.external_id,
+  });
   await run(
     `INSERT INTO applications (id, user_id, company_id, contact_id, kind, status, role_title, company_name, source, url, created_at, updated_at)
      VALUES (?, ?, ?, ?, 'pitch', 'saved', ?, ?, 'pitch_target', ?, ?, ?)`,
-    appId, userId, companyId, contactId, `Software help pitch`, target.name, target.website, now, now
+    appId, userId, companyId, contactId, `Software help pitch (${composed.category})`, target.name, target.website, now, now
   );
 
-  const msg: any = await createOutreach(userId, { app_id: appId, contact_id: contactId, subject: PITCH_SUBJECT, body: PITCH_BODY });
+  const msg: any = await createOutreach(userId, { app_id: appId, contact_id: contactId, subject: composed.subject, body: composed.body });
 
   return {
     application_id: appId,
@@ -341,6 +385,8 @@ export async function preparePitch(userId: string, externalId: string) {
     smtp_ready: await smtpReadyFor(userId),
     company: { id: companyId, name: target.name },
     contact: { id: contactId, email: target.email, email_derived: !!target.email_derived },
+    // the composer's own audit: score + per-check detail, surfaced by the preview
+    compose: { score: composed.score, checks: composed.checks, category: composed.category, variant: composed.variant },
     target,
   };
 }

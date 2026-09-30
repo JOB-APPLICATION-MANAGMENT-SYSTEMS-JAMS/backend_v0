@@ -24,6 +24,26 @@ export const driver: "postgres" | "sqlite" = pgUrl ? "postgres" : "sqlite";
 let pgPoolPromise: Promise<pg.Pool> | null = null;
 let sqlitePromise: Promise<DatabaseSync> | null = null;
 
+/**
+ * Columns shipped after the first release. `CREATE IF NOT EXISTS` never alters an
+ * existing table, so both drivers run these at boot: a database created last month
+ * gains the column, a fresh one already has it in the DDL above.
+ */
+const ENSURE_COLUMNS: { table: string; column: string; ddl: string }[] = [
+  { table: "job_postings", column: "contact_email", ddl: "ALTER TABLE job_postings ADD COLUMN contact_email TEXT" },
+  { table: "pitch_targets", column: "country", ddl: "ALTER TABLE pitch_targets ADD COLUMN country TEXT" },
+];
+
+/** Idempotent statements for databases created before they existed. */
+const BOOT_SQL = [
+  // pre-existing databases: the old index was global (source, external_id), which
+  // made the second account's ingest fail on UNIQUE while dedupe is per user
+  "DROP INDEX IF EXISTS ux_postings_src_ext",
+  "CREATE UNIQUE INDEX IF NOT EXISTS ux_postings_user_src_ext ON job_postings(user_id, source, external_id)",
+  "CREATE INDEX IF NOT EXISTS ix_postings_email ON job_postings(contact_email)",
+  "CREATE INDEX IF NOT EXISTS ix_pitch_sector ON pitch_targets(sector, email_derived)",
+];
+
 function getPool(): Promise<pg.Pool> {
   if (!pgPoolPromise) {
     pgPoolPromise = (async () => {
@@ -36,6 +56,15 @@ function getPool(): Promise<pg.Pool> {
         ...(pgUrl?.includes("sslmode=require") ? { ssl: { rejectUnauthorized: false } } : {}),
       });
       await pool.query(SCHEMA_PG); // idempotent CREATE IF NOT EXISTS, one round-trip per cold start
+      for (const c of ENSURE_COLUMNS) {
+        try {
+          const res = await pool.query(`SELECT 1 FROM information_schema.columns WHERE table_name = $1 AND column_name = $2`, [c.table, c.column]);
+          if (!res.rowCount) await pool.query(c.ddl);
+        } catch (e) {
+          console.warn(`[db] could not ensure ${c.table}.${c.column}:`, (e as Error).message);
+        }
+      }
+      for (const sql of BOOT_SQL) await pool.query(sql).catch((e) => console.warn("[db] boot sql:", (e as Error).message));
       return pool;
     })();
     pgPoolPromise.catch(() => {
@@ -55,7 +84,24 @@ async function getSqlite(): Promise<DatabaseSync> {
       const db = new DatabaseSync(config.dbPath);
       db.exec("PRAGMA journal_mode = WAL;");
       db.exec("PRAGMA foreign_keys = ON;");
+      // a restart while an ingest is still writing must wait for the lock, not crash
+      db.exec("PRAGMA busy_timeout = 8000;");
       db.exec(SCHEMA);
+      for (const c of ENSURE_COLUMNS) {
+        try {
+          const cols = db.prepare(`PRAGMA table_info(${c.table})`).all() as { name: string }[];
+          if (!cols.some((r) => r.name === c.column)) db.exec(c.ddl);
+        } catch (e) {
+          console.warn(`[db] could not ensure ${c.table}.${c.column}:`, (e as Error).message);
+        }
+      }
+      for (const sql of BOOT_SQL) {
+        try {
+          db.exec(sql);
+        } catch (e) {
+          console.warn("[db] boot sql:", (e as Error).message);
+        }
+      }
       return db;
     })();
     sqlitePromise.catch(() => {

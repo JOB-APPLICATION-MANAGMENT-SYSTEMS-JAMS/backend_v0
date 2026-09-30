@@ -1,8 +1,12 @@
 import { Router } from "express";
 import { z } from "zod";
 import { ok } from "../core/envelope";
+import { validation } from "../core/errors";
 import { requireAuth, type AuthedRequest } from "../core/security";
 import * as pitch from "../services/pitch.service";
+import { composePitch } from "../services/pitch-rewrite";
+import { startRescan, rescanProgress, discoverListPages, enrichEmails, type ListSector } from "../services/logcluster";
+import { saveAttachment, saveCvAttachment } from "../services/attachments";
 
 export const pitchRouter = Router();
 pitchRouter.use(requireAuth);
@@ -66,6 +70,127 @@ pitchRouter.post("/:externalId/prepare", async (req: AuthedRequest, res, next) =
   try {
     const externalId = decodeURIComponent(String(req.params.externalId));
     ok(res, "Pitch prepared (draft)", await pitch.preparePitch(req.userId!, externalId), 201);
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * POST /pitch-targets/rewrite {external_id | company, seed} — regenerate the wording.
+ * Same pipeline as prepare (category hooks + seeded selection + grammar passes), a
+ * different seed: this is the Refresh button. Text is returned, not saved, so the
+ * preview can be cycled without touching the stored draft until the user keeps it.
+ */
+pitchRouter.post("/rewrite", async (req: AuthedRequest, res, next) => {
+  try {
+    const body = z
+      .object({
+        external_id: z.string().optional(),
+        company: z.string().optional(),
+        role: z.string().optional(),
+        kind: z.enum(["pitch", "application"]).optional(),
+        seed: z.union([z.string(), z.number()]).optional(),
+      })
+      .parse(req.body ?? {});
+    let company = body.company;
+    let category: string | null | undefined;
+    let city: string | null | undefined;
+    if (body.external_id) {
+      const t = await pitch.targetByExternalId(body.external_id);
+      company = company ?? t.name;
+      category = t.sector;
+      city = t.city;
+    }
+    if (!company) throw validation("external_id or company is required");
+    const composed = await composePitch({
+      kind: body.kind ?? "pitch",
+      category,
+      company,
+      role: body.role,
+      city,
+      seed: body.seed ?? `${Date.now()}`,
+    });
+    ok(res, "Wording regenerated", composed);
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * POST /pitch-targets/rescan {scope, categories?, limit?, force?, enrich?} — walk the
+ * worldwide contact-list catalog (or just Nigeria) in the background; poll
+ * GET /pitch-targets/rescan for progress. This is where the ~10,000 companies come from.
+ */
+pitchRouter.post("/rescan", async (req: AuthedRequest, res, next) => {
+  try {
+    const body = z
+      .object({
+        scope: z.enum(["all", "nigeria"]).optional(),
+        categories: z.array(z.string()).optional(),
+        limit: z.number().int().positive().max(2000).optional(),
+        force: z.boolean().optional(),
+        enrich: z.boolean().optional(),
+      })
+      .default({})
+      .parse(req.body ?? {});
+    const state = startRescan({ ...body, categories: body.categories as ListSector[] | undefined });
+    ok(res, state.status === "running" ? "Rescan already running" : "Rescan enqueued", state, 202);
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** Live progress of the catalog walk: pages, rows, emails, errors. */
+pitchRouter.get("/rescan", async (_req, res, next) => {
+  try {
+    const pages = await discoverListPages().catch(() => []);
+    ok(res, "Rescan progress", {
+      progress: rescanProgress(),
+      catalog: {
+        lists_available: pages.length,
+        countries: new Set(pages.map((p) => p.country)).size,
+        by_sector: pages.reduce<Record<string, number>>((acc, p) => ((acc[p.sector!] = (acc[p.sector!] ?? 0) + 1), acc), {}),
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** POST /pitch-targets/enrich {limit} — visit company sites and pick up published inboxes. */
+pitchRouter.post("/enrich", async (req: AuthedRequest, res, next) => {
+  try {
+    const body = z.object({ limit: z.number().int().positive().max(5000).optional() }).default({}).parse(req.body ?? {});
+    const updated = await enrichEmails({ limit: body.limit ?? 500 });
+    ok(res, `${updated} emails discovered from company websites`, { updated });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * POST /pitch-targets/attach — either a file (base64) or a CV Studio document
+ * (`cv_id`), which is rendered to a self-contained HTML file. The answer's `url` is
+ * the public link that goes into the email body.
+ */
+pitchRouter.post("/attach", async (req: AuthedRequest, res, next) => {
+  try {
+    const body = z
+      .object({
+        filename: z.string().min(1).max(200),
+        content_type: z.string().max(120).optional(),
+        content_b64: z.string().optional(),
+        cv_id: z.string().optional(),
+      })
+      .parse(req.body ?? {});
+    const saved = body.cv_id
+      ? await saveCvAttachment(req.userId!, body.cv_id)
+      : await saveAttachment(req.userId!, {
+          filename: body.filename,
+          content_type: body.content_type ?? "application/octet-stream",
+          content_b64: body.content_b64 ?? "",
+        });
+    ok(res, "Attachment stored", saved, 201);
   } catch (e) {
     next(e);
   }

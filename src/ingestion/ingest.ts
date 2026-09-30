@@ -6,6 +6,16 @@ import { profileSignals } from "../services/profile-signals";
 import { scorePosting, extractKeywords } from "../services/scoring.service";
 import { dedupeKey } from "./base";
 
+/** First deliverability-shaped address in a posting's text (job ads print apply@…). */
+const STRICT_EMAIL = /^[a-z0-9._%+-]+@(?:[a-z0-9-]+\.)+[a-z]{2,}$/i;
+const FREE_DOMAINS = new Set(["gmail.com", "googlemail.com", "yahoo.com", "hotmail.com", "outlook.com", "live.com", "aol.com", "icloud.com", "mail.com"]);
+export function findContactEmail(text: string): string | null {
+  const matches = (text.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) ?? [])
+    .map((e) => e.toLowerCase().replace(/[.,;]+$/, ""))
+    .filter((e) => STRICT_EMAIL.test(e));
+  return matches.find((e) => !FREE_DOMAINS.has(e.split("@")[1])) ?? matches[0] ?? null;
+}
+
 export interface IngestResult {
   sources_ok: string[];
   sources_failed: { source: string; error: string }[];
@@ -19,7 +29,12 @@ export interface IngestResult {
 export async function ingestAll(userId: string, opts: { sources?: string[] } = {}): Promise<IngestResult> {
   const t0 = Date.now();
   const signals = await profileSignals(userId);
-  const enabled = opts.sources?.length ? opts.sources : (await all<{ name: string; enabled: number }>("SELECT name, enabled FROM sources WHERE enabled = 1")).map((s) => s.name);
+  // enabled by default: a source with no row yet (first run, or one added in a new
+  // release) must not be silently skipped — only an explicit `enabled = 0` blocks it
+  const disabled = new Set(
+    (await all<{ name: string; enabled: number }>("SELECT name FROM sources WHERE enabled = 0")).map((s) => s.name)
+  );
+  const enabled = opts.sources?.length ? opts.sources : SOURCES.map((s) => s.name).filter((n) => !disabled.has(n));
   const sources_ok: string[] = [];
   const sources_failed: { source: string; error: string }[] = [];
   let inserted = 0;
@@ -41,6 +56,9 @@ export async function ingestAll(userId: string, opts: { sources?: string[] } = {
       let found = 0;
       for (const item of raw) {
         const n = normalize(item);
+        // apply-by-email: the address published in the posting text, if any. This is
+        // what the Jobs-with-emails view and auto-apply fall back to.
+        const contactEmail = findContactEmail(`${n.title ?? ""} ${n.description ?? ""}`);
         const uniq = `${src.name}:${item.external_id}`;
         if (existingKeys.has(uniq)) {
           refreshed++;
@@ -65,8 +83,8 @@ export async function ingestAll(userId: string, opts: { sources?: string[] } = {
         const keywords = n.keywords?.length ? n.keywords : extractKeywords(`${n.title} ${n.description ?? ""}`);
         await run(
           `INSERT INTO job_postings (id, user_id, company_name, source, external_id, title, location, remote, salary_min, salary_max, currency,
-             seniority, employment_type, career_category, description, jd_keywords, url, posted_at, first_seen_at, last_seen_at, score, explain, dedupe_key, status, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
+             seniority, employment_type, career_category, description, jd_keywords, url, posted_at, first_seen_at, last_seen_at, score, explain, dedupe_key, status, contact_email, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`,
           newId(),
           userId,
           n.company,
@@ -90,6 +108,7 @@ export async function ingestAll(userId: string, opts: { sources?: string[] } = {
           scored.score,
           JSON.stringify(scored.explain),
           n.dedupe_key,
+          contactEmail,
           nowIso()
         );
         keySeen.add(n.dedupe_key);
@@ -97,12 +116,14 @@ export async function ingestAll(userId: string, opts: { sources?: string[] } = {
         found++;
       }
       sources_ok.push(src.name);
+      // items_found = how many rows the source RETURNED, not how many were new:
+      // counting inserts only made every chip read 0 after the first successful run
       await run(
         `INSERT INTO sources (name, enabled, last_run_at, items_found, error_streak, last_error) VALUES (?, 1, ?, ?, 0, NULL)
          ON CONFLICT(name) DO UPDATE SET last_run_at = excluded.last_run_at, items_found = excluded.items_found, error_streak = 0, last_error = NULL`,
         src.name,
         nowIso(),
-        found
+        raw.length
       );
     } catch (e: any) {
       sources_failed.push({ source: src.name, error: String(e.message ?? e) });

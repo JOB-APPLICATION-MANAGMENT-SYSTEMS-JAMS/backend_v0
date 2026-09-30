@@ -144,9 +144,13 @@ CREATE TABLE IF NOT EXISTS job_postings (
   explain          TEXT,                    -- JSON array of {factor, weight, points, why}
   dedupe_key       TEXT NOT NULL,
   status           TEXT NOT NULL DEFAULT 'open',
+  contact_email    TEXT,           -- published apply-by-email address found in the posting text
   created_at       TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS ux_postings_src_ext ON job_postings(source, external_id);
+/* per-user uniqueness: two accounts may each hold the same external posting
+   (their scores, votes and pipelines are independent). The old global
+   ux_postings_src_ext index is dropped at boot by core/db. */
+CREATE UNIQUE INDEX IF NOT EXISTS ux_postings_user_src_ext ON job_postings(user_id, source, external_id);
 CREATE INDEX IF NOT EXISTS ix_postings_cat_seen ON job_postings(career_category, posted_at DESC);
 CREATE INDEX IF NOT EXISTS ix_postings_dedupe ON job_postings(dedupe_key);
 CREATE INDEX IF NOT EXISTS ix_postings_user ON job_postings(user_id);
@@ -334,7 +338,22 @@ CREATE TABLE IF NOT EXISTS pitch_targets (
   phone         TEXT,
   lat           REAL,
   lon           REAL,
+  country       TEXT,               -- curated lists are worldwide: country of the source page
   fetched_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_pitch_sector ON pitch_targets(sector, email_derived);
+
+-- attachments for pitch/application emails (CV from CV Studio, uploaded files).
+-- base64 in TEXT keeps one code path for sqlite and Postgres; ids are unguessable
+-- so the public download link below can hand the file to the recipient.
+CREATE TABLE IF NOT EXISTS pitch_attachments (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL,
+  filename     TEXT NOT NULL,
+  content_type TEXT NOT NULL,
+  size_bytes   INTEGER NOT NULL,
+  content_b64  TEXT NOT NULL,
+  created_at   TEXT NOT NULL
 );
 `;
 

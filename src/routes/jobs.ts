@@ -29,6 +29,7 @@ jobRouter.get("/search", searchLimiter, async (req: AuthedRequest, res, next) =>
       page: q.page ? Number(q.page) : 1,
       page_size: q.page_size ? Number(q.page_size) : 20,
       exclude: toArray(q.exclude),
+      has_email: q.has_email,
     });
     ok(res, `${result.pagination.total_count} results in ${result.took_ms}ms`, result);
   } catch (e) {

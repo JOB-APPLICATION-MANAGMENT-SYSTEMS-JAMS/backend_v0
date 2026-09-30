@@ -17,6 +17,8 @@ export interface SearchParams {
   page?: number;
   page_size?: number;
   exclude?: string[]; // applied | ignored | seen
+  /** only postings that publish an apply-by-email address */
+  has_email?: boolean | "true" | "false";
 }
 
 /** Search: pre-filter in SQL → score+explain in Python-space → facets → paginate (§34.2). */
@@ -59,6 +61,7 @@ export async function searchJobs(userId: string, p: SearchParams) {
     const like = `%${p.q.toLowerCase()}%`;
     args.push(like, like, like, like);
   }
+  if (p.has_email === true || p.has_email === "true") where.push("contact_email IS NOT NULL");
 
   const exclude = p.exclude ?? ["applied", "ignored"];
   const excludeClauses: string[] = [];
@@ -130,6 +133,7 @@ export async function searchJobs(userId: string, p: SearchParams) {
       seniority: r.seniority,
       source: r.source,
       category: r.career_category,
+      contact_email: r.contact_email ?? null,
       url: r.url,
       posted_at: r.posted_at,
       score: fresh.score,

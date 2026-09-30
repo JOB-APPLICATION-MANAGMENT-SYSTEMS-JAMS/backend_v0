@@ -4,6 +4,7 @@ import { newId, nowIso } from "../util/id";
 import { config, smtpReady } from "../core/config";
 import nodemailer from "nodemailer";
 import { mergeTemplate } from "./cv.service";
+import { composePitch } from "./pitch-rewrite";
 import { writeEvent, changeStatus } from "./application.service";
 import { recordEffort } from "./streak.service";
 import { classify, correctionEffect, type Classification } from "./classify.service";
@@ -211,6 +212,18 @@ export async function smtpReadyFor(userId: string): Promise<boolean> {
   return !!(await smtpForUser(userId));
 }
 
+/** Category + role behind an application, so the wording can match the job/sector. */
+async function pitchContext(userId: string, app: any): Promise<{ category: string | null; role: string | null }> {
+  if (app.kind === "pitch") {
+    const t = await get<any>(`SELECT sector FROM pitch_targets WHERE name = ?`, app.company_name);
+    return { category: t?.sector ?? null, role: null };
+  }
+  const posting = app.url
+    ? await get<any>(`SELECT career_category, title FROM job_postings WHERE user_id = ? AND url = ? LIMIT 1`, userId, app.url)
+    : null;
+  return { category: posting?.career_category ?? null, role: app.role_title ?? posting?.title ?? null };
+}
+
 const AUTO_SUBJECT = `Application: {{posting.role}}`;
 const AUTO_BODY = `Hello,
 
@@ -231,9 +244,31 @@ export async function autoApply(userId: string, appId: string) {
   const app = await get<any>("SELECT * FROM applications WHERE id = ? AND user_id = ?", appId, userId);
   if (!app) throw notFound("Application");
 
-  const contact = app.contact_id
+  let contact = app.contact_id
     ? await get<any>("SELECT * FROM contacts WHERE id = ? AND user_id = ?", app.contact_id, userId)
     : await get<any>("SELECT * FROM contacts WHERE user_id = ? AND company_id IS NOT NULL AND company_id = ? AND email IS NOT NULL LIMIT 1", userId, app.company_id ?? "__none__");
+
+  if (!contact?.email) {
+    // apply-by-email: fall back to the address published in the posting text itself
+    const posting = app.url
+      ? await get<any>(`SELECT contact_email, career_category FROM job_postings WHERE user_id = ? AND url = ? AND contact_email IS NOT NULL LIMIT 1`, userId, app.url)
+      : null;
+    if (posting?.contact_email) {
+      const email = posting.contact_email.toLowerCase();
+      let c = await get<any>(`SELECT id FROM contacts WHERE user_id = ? AND lower(email) = ?`, userId, email);
+      if (!c) {
+        const cid = newId();
+        await run(
+          `INSERT INTO contacts (id, user_id, company_id, name, role, email, source_note, never_contact, created_at)
+           VALUES (?, ?, ?, 'Apply-by-email', NULL, ?, ?, 0, ?)`,
+          cid, userId, app.company_id ?? null, email, `published in the posting for ${app.role_title ?? "this role"}`, nowIso()
+        );
+        c = { id: cid };
+      }
+      await run(`UPDATE applications SET contact_id = ? WHERE id = ?`, c.id, appId);
+      contact = { id: c.id, email };
+    }
+  }
 
   if (!contact?.email) {
     return {
@@ -250,11 +285,21 @@ export async function autoApply(userId: string, appId: string) {
     appId
   );
   if (!msg) {
+    // category-aware wording: hooks and value props that match this kind of company
+    // and role, seeded by the application so re-runs do not shuffle the text
+    const ctx = await pitchContext(userId, app);
+    const composed = await composePitch({
+      kind: app.kind === "pitch" ? "pitch" : "application",
+      category: ctx.category,
+      company: app.company_name,
+      role: ctx.role,
+      seed: appId,
+    });
     msg = (await createOutreach(userId, {
       app_id: appId,
       contact_id: contact.id,
-      subject: app.kind === "pitch" ? PITCH_SUBJECT : AUTO_SUBJECT,
-      body: app.kind === "pitch" ? PITCH_BODY : AUTO_BODY,
+      subject: composed.subject,
+      body: composed.body,
     })) as any;
   }
 

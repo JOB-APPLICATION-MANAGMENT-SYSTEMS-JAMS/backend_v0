@@ -53,22 +53,32 @@ export function inferSeniority(title: string, text = ""): string | null {
 
 export function normalize(raw: RawPosting, now = new Date()): Omit<RawPosting, "source" | "external_id"> & { dedupe_key: string; first_seen_at: string } {
   const text = raw.description ?? "";
+  // feeds are loosely typed: Jobicy hands back objects where a string is declared,
+  // and SQLite refuses to bind an object — coerce every scalar before it hits SQL
+  const asText = (v: any): string | null =>
+    v == null ? null : typeof v === "string" ? v.trim() || null : typeof v === "number" || typeof v === "boolean" ? String(v) : JSON.stringify(v);
+  const asNum = (v: any): number | null => {
+    if (v == null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const location = asText(raw.location);
   return {
     title: raw.title.trim(),
-    company: (raw.company || "Unknown").trim(),
-    location: raw.location ?? null,
+    company: asText(raw.company) ?? "Unknown",
+    location,
     remote: raw.remote ?? /remote|anywhere|worldwide/i.test(`${raw.location ?? ""} ${text.slice(0, 300)}`),
-    salary_min: raw.salary_min ?? null,
-    salary_max: raw.salary_max ?? null,
-    currency: raw.currency ?? null,
-    seniority: raw.seniority ?? inferSeniority(raw.title, text),
-    employment_type: raw.employment_type ?? null,
+    salary_min: asNum(raw.salary_min),
+    salary_max: asNum(raw.salary_max),
+    currency: asText(raw.currency),
+    seniority: asText(raw.seniority) ?? inferSeniority(raw.title, text),
+    employment_type: asText(raw.employment_type),
     category: raw.category ?? "software_engineering",
     description: (text ?? "").slice(0, 12000),
     keywords: raw.keywords ?? [],
-    url: raw.url,
-    posted_at: raw.posted_at ?? null,
-    dedupe_key: dedupeKey(raw.title, raw.company, raw.location),
+    url: asText(raw.url) ?? "",
+    posted_at: asText(raw.posted_at),
+    dedupe_key: dedupeKey(raw.title, asText(raw.company) ?? "Unknown", location),
     first_seen_at: now.toISOString(),
   };
 }

@@ -18,7 +18,8 @@ export function createApp() {
       credentials: true,
     })
   );
-  app.use(express.json({ limit: "2mb" }));
+  // 8mb: the pitch preview uploads files/CVs as base64 JSON (§19.1 attachments)
+  app.use(express.json({ limit: "8mb" }));
   app.use(requestContext);
   startRateLimitSweeper();
 

@@ -1507,7 +1507,7 @@ var require_safer = __commonJS({
       };
     }
     if (!Safer.alloc) {
-      Safer.alloc = function(size, fill, encoding) {
+      Safer.alloc = function(size, fill2, encoding) {
         if (typeof size !== "number") {
           throw new TypeError('The "size" argument must be of type number. Received type ' + typeof size);
         }
@@ -1515,12 +1515,12 @@ var require_safer = __commonJS({
           throw new RangeError('The value "' + size + '" is invalid for option "size"');
         }
         var buf = Buffer2(size);
-        if (!fill || fill.length === 0) {
+        if (!fill2 || fill2.length === 0) {
           buf.fill(0);
         } else if (typeof encoding === "string") {
-          buf.fill(fill, encoding);
+          buf.fill(fill2, encoding);
         } else {
-          buf.fill(fill);
+          buf.fill(fill2);
         }
         return buf;
       };
@@ -28217,16 +28217,16 @@ var require_safe_buffer = __commonJS({
       }
       return Buffer2(arg, encodingOrOffset, length);
     };
-    SafeBuffer.alloc = function(size, fill, encoding) {
+    SafeBuffer.alloc = function(size, fill2, encoding) {
       if (typeof size !== "number") {
         throw new TypeError("Argument must be a number");
       }
       var buf = Buffer2(size);
-      if (fill !== void 0) {
+      if (fill2 !== void 0) {
         if (typeof encoding === "string") {
-          buf.fill(fill, encoding);
+          buf.fill(fill2, encoding);
         } else {
-          buf.fill(fill);
+          buf.fill(fill2);
         }
       } else {
         buf.fill(0);
@@ -38126,15 +38126,15 @@ var require_pg_pool = __commonJS({
       });
       return { callback: cb, result };
     }
-    function makeIdleListener(pool, client) {
+    function makeIdleListener(pool2, client) {
       return function idleListener(err) {
         err.client = client;
         client.removeListener("error", idleListener);
         client.on("error", () => {
-          pool.log("additional client error after disconnection due to error", err);
+          pool2.log("additional client error after disconnection due to error", err);
         });
-        pool._remove(client);
-        pool.emit("error", err, client);
+        pool2._remove(client);
+        pool2.emit("error", err, client);
       };
     }
     var Pool2 = class extends EventEmitter7 {
@@ -39219,9 +39219,13 @@ CREATE TABLE IF NOT EXISTS job_postings (
   explain          TEXT,                    -- JSON array of {factor, weight, points, why}
   dedupe_key       TEXT NOT NULL,
   status           TEXT NOT NULL DEFAULT 'open',
+  contact_email    TEXT,           -- published apply-by-email address found in the posting text
   created_at       TEXT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS ux_postings_src_ext ON job_postings(source, external_id);
+/* per-user uniqueness: two accounts may each hold the same external posting
+   (their scores, votes and pipelines are independent). The old global
+   ux_postings_src_ext index is dropped at boot by core/db. */
+CREATE UNIQUE INDEX IF NOT EXISTS ux_postings_user_src_ext ON job_postings(user_id, source, external_id);
 CREATE INDEX IF NOT EXISTS ix_postings_cat_seen ON job_postings(career_category, posted_at DESC);
 CREATE INDEX IF NOT EXISTS ix_postings_dedupe ON job_postings(dedupe_key);
 CREATE INDEX IF NOT EXISTS ix_postings_user ON job_postings(user_id);
@@ -39409,7 +39413,22 @@ CREATE TABLE IF NOT EXISTS pitch_targets (
   phone         TEXT,
   lat           REAL,
   lon           REAL,
+  country       TEXT,               -- curated lists are worldwide: country of the source page
   fetched_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_pitch_sector ON pitch_targets(sector, email_derived);
+
+-- attachments for pitch/application emails (CV from CV Studio, uploaded files).
+-- base64 in TEXT keeps one code path for sqlite and Postgres; ids are unguessable
+-- so the public download link below can hand the file to the recipient.
+CREATE TABLE IF NOT EXISTS pitch_attachments (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL,
+  filename     TEXT NOT NULL,
+  content_type TEXT NOT NULL,
+  size_bytes   INTEGER NOT NULL,
+  content_b64  TEXT NOT NULL,
+  created_at   TEXT NOT NULL
 );
 `;
     SCHEMA_PG = SCHEMA.replace(
@@ -39425,7 +39444,7 @@ import path2 from "node:path";
 function getPool() {
   if (!pgPoolPromise) {
     pgPoolPromise = (async () => {
-      const pool = new esm_default.Pool({
+      const pool2 = new esm_default.Pool({
         connectionString: pgUrl,
         max: 3,
         idleTimeoutMillis: 3e4,
@@ -39433,8 +39452,17 @@ function getPool() {
         // Neon terminates idle connections and requires TLS; sslmode=require in the URL
         ...pgUrl?.includes("sslmode=require") ? { ssl: { rejectUnauthorized: false } } : {}
       });
-      await pool.query(SCHEMA_PG);
-      return pool;
+      await pool2.query(SCHEMA_PG);
+      for (const c of ENSURE_COLUMNS) {
+        try {
+          const res = await pool2.query(`SELECT 1 FROM information_schema.columns WHERE table_name = $1 AND column_name = $2`, [c.table, c.column]);
+          if (!res.rowCount) await pool2.query(c.ddl);
+        } catch (e) {
+          console.warn(`[db] could not ensure ${c.table}.${c.column}:`, e.message);
+        }
+      }
+      for (const sql of BOOT_SQL) await pool2.query(sql).catch((e) => console.warn("[db] boot sql:", e.message));
+      return pool2;
     })();
     pgPoolPromise.catch(() => {
       pgPoolPromise = null;
@@ -39451,7 +39479,23 @@ async function getSqlite() {
       const db = new DatabaseSync(config.dbPath);
       db.exec("PRAGMA journal_mode = WAL;");
       db.exec("PRAGMA foreign_keys = ON;");
+      db.exec("PRAGMA busy_timeout = 8000;");
       db.exec(SCHEMA);
+      for (const c of ENSURE_COLUMNS) {
+        try {
+          const cols = db.prepare(`PRAGMA table_info(${c.table})`).all();
+          if (!cols.some((r) => r.name === c.column)) db.exec(c.ddl);
+        } catch (e) {
+          console.warn(`[db] could not ensure ${c.table}.${c.column}:`, e.message);
+        }
+      }
+      for (const sql of BOOT_SQL) {
+        try {
+          db.exec(sql);
+        } catch (e) {
+          console.warn("[db] boot sql:", e.message);
+        }
+      }
       return db;
     })();
     sqlitePromise.catch(() => {
@@ -39492,31 +39536,31 @@ function castRows(result) {
 }
 async function all(sql, ...params) {
   if (driver === "postgres") {
-    const pool = await getPool();
-    return castRows(await pool.query(toPg(sql), norm(params)));
+    const pool2 = await getPool();
+    return castRows(await pool2.query(toPg(sql), norm(params)));
   }
   return (await getSqlite()).prepare(sql).all(...norm(params));
 }
 async function get(sql, ...params) {
   if (driver === "postgres") {
-    const pool = await getPool();
-    const rows = castRows(await pool.query(toPg(sql), norm(params)));
+    const pool2 = await getPool();
+    const rows = castRows(await pool2.query(toPg(sql), norm(params)));
     return rows[0];
   }
   return (await getSqlite()).prepare(sql).get(...norm(params));
 }
 async function run(sql, ...params) {
   if (driver === "postgres") {
-    const pool = await getPool();
-    return (await pool.query(toPg(sql), norm(params))).rowCount ?? 0;
+    const pool2 = await getPool();
+    return (await pool2.query(toPg(sql), norm(params))).rowCount ?? 0;
   }
   const res = (await getSqlite()).prepare(sql).run(...norm(params));
   return Number(res.changes);
 }
 async function tx(fn) {
   if (driver === "postgres") {
-    const pool = await getPool();
-    const client = await pool.connect();
+    const pool2 = await getPool();
+    const client = await pool2.connect();
     try {
       await client.query("BEGIN");
       const out = await fn();
@@ -39546,7 +39590,7 @@ async function tx(fn) {
     throw e;
   }
 }
-var pgUrl, driver, pgPoolPromise, sqlitePromise, OID_INT8, OID_NUMERIC, parseJson;
+var pgUrl, driver, pgPoolPromise, sqlitePromise, ENSURE_COLUMNS, BOOT_SQL, OID_INT8, OID_NUMERIC, parseJson;
 var init_db = __esm({
   "src/core/db.ts"() {
     "use strict";
@@ -39557,6 +39601,18 @@ var init_db = __esm({
     driver = pgUrl ? "postgres" : "sqlite";
     pgPoolPromise = null;
     sqlitePromise = null;
+    ENSURE_COLUMNS = [
+      { table: "job_postings", column: "contact_email", ddl: "ALTER TABLE job_postings ADD COLUMN contact_email TEXT" },
+      { table: "pitch_targets", column: "country", ddl: "ALTER TABLE pitch_targets ADD COLUMN country TEXT" }
+    ];
+    BOOT_SQL = [
+      // pre-existing databases: the old index was global (source, external_id), which
+      // made the second account's ingest fail on UNIQUE while dedupe is per user
+      "DROP INDEX IF EXISTS ux_postings_src_ext",
+      "CREATE UNIQUE INDEX IF NOT EXISTS ux_postings_user_src_ext ON job_postings(user_id, source, external_id)",
+      "CREATE INDEX IF NOT EXISTS ix_postings_email ON job_postings(contact_email)",
+      "CREATE INDEX IF NOT EXISTS ix_pitch_sector ON pitch_targets(sector, email_derived)"
+    ];
     OID_INT8 = 20;
     OID_NUMERIC = 1700;
     parseJson = (v, fallback) => {
@@ -41563,7 +41619,7 @@ var init_autofill_service = __esm({
 
 // src/routes/core.ts
 function renderCvHtml(c, p) {
-  const esc = (s) => String(s ?? "").replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m]);
+  const esc2 = (s) => String(s ?? "").replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m]);
   const id = p?.identity ?? {};
   const links = id.links ?? {};
   const clean = (v) => String(v ?? "").replace(/^https?:\/\//, "").replace(/\/$/, "").trim();
@@ -41573,13 +41629,13 @@ function renderCvHtml(c, p) {
     const a = String(s ?? "").trim();
     const b = String(e ?? "").trim();
     if (!a && !b) return "";
-    if (!a) return esc(b);
-    return `${esc(a)} \u2013 ${esc(b || "Present")}`;
+    if (!a) return esc2(b);
+    return `${esc2(a)} \u2013 ${esc2(b || "Present")}`;
   };
   const lines = (t) => String(t ?? "").split(/\n/).map((x) => x.trim()).filter(Boolean);
-  const paras = (t) => String(t ?? "").split(/\n\s*\n/).map((para) => esc(para.replace(/\s*\n\s*/g, " ")).trim()).filter(Boolean);
-  const bulletList = (arr) => arr.length ? `<ul>${arr.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "";
-  const entry = (when, loc, what) => `<div class="entry"><div class="when">${when ? `<div class="d">${when}</div>` : ""}${loc ? `<div class="loc">${esc(loc)}</div>` : ""}</div><div class="what">${what}</div></div>`;
+  const paras = (t) => String(t ?? "").split(/\n\s*\n/).map((para) => esc2(para.replace(/\s*\n\s*/g, " ")).trim()).filter(Boolean);
+  const bulletList = (arr) => arr.length ? `<ul>${arr.map((x) => `<li>${esc2(x)}</li>`).join("")}</ul>` : "";
+  const entry = (when, loc, what) => `<div class="entry"><div class="when">${when ? `<div class="d">${when}</div>` : ""}${loc ? `<div class="loc">${esc2(loc)}</div>` : ""}</div><div class="what">${what}</div></div>`;
   const HEADS = {
     summary: "Profile",
     experience: "Experience",
@@ -41593,27 +41649,27 @@ function renderCvHtml(c, p) {
   const profEdu = p?.education ?? [];
   const profSkills = p?.skills ?? [];
   const body = c.blocks.map((b) => {
-    const head = esc(b.title || HEADS[b.type] || "Section");
+    const head = esc2(b.title || HEADS[b.type] || "Section");
     const section = (inner) => inner ? `<section><h2>${head}</h2>${inner}</section>` : "";
     if (b.type === "summary") return section(paras(b.text).map((x) => `<p class="prose">${x}</p>`).join(""));
     if (b.type === "custom") return section(paras(b.text).map((x) => `<p class="prose">${x}</p>`).join(""));
     if (b.type === "skills") {
       const fromGroups = (b.groups ?? []).flatMap((g) => lines(g).flatMap((l) => l.split(",")));
       const items = (fromGroups.length ? fromGroups : profSkills.map((s) => s.name)).map((x) => String(x ?? "").trim()).filter(Boolean);
-      return section(items.length ? `<div class="skills">${items.map((x) => `<span>${esc(x)}</span>`).join("")}</div>` : "");
+      return section(items.length ? `<div class="skills">${items.map((x) => `<span>${esc2(x)}</span>`).join("")}</div>` : "");
     }
     if (b.type === "experience") {
-      const fromProfile = (b.source === "profile" ? profExps : []).map((e) => entry(fmtRange(e.start_date, e.end_date), e.location, `<div class="t">${esc(e.title)}</div>${e.company ? `<div class="org">${esc(e.company)}</div>` : ""}${bulletList(e.bullets ?? [])}`)).join("");
-      const local = lines(b.text).length ? entry("", "", `${b.title ? `<div class="t">${esc(b.title)}</div>` : ""}${bulletList(lines(b.text))}`) : "";
+      const fromProfile = (b.source === "profile" ? profExps : []).map((e) => entry(fmtRange(e.start_date, e.end_date), e.location, `<div class="t">${esc2(e.title)}</div>${e.company ? `<div class="org">${esc2(e.company)}</div>` : ""}${bulletList(e.bullets ?? [])}`)).join("");
+      const local = lines(b.text).length ? entry("", "", `${b.title ? `<div class="t">${esc2(b.title)}</div>` : ""}${bulletList(lines(b.text))}`) : "";
       return section(fromProfile + local);
     }
     if (b.type === "education") {
       const fromProfile = (b.source === "profile" ? profEdu : []).map((e) => {
         const qual = [e.degree, e.field].map((x) => String(x ?? "").trim()).filter(Boolean).join(" \xB7 ");
-        const what = `${qual ? `<div class="t">${esc(qual)}</div>` : ""}${e.school ? `<div class="org">${esc(e.school)}</div>` : ""}`;
+        const what = `${qual ? `<div class="t">${esc2(qual)}</div>` : ""}${e.school ? `<div class="org">${esc2(e.school)}</div>` : ""}`;
         return entry(fmtRange(e.start_date, e.end_date), "", what);
       }).join("");
-      const local = lines(b.text).length ? entry("", "", `${b.title ? `<div class="t">${esc(b.title)}</div>` : ""}${bulletList(lines(b.text))}`) : "";
+      const local = lines(b.text).length ? entry("", "", `${b.title ? `<div class="t">${esc2(b.title)}</div>` : ""}${bulletList(lines(b.text))}`) : "";
       return section(fromProfile + local);
     }
     if (b.type === "projects" || b.type === "awards") {
@@ -41622,8 +41678,8 @@ function renderCvHtml(c, p) {
     }
     return "";
   }).join("");
-  const contactHtml = contact.length ? `<div class="contact">${contact.map((x) => `<span>${esc(x)}</span>`).join("")}</div>` : "";
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(name2)}</title>
+  const contactHtml = contact.length ? `<div class="contact">${contact.map((x) => `<span>${esc2(x)}</span>`).join("")}</div>` : "";
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc2(name2)}</title>
 <style>
  @page { size: A4; margin: 15mm; }
  * { box-sizing: border-box; }
@@ -41648,7 +41704,7 @@ function renderCvHtml(c, p) {
  .skills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3pt 12pt; font-size: 10pt; }
  @media print { body { -webkit-print-color-adjust: exact; } }
 </style></head><body>
-<header><h1 class="name">${esc(name2)}</h1>${id.headline ? `<p class="headline">${esc(id.headline)}</p>` : ""}${contactHtml}</header>
+<header><h1 class="name">${esc2(name2)}</h1>${id.headline ? `<p class="headline">${esc2(id.headline)}</p>` : ""}${contactHtml}</header>
 ${body}
 </body></html>`;
 }
@@ -41945,6 +42001,7 @@ async function searchJobs(userId, p) {
     const like = `%${p.q.toLowerCase()}%`;
     args.push(like, like, like, like);
   }
+  if (p.has_email === true || p.has_email === "true") where.push("contact_email IS NOT NULL");
   const exclude = p.exclude ?? ["applied", "ignored"];
   const excludeClauses = [];
   if (exclude.includes("applied") || exclude.includes("ignored")) {
@@ -42005,6 +42062,7 @@ async function searchJobs(userId, p) {
       seniority: r.seniority,
       source: r.source,
       category: r.career_category,
+      contact_email: r.contact_email ?? null,
       url: r.url,
       posted_at: r.posted_at,
       score: fresh.score,
@@ -42203,32 +42261,53 @@ var init_social = __esm({
 });
 
 // src/ingestion/sources.ts
-async function getJson(url, timeout = 9e3) {
-  const res = await fetch(url, { headers: UA2, signal: AbortSignal.timeout(timeout) });
+async function getJson(url, timeout = 9e3, headers = UA2) {
+  const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeout) });
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
   return res.json();
 }
-var UA2, arbeitnow, remotive, remoteok, hackernews, boardSlug, greenhouseBoards, greenhouse, leverBoards, lever, ashbyBoards, ashby, jobicy, SOURCES;
+async function whoIsHiringStoryId() {
+  const data = await getJson(
+    "https://hn.algolia.com/api/v1/search_by_date?query=%22Ask%20HN%3A%20Who%20is%20hiring%3F%22&tags=story&hitsPerPage=20"
+  );
+  const hits = (data.hits ?? []).filter((h) => /^Ask HN:\s*Who is hiring/i.test(h.title ?? ""));
+  const fresh = hits.find((h) => Date.now() - Date.parse(h.created_at) < 60 * 864e5) ?? hits[0];
+  return fresh ? String(fresh.objectID) : null;
+}
+var UA2, BROWSER_UA, stripTags2, arbeitnow, remotive, remoteok, hnComments, wwr, boardSlug, greenhouseBoards, greenhouse, leverBoards, lever, ashbyBoards, ashby, jobicy, SOURCES;
 var init_sources = __esm({
   "src/ingestion/sources.ts"() {
     "use strict";
     UA2 = { "User-Agent": "JAMS-Ingest/0.1 (personal job tracker)", Accept: "application/json" };
+    BROWSER_UA = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36", Accept: "*/*" };
+    stripTags2 = (s) => (s ?? "").replace(/<[^>]+>/g, " ").replace(/&nbsp;?/gi, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
     arbeitnow = {
       name: "arbeitnow",
       fetch: async () => {
-        const data = await getJson("https://www.arbeitnow.com/api/job-board-api");
-        return (data.data ?? []).map((j) => ({
-          source: "arbeitnow",
-          external_id: String(j.slug),
-          title: j.title,
-          company: j.company_name,
-          location: j.location,
-          remote: !!j.remote,
-          employment_type: (j.job_types ?? []).join(", ") || null,
-          description: j.description ?? "",
-          url: j.url,
-          posted_at: j.created_at ? new Date(Number(j.created_at) * 1e3).toISOString() : null
-        }));
+        const out = [];
+        for (let page = 1; page <= 3; page++) {
+          const data = await getJson(`https://www.arbeitnow.com/api/job-board-api?page=${page}`);
+          const rows = data.data ?? [];
+          for (const j of rows) {
+            out.push({
+              source: "arbeitnow",
+              external_id: String(j.slug),
+              title: j.title,
+              company: j.company_name,
+              location: j.location,
+              remote: !!j.remote,
+              employment_type: (j.job_types ?? []).join(", ") || null,
+              description: stripTags2(j.description ?? "").slice(0, 8e3),
+              keywords: (j.tags ?? []).slice(0, 12),
+              url: j.url,
+              posted_at: j.created_at ? new Date(Number(j.created_at) * 1e3).toISOString() : null
+            });
+          }
+          if (rows.length < 100) break;
+          if (page < 3) await new Promise((r) => setTimeout(r, 400));
+        }
+        if (!out.length) throw new Error("arbeitnow: empty response");
+        return out;
       }
     };
     remotive = {
@@ -42273,23 +42352,67 @@ var init_sources = __esm({
         }));
       }
     };
-    hackernews = {
+    hnComments = {
       name: "hn",
       fetch: async () => {
-        const data = await getJson("https://hn.algolia.com/api/v1/search_by_date?query=%22is%20hiring%22&tags=story&hitsPerPage=40");
-        return (data.hits ?? []).filter((h) => h.title && /hiring/i.test(h.title) && h.url).map((h) => {
-          const title = h.title.replace(/^(Ask HN|Show HN):\s*/i, "");
-          const company = title.split(/\s+is hiring/i)[0]?.trim() || "Unknown";
+        const storyId = await whoIsHiringStoryId();
+        if (!storyId) throw new Error("hn: no hiring thread found");
+        const out = [];
+        for (let page = 0; page < 3; page++) {
+          const data = await getJson(`https://hn.algolia.com/api/v1/search?tags=comment,story_${storyId}&hitsPerPage=100&page=${page}`);
+          const hits = data.hits ?? [];
+          for (const h of hits) {
+            const text = stripTags2(h.comment_text ?? "");
+            if (text.length < 80) continue;
+            const line = (h.comment_text ?? "").replace(/<[^>]+>/g, "").split("\n")[0].trim();
+            const parts = line.split("|").map((s) => s.trim()).filter(Boolean);
+            const company = (parts[0] ?? "Unknown").slice(0, 80);
+            const rawLocation = parts[2] ?? null;
+            const location = rawLocation && rawLocation.length <= 60 && !/[.;:]/.test(rawLocation) ? rawLocation : null;
+            out.push({
+              source: "hn",
+              external_id: String(h.objectID),
+              title: (parts[1] ? `${parts[1]} \u2014 ${company}` : line.slice(0, 120)).slice(0, 140),
+              company,
+              location,
+              remote: /remote/i.test(location ?? "") || /remote/i.test(text.slice(0, 300)),
+              description: text.slice(0, 8e3),
+              url: `https://news.ycombinator.com/item?id=${h.objectID}`,
+              posted_at: h.created_at ?? null
+            });
+          }
+          if (hits.length < 100) break;
+          await new Promise((r) => setTimeout(r, 350));
+        }
+        if (!out.length) throw new Error("hn: thread had no parseable comments");
+        return out;
+      }
+    };
+    wwr = {
+      name: "wwr",
+      fetch: async () => {
+        const res = await fetch("https://weworkremotely.com/categories/remote-programming-jobs.rss", {
+          headers: BROWSER_UA,
+          signal: AbortSignal.timeout(12e3)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status} for working nomads rss`);
+        const xml = await res.text();
+        const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((m) => m[1]);
+        return items.map((block, i) => {
+          const tag = (name2) => (block.match(new RegExp(`<${name2}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${name2}>`)) ?? [])[1]?.trim() ?? "";
+          const title = stripTags2(tag("title"));
+          const link = tag("link");
+          const company = title.split(/\s+[–—|]\s+/).slice(-1)[0]?.trim() || "Unknown";
           return {
-            source: "hn",
-            external_id: String(h.objectID),
+            source: "wwr",
+            external_id: link || `wwr-${i}`,
             title: title.slice(0, 140),
             company: company.slice(0, 80),
-            location: null,
-            remote: null,
-            description: h.story_text ?? "",
-            url: h.url,
-            posted_at: h.created_at ?? null
+            location: "Remote",
+            remote: true,
+            description: stripTags2(tag("description")).slice(0, 6e3),
+            url: link,
+            posted_at: tag("pubDate") ? new Date(tag("pubDate")).toISOString() : null
           };
         });
       }
@@ -42389,7 +42512,7 @@ var init_sources = __esm({
     jobicy = {
       name: "jobicy",
       fetch: async () => {
-        const data = await getJson("https://jobicy.com/api/v2/remote-jobs?count=50&tag=software-dev");
+        const data = await getJson("https://jobicy.com/api/v2/remote-jobs?count=50");
         return (data.jobs ?? []).map((j) => ({
           source: "jobicy",
           external_id: String(j.id),
@@ -42409,7 +42532,7 @@ ${(j.description ?? "").replace(/<[^>]+>/g, " ")}`.trim().slice(0, 8e3),
         }));
       }
     };
-    SOURCES = [arbeitnow, remotive, remoteok, jobicy, hackernews, greenhouse, lever, ashby];
+    SOURCES = [arbeitnow, remotive, remoteok, jobicy, hnComments, wwr, greenhouse, lever, ashby];
   }
 });
 
@@ -42421,22 +42544,29 @@ function inferSeniority(title, text = "") {
 }
 function normalize(raw, now = /* @__PURE__ */ new Date()) {
   const text = raw.description ?? "";
+  const asText = (v) => v == null ? null : typeof v === "string" ? v.trim() || null : typeof v === "number" || typeof v === "boolean" ? String(v) : JSON.stringify(v);
+  const asNum = (v) => {
+    if (v == null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const location = asText(raw.location);
   return {
     title: raw.title.trim(),
-    company: (raw.company || "Unknown").trim(),
-    location: raw.location ?? null,
+    company: asText(raw.company) ?? "Unknown",
+    location,
     remote: raw.remote ?? /remote|anywhere|worldwide/i.test(`${raw.location ?? ""} ${text.slice(0, 300)}`),
-    salary_min: raw.salary_min ?? null,
-    salary_max: raw.salary_max ?? null,
-    currency: raw.currency ?? null,
-    seniority: raw.seniority ?? inferSeniority(raw.title, text),
-    employment_type: raw.employment_type ?? null,
+    salary_min: asNum(raw.salary_min),
+    salary_max: asNum(raw.salary_max),
+    currency: asText(raw.currency),
+    seniority: asText(raw.seniority) ?? inferSeniority(raw.title, text),
+    employment_type: asText(raw.employment_type),
     category: raw.category ?? "software_engineering",
     description: (text ?? "").slice(0, 12e3),
     keywords: raw.keywords ?? [],
-    url: raw.url,
-    posted_at: raw.posted_at ?? null,
-    dedupe_key: dedupeKey(raw.title, raw.company, raw.location),
+    url: asText(raw.url) ?? "",
+    posted_at: asText(raw.posted_at),
+    dedupe_key: dedupeKey(raw.title, asText(raw.company) ?? "Unknown", location),
     first_seen_at: now.toISOString()
   };
 }
@@ -42457,10 +42587,17 @@ var init_base = __esm({
 });
 
 // src/ingestion/ingest.ts
+function findContactEmail(text) {
+  const matches = (text.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) ?? []).map((e) => e.toLowerCase().replace(/[.,;]+$/, "")).filter((e) => STRICT_EMAIL.test(e));
+  return matches.find((e) => !FREE_DOMAINS.has(e.split("@")[1])) ?? matches[0] ?? null;
+}
 async function ingestAll(userId, opts = {}) {
   const t0 = Date.now();
   const signals = await profileSignals(userId);
-  const enabled = opts.sources?.length ? opts.sources : (await all("SELECT name, enabled FROM sources WHERE enabled = 1")).map((s) => s.name);
+  const disabled = new Set(
+    (await all("SELECT name FROM sources WHERE enabled = 0")).map((s) => s.name)
+  );
+  const enabled = opts.sources?.length ? opts.sources : SOURCES.map((s) => s.name).filter((n) => !disabled.has(n));
   const sources_ok = [];
   const sources_failed = [];
   let inserted = 0;
@@ -42480,6 +42617,7 @@ async function ingestAll(userId, opts = {}) {
       let found = 0;
       for (const item of raw) {
         const n = normalize(item);
+        const contactEmail = findContactEmail(`${n.title ?? ""} ${n.description ?? ""}`);
         const uniq = `${src.name}:${item.external_id}`;
         if (existingKeys.has(uniq)) {
           refreshed++;
@@ -42503,8 +42641,8 @@ async function ingestAll(userId, opts = {}) {
         const keywords = n.keywords?.length ? n.keywords : extractKeywords(`${n.title} ${n.description ?? ""}`);
         await run(
           `INSERT INTO job_postings (id, user_id, company_name, source, external_id, title, location, remote, salary_min, salary_max, currency,
-             seniority, employment_type, career_category, description, jd_keywords, url, posted_at, first_seen_at, last_seen_at, score, explain, dedupe_key, status, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
+             seniority, employment_type, career_category, description, jd_keywords, url, posted_at, first_seen_at, last_seen_at, score, explain, dedupe_key, status, contact_email, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`,
           newId(),
           userId,
           n.company,
@@ -42528,6 +42666,7 @@ async function ingestAll(userId, opts = {}) {
           scored.score,
           JSON.stringify(scored.explain),
           n.dedupe_key,
+          contactEmail,
           nowIso()
         );
         keySeen.add(n.dedupe_key);
@@ -42540,7 +42679,7 @@ async function ingestAll(userId, opts = {}) {
          ON CONFLICT(name) DO UPDATE SET last_run_at = excluded.last_run_at, items_found = excluded.items_found, error_streak = 0, last_error = NULL`,
         src.name,
         nowIso(),
-        found
+        raw.length
       );
     } catch (e) {
       sources_failed.push({ source: src.name, error: String(e.message ?? e) });
@@ -42561,6 +42700,7 @@ async function sourceHealth() {
   for (const name2 of known) if (!rows.find((r) => r.name === name2)) rows.push({ name: name2, enabled: 1, last_run_at: null, items_found: 0, error_streak: 0, last_error: null });
   return rows;
 }
+var STRICT_EMAIL, FREE_DOMAINS;
 var init_ingest = __esm({
   "src/ingestion/ingest.ts"() {
     "use strict";
@@ -42570,6 +42710,8 @@ var init_ingest = __esm({
     init_base();
     init_profile_signals();
     init_scoring_service();
+    STRICT_EMAIL = /^[a-z0-9._%+-]+@(?:[a-z0-9-]+\.)+[a-z]{2,}$/i;
+    FREE_DOMAINS = /* @__PURE__ */ new Set(["gmail.com", "googlemail.com", "yahoo.com", "hotmail.com", "outlook.com", "live.com", "aol.com", "icloud.com", "mail.com"]);
   }
 });
 
@@ -42605,7 +42747,8 @@ var init_jobs = __esm({
           sort: q.sort,
           page: q.page ? Number(q.page) : 1,
           page_size: q.page_size ? Number(q.page_size) : 20,
-          exclude: toArray(q.exclude)
+          exclude: toArray(q.exclude),
+          has_email: q.has_email
         });
         ok(res, `${result.pagination.total_count} results in ${result.took_ms}ms`, result);
       } catch (e) {
@@ -52328,10 +52471,10 @@ var init_pool_resource = __esm({
     init_xoauth2();
     init_errors3();
     PoolResource = class extends EventEmitter3 {
-      constructor(pool) {
+      constructor(pool2) {
         super();
-        this.pool = pool;
-        this.options = pool.options;
+        this.pool = pool2;
+        this.options = pool2.options;
         this.logger = this.pool.logger;
         if (this.options.auth) {
           switch ((this.options.auth.type || "").toString().toUpperCase()) {
@@ -54691,6 +54834,635 @@ var init_nodemailer = __esm({
   }
 });
 
+// src/services/pitch-rewrite.ts
+import { execFile } from "node:child_process";
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = a + 1831565813 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function resolveProfile(category, role) {
+  const hay = `${category ?? ""} ${role ?? ""}`;
+  const hit = CATEGORY_ALIASES.find(([re]) => re.test(hay));
+  const key = hit ? hit[1] : category ? "tech" : "tech";
+  return { key, profile: PROFILES[key] ?? PROFILES.tech };
+}
+async function portfolioSignals() {
+  if (portfolioCache && Date.now() - portfolioCache.at < PORTFOLIO_TTL) return portfolioCache.items;
+  try {
+    const subjects = await new Promise((resolve3, reject) => {
+      execFile(
+        "git",
+        ["log", "--pretty=%s", "-n", "300"],
+        { timeout: 6e3, cwd: process.cwd(), windowsHide: true },
+        (err, stdout) => err ? reject(err) : resolve3(String(stdout).split("\n"))
+      );
+    });
+    const counts = /* @__PURE__ */ new Map();
+    for (const s of subjects) {
+      const low = s.toLowerCase();
+      for (const t of KNOWN_TECH) if (low.includes(t)) counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+    const items = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([t]) => t);
+    if (items.length >= 3) {
+      portfolioCache = { at: Date.now(), items };
+      return items;
+    }
+  } catch {
+  }
+  const fallback = ["typed APIs", "automation tooling", "data dashboards"];
+  portfolioCache = { at: Date.now(), items: fallback };
+  return fallback;
+}
+function polish(text) {
+  const tokens = [];
+  const masked = text.replace(/\{\{[^{}]+\}\}/g, (m) => {
+    tokens.push(m);
+    return `\0${tokens.length - 1}\0`;
+  });
+  let out = masked.replace(/\r\n/g, "\n").replace(/[ \t]+/g, " ").replace(/ +\n/g, "\n").replace(/\n{3,}/g, "\n\n").replace(FILLERS, "").replace(/\s+([,.;:!?])/g, "$1").replace(/([,.;:])([A-Za-z])/g, "$1 $2").replace(/ {2,}/g, " ").trim();
+  out = out.split("\n").map((line) => {
+    if (!line.trim() || /^\s*[-•]/.test(line)) return line;
+    const sentences = line.split(/(?<=[.!?])\s+/).filter(Boolean);
+    const varied = varyOpeners(sentences).map((s) => fixArticles(dedupeWords(s)));
+    return capitalizeSentences(varied.join(" "));
+  }).join("\n");
+  out = out.replace(/\n{3,}/g, "\n\n");
+  out = out.replace(/\b([a-z]+)\s+\1\b/gi, (_m, w) => w);
+  return out.trim().replace(/\u0000(\d+)\u0000/g, (_m, i) => tokens[Number(i)] ?? "");
+}
+function scorePitch(body, input) {
+  const text = body.trim();
+  const words = text.split(/\s+/).filter(Boolean);
+  const sentences = text.split(/[.!?]+(\s|$)/).map((s) => s.trim()).filter((s) => s.split(/\s+/).length > 1);
+  const lower = text.toLowerCase();
+  const company = (input.company ?? "").toLowerCase().split(/\s+/)[0] ?? "";
+  const checks = [];
+  const wordCount = words.length;
+  checks.push({ label: "Brevity", pass: wordCount >= 70 && wordCount <= 240, detail: `${wordCount} words (aim 70\u2013240)`, weight: 14 });
+  const avgSentence = sentences.length ? wordCount / sentences.length : wordCount;
+  checks.push({ label: "Sentence rhythm", pass: avgSentence >= 6 && avgSentence <= 22, detail: `${avgSentence.toFixed(1)} words per sentence`, weight: 12 });
+  const unique = new Set(words.map((w) => w.toLowerCase().replace(/[^a-z]/g, ""))).size;
+  const variety = wordCount ? unique / wordCount : 0;
+  checks.push({ label: "Word variety", pass: variety > 0.55, detail: `${Math.round(variety * 100)}% unique words`, weight: 10 });
+  const fillers = (text.match(FILLERS) ?? []).length;
+  checks.push({ label: "No filler", pass: fillers === 0, detail: fillers ? `${fillers} filler words removed/remaining` : "clean of hedges", weight: 10 });
+  const personalised = !!company && lower.includes(company);
+  checks.push({ label: "Personalised", pass: personalised, detail: personalised ? `mentions ${input.company}` : "company not named", weight: 16 });
+  const youCount = (lower.match(/\byou\b|\byour\b/g) ?? []).length;
+  checks.push({ label: "Reader-focused", pass: youCount >= 3, detail: `${youCount} \u201Cyou/your\u201D references`, weight: 12 });
+  const passive = (text.match(PASSIVE) ?? []).length;
+  checks.push({ label: "Active voice", pass: passive <= 2, detail: `${passive} passive constructions`, weight: 8 });
+  const hasGreeting = /^(hi|hello|dear|hey|good (morning|afternoon))\b/i.test(text.trim());
+  checks.push({ label: "Opens with a greeting", pass: hasGreeting, detail: hasGreeting ? "greeting present" : "missing greeting", weight: 8 });
+  const hasCta = /(reply|let me know|happy to|glad to|would you be open|send over|share|call|walk you|proposal|next step)/i.test(text);
+  checks.push({ label: "Clear next step", pass: hasCta, detail: hasCta ? "asks for a next step" : "no call to action", weight: 12 });
+  const signsOff = /(best regards|kind regards|regards|sincerely|thanks and|thank you,?$)/im.test(text);
+  checks.push({ label: "Closes properly", pass: signsOff, detail: signsOff ? "sign-off present" : "missing sign-off", weight: 6 });
+  const score = Math.round(
+    checks.reduce((sum, c) => sum + (c.pass ? c.weight : 0), 0) / checks.reduce((sum, c) => sum + c.weight, 0) * 100
+  );
+  return { score, checks };
+}
+async function composePitch(input) {
+  const { key, profile } = resolveProfile(input.category, input.role);
+  const variant = Math.abs(typeof input.seed === "number" ? input.seed : hashSeed(input.seed ?? 0)) % 1e6;
+  const rng = mulberry32(hashSeed(input.company, key, variant, input.role ?? ""));
+  const portfolio = await portfolioSignals();
+  const company = (input.company ?? "your team").trim();
+  const city = input.city && input.city !== "Nigeria" ? input.city : null;
+  const focus = input.role ?? profile.words[0];
+  const vars = {
+    company,
+    focus,
+    role: input.role ?? "the role",
+    word: pick(rng, profile.words),
+    city: city ?? "Lagos"
+  };
+  const formal = profile.formal;
+  const greeting = input.contactName ? `Dear ${input.contactName.split(" ")[0]},` : fill(pick(rng, formal ? GREETINGS_FORMAL : GREETINGS_CASUAL), vars);
+  const chosenProps = sample(rng, profile.props, 3);
+  const proof = pick(rng, [...profile.proof, ...profile.proof]);
+  const portfolioLine = sample(rng, portfolio, 2).join(" and ");
+  const cta = input.kind === "application" ? pick(rng, APPLICATION_CTAS) : pick(rng, CTAS);
+  const opener = input.kind === "application" ? [
+    `I am applying for the ${vars.role} and wanted to introduce myself directly rather than only through the form.`,
+    `I saw the ${vars.role} opening and am writing to make sure my application reaches a person.`
+  ][Math.floor(rng() * 2)] : [
+    `I came across ${company} and wanted to introduce myself directly, since I did not see an open engineering role on your careers page.`,
+    `I have been following ${company} and wanted to reach out directly about work I could take on.`,
+    `Most teams like yours get approached with a generic deck; this is a specific one for ${company}.`
+  ][Math.floor(rng() * 3)];
+  const context = `${city ? `${city} is where much of this work happens, and ` : ""}${pick(rng, profile.context)}.`;
+  const proofSentence = input.kind === "application" ? `On the practical side: ${proof}, and most recently ${portfolioLine}.` : `Why this is credible: ${proof}. Recent work here includes ${portfolioLine}.`;
+  const bullets = chosenProps.map((p) => `- ${p}`);
+  const signoff = pick(rng, formal ? SIGNOFFS_FORMAL : SIGNOFFS_CASUAL);
+  const subjectTemplate = input.kind === "application" ? pick(rng, SUBJECT_APPLICATION) : pick(rng, SUBJECT_PITCH);
+  const subject = fill(subjectTemplate, vars).replace(/\s+—\s+$/g, "").slice(0, 120);
+  const body = polish(
+    [
+      greeting,
+      "",
+      opener,
+      "",
+      context,
+      "",
+      `I am a software engineer who builds typed, well-tested product surfaces end to end: web apps, APIs and the automation that removes manual work. For ${company} specifically, I would start with:`,
+      "",
+      ...bullets,
+      "",
+      proofSentence,
+      "",
+      cta,
+      "",
+      `${signoff}`,
+      `{{profile.first_name}} {{profile.last_name}}`
+    ].join("\n")
+  );
+  const { score, checks } = scorePitch(body, input);
+  return { subject, body, score, checks, variant, category: key };
+}
+var hashSeed, pick, sample, PROFILES, CATEGORY_ALIASES, portfolioCache, PORTFOLIO_TTL, KNOWN_TECH, FILLERS, PASSIVE, CONSONANT_SOUND, VOWEL_SOUND, fixArticles, dedupeWords, capitalizeSentences, varyOpeners, GREETINGS_FORMAL, GREETINGS_CASUAL, SIGNOFFS_FORMAL, SIGNOFFS_CASUAL, CTAS, APPLICATION_CTAS, SUBJECT_PITCH, SUBJECT_APPLICATION, fill;
+var init_pitch_rewrite = __esm({
+  "src/services/pitch-rewrite.ts"() {
+    "use strict";
+    hashSeed = (...parts) => {
+      const s = parts.map((p) => String(p ?? "")).join("|");
+      let h = 2166136261;
+      for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return h >>> 0;
+    };
+    pick = (rng, arr) => arr[Math.floor(rng() * arr.length) % arr.length];
+    sample = (rng, arr, n) => {
+      const copy = [...arr];
+      const out = [];
+      while (out.length < n && copy.length) out.push(copy.splice(Math.floor(rng() * copy.length), 1)[0]);
+      return out;
+    };
+    PROFILES = {
+      bank: {
+        context: [
+          "reconciliation and back-office work still eats hours every week",
+          "manual checks between core banking, cards and agency channels are slow to catch",
+          "customers expect instant answers while operations run on spreadsheets"
+        ],
+        props: [
+          "a reconciliation dashboard that flags mismatches before they reach customers",
+          "internal tooling with role-based access and a full audit trail",
+          "an API layer that connects your core system to the channels you already run",
+          "reporting that finance can regenerate without waiting on developers",
+          "alerting so a failed batch or stalled transfer is seen in minutes, not days"
+        ],
+        proof: [
+          "audit-grade logging and role-based access built into every screen",
+          "typed, tested services where a silent failure is a failing test, not a angry customer",
+          "batch jobs with idempotency and replay, so a retry never double-charges"
+        ],
+        words: ["banking", "reconciliation", "operations"],
+        formal: true
+      },
+      agriculture: {
+        context: [
+          "stock, deliveries and output are still tracked on paper and phone calls",
+          "seasonal volumes make manual record keeping break at exactly the wrong moment",
+          "moving product from depot to buyer involves too many hand-offs to verify"
+        ],
+        props: [
+          "a lightweight inventory view that works on a phone with a weak signal",
+          "delivery and dispatch tracking that both the depot and the buyer can trust",
+          "weighing, grading and lot records that reconcile without retyping",
+          "a simple supplier and buyer ledger with balances anyone can verify",
+          "reports for season, depot or product line generated in one click"
+        ],
+        proof: [
+          "offline-tolerant flows designed for low-bandwidth field use",
+          "dashboards that turn raw operational rows into decisions for non-technical teams",
+          "automation of a repetitive back-office process end to end"
+        ],
+        words: ["agriculture", "supply", "harvest"],
+        formal: false
+      },
+      airline: {
+        context: [
+          "bookings, charter requests and cargo enquiries arrive through too many channels",
+          "operations teams reconcile schedules, crews and loads by hand",
+          "customers expect an answer now, not after a shift change"
+        ],
+        props: [
+          "a booking and enquiry flow your team controls instead of a third-party form",
+          "an operations board for schedules, aircraft and load at a glance",
+          "an API that joins your reservation, cargo and support channels",
+          "self-serve status answers that cut repetitive calls to the desk",
+          "monitoring that surfaces a broken integration before a passenger does"
+        ],
+        proof: [
+          "real-time status surfaces with clear fallbacks when an upstream feed fails",
+          "typed integrations across systems that were never designed to talk",
+          "search and filtering that stay fast on real operational data"
+        ],
+        words: ["aviation", "flights", "operations"],
+        formal: true
+      },
+      port: {
+        context: [
+          "vessel, terminal and cargo visibility still runs on calls and spreadsheets",
+          "agents wait on updates that exist somewhere in the system already",
+          "every hand-off between terminal, agent and line is re-keyed"
+        ],
+        props: [
+          "a terminal and cargo visibility board shared with your agents",
+          "appointment and berth scheduling that stops the phone-tag",
+          "document flow (bills of lading, release notes) without the re-keying",
+          "customer self-serve tracking so enquiries answer themselves",
+          "alerts when a container, invoice or release stalls"
+        ],
+        proof: [
+          "workflow automation across teams that currently paste data between tools",
+          "auditable state changes: who released what, and when",
+          "integrations with the systems you already run, not a rip-and-replace"
+        ],
+        words: ["ports", "terminal", "cargo"],
+        formal: true
+      },
+      retail: {
+        context: [
+          "sales, stock and staff rotas live in separate places that never agree",
+          "head office finds out about a stock-out after the shelf is empty",
+          "supplier orders are placed on gut feel because the numbers are late"
+        ],
+        props: [
+          "a stock view across outlets that updates as sales happen",
+          "reorder suggestions built from your own sales history",
+          "a supplier and purchase ledger your team can trust",
+          "staff rota and shift tooling that replaces the WhatsApp thread",
+          "a storefront or booking flow you own end to end"
+        ],
+        proof: [
+          "point-of-sale style data pipelines that keep working when a till goes offline",
+          "clear dashboards for people who do not have time to learn a BI tool",
+          "automation that gave a small team back a full working day each week"
+        ],
+        words: ["retail", "stores", "sales"],
+        formal: false
+      },
+      manufacturing: {
+        context: [
+          "production, orders and maintenance are recorded in books that lag reality",
+          "downtime is discovered after the line has already stopped",
+          "quotes and orders are re-typed between the workshop and the office"
+        ],
+        props: [
+          "a production and order board that reflects the floor in real time",
+          "maintenance scheduling with history anyone can look up",
+          "quoting and job cards that move from request to invoice without retyping",
+          "inventory and raw-material tracking tied to actual output",
+          "quality checks recorded at the station, not reconstructed later"
+        ],
+        proof: [
+          "event-driven updates from machines or forms into one operational view",
+          "replacing a manual spreadsheet process with a tested, auditable workflow",
+          "tooling built for the people wearing gloves, not just the office"
+        ],
+        words: ["manufacturing", "production", "industry"],
+        formal: false
+      },
+      laboratory: {
+        context: [
+          "samples, results and turnaround times are tracked across books and inboxes",
+          "clients chase reports that the lab has already produced",
+          "quality and accreditation evidence is assembled by hand"
+        ],
+        props: [
+          "a sample tracker from intake to released result",
+          "client portals for report delivery and status",
+          "turnaround and workload reporting without spreadsheet archaeology",
+          "instrument and reagent logs kept with the record they belong to",
+          "audit-ready exports for accreditation reviews"
+        ],
+        proof: [
+          "validated workflows where every state change is attributable",
+          "structured data entry that prevents the error before it is stored",
+          "clear provenance: which analyst, which instrument, which version"
+        ],
+        words: ["laboratory", "testing", "quality"],
+        formal: true
+      },
+      government: {
+        context: [
+          "citizen requests and internal approvals move on paper and email",
+          "data needed for a report sits in five offices and four formats",
+          "constituents wait because nobody can see where their request is"
+        ],
+        props: [
+          "a request and approval workflow with visible status at every step",
+          "a records register that is searchable instead of archived",
+          "dashboards for budget, project and service delivery",
+          "open data publishing from the systems you already maintain",
+          "citizen-facing forms that work on low-end phones"
+        ],
+        proof: [
+          "role-based access and full audit history on every action",
+          "accessible, low-bandwidth interfaces for a general audience",
+          "migrations from paper processes without losing the existing records"
+        ],
+        words: ["public sector", "services", "records"],
+        formal: true
+      },
+      humanitarian: {
+        context: [
+          "programme data is collected in the field and consolidated by hand",
+          "donor reporting eats days that should go to the programme",
+          "beneficiary records live in spreadsheets that cannot be reconciled"
+        ],
+        props: [
+          "field data capture that works offline and syncs when signal returns",
+          "a beneficiary and distribution register that reconciles across sites",
+          "donor-ready reports generated from live programme data",
+          "case management with the history and consent trail intact",
+          "monitoring dashboards for the whole programme in one place"
+        ],
+        proof: [
+          "offline-first tools designed for unreliable connectivity",
+          "data pipelines that survive messy, partially filled field submissions",
+          "privacy-aware records with consent and access controls"
+        ],
+        words: ["humanitarian", "programmes", "aid"],
+        formal: true
+      },
+      fuel: {
+        context: [
+          "deliveries, depots and stock are reconciled from driver calls and paper",
+          "pricing and dispatch change faster than the records do",
+          "product loss is found at month end, when it is already too late"
+        ],
+        props: [
+          "delivery and dispatch tracking from loading to drop-off",
+          "tank and depot stock that matches the meter, not the memory",
+          "driver, waybill and proof-of-delivery captured on the phone",
+          "pricing and margin reporting per product and per site",
+          "reconciliation alerts for variance, loss and stalled loads"
+        ],
+        proof: [
+          "operational tooling built for high-volume, time-sensitive transactions",
+          "tolerance rules and alerts tuned to how the operation actually behaves",
+          "audit trails that make month-end reconciliation a lookup, not a hunt"
+        ],
+        words: ["fuel", "energy", "distribution"],
+        formal: false
+      },
+      transporter: {
+        context: [
+          "jobs are dispatched over calls and tracked in a notebook",
+          "customers ask for status the system could answer instantly",
+          "vehicles, drivers and loads meet on a whiteboard"
+        ],
+        props: [
+          "job dispatch and driver assignment your coordinator can run in one screen",
+          "live status your customers can check instead of calling",
+          "vehicle and driver records with documents and expiry reminders",
+          "waybills and proof of delivery captured at the gate",
+          "cost-per-route reporting from the trips you already run"
+        ],
+        proof: [
+          "map and route views that stay responsive on real fleet sizes",
+          "event streams from drivers and depots into one operational board",
+          "simple tools a dispatcher learns in an afternoon"
+        ],
+        words: ["transport", "fleet", "logistics"],
+        formal: false
+      },
+      railway: {
+        context: [
+          "maintenance, assets and movements are recorded in separate registers",
+          "planning happens on top of data nobody fully trusts",
+          "incidents are reconstructed after the fact from messages"
+        ],
+        props: [
+          "asset and maintenance registers linked to the actual work orders",
+          "movement and schedule visibility across depots",
+          "incident capture at the time, with the evidence attached",
+          "planning dashboards built on data that reconciles",
+          "document control for procedures and compliance records"
+        ],
+        proof: [
+          "long-lived records with versioning and clear ownership",
+          "operational views designed around safety and compliance reviews",
+          "integrations that respect the systems already certified"
+        ],
+        words: ["rail", "assets", "operations"],
+        formal: true
+      },
+      waste: {
+        context: [
+          "collections, routes and bins are coordinated by phone",
+          "invoices are disputed because the collection record is thin",
+          "compliance evidence is assembled manually for every audit"
+        ],
+        props: [
+          "route and collection capture at the kerbside, on a phone",
+          "bin and site inspections logged with photos in the record",
+          "customer accounts with collection history that settles disputes",
+          "weighbridge and tonnage reporting for compliance",
+          "billing built from completed collections, not memory"
+        ],
+        proof: [
+          "field-first capture that works with gloves and poor signal",
+          "reconciliation between operational events and invoices",
+          "reports shaped to the regulator's questions, not a generic template"
+        ],
+        words: ["waste", "collections", "compliance"],
+        formal: false
+      },
+      supplier: {
+        context: [
+          "orders, quotes and stock levels live in a spreadsheet nobody trusts",
+          "customers chase orders that were confirmed by phone weeks ago",
+          "pricing differs per customer and nobody can prove why"
+        ],
+        props: [
+          "a catalogue and order flow with customer-specific pricing",
+          "stock and purchase ordering that reflects reality",
+          "quotes that become invoices without being retyped",
+          "delivery status your customers can check themselves",
+          "sales and margin reporting per customer and per line"
+        ],
+        proof: [
+          "order pipelines with clear states, from quote through delivery",
+          "role-aware pricing and approval rules encoded once, enforced everywhere",
+          'dashboards that answer "what moved this week" in one screen'
+        ],
+        words: ["supply", "distribution", "orders"],
+        formal: false
+      },
+      services: {
+        context: [
+          "bookings, requests and team workload arrive through inboxes",
+          "clients cannot see the status of what they asked for",
+          "scheduling and follow-up depend on someone remembering"
+        ],
+        props: [
+          "a request and booking flow with status the client can see",
+          "scheduling and workload views for the whole team",
+          "invoicing and follow-up triggered by the work actually done",
+          "a knowledge base so the same question is answered once",
+          "automation of the repetitive admin between your existing tools"
+        ],
+        proof: [
+          "workflow engines that encode a process once and run it reliably",
+          "client-facing portals that cut inbound status calls",
+          "integrations that remove the copy-paste between two systems"
+        ],
+        words: ["services", "clients", "operations"],
+        formal: false
+      },
+      tech: {
+        context: [
+          "internal tools lag behind the product and slow the team down",
+          "manual processes still sit between the customer and the system",
+          "data lives in enough places that nobody trusts a single number"
+        ],
+        props: [
+          "an internal tool that removes a daily manual workflow",
+          "an API integration between the systems you already pay for",
+          "a dashboard that answers the question your team asks every morning",
+          "automation with monitoring, so failures surface instead of hiding",
+          "a customer-facing flow your team can change without a release cycle"
+        ],
+        proof: [
+          "typed, tested product surfaces shipped end to end",
+          "automation that gave a team back hours every week",
+          "monitoring and alerts wired in from day one"
+        ],
+        words: ["software", "product", "engineering"],
+        formal: false
+      }
+    };
+    CATEGORY_ALIASES = [
+      [/bank|fintech|financ|payment|insurance|credit|invest/i, "bank"],
+      [/agri|farm|mill|food|harvest|crop|poultry/i, "agriculture"],
+      [/airline|aviation|airport|aero/i, "airline"],
+      [/port|shipping|marin|terminal|cargo|freight|sea/i, "port"],
+      [/retail|supermarket|shop|store|grocer|market|wholesale|distribut|supplier|commerce/i, "retail"],
+      [/manufact|factor|industr|construct|produc/i, "manufacturing"],
+      [/lab|clinic|hospital|health|medic|pharma|diagnos|quality test/i, "laboratory"],
+      [/govern|public sector|municip|ministr|agency of state|civil/i, "government"],
+      [/humanit|ngo|aid|relief|charity|donor|un |unicef|red cross/i, "humanitarian"],
+      [/fuel|petrol|diesel|energ|oil ?& ?gas|gas station/i, "fuel"],
+      [/transport|logistic|fleet|haulage|courier|delivery|driver|taxi/i, "transporter"],
+      [/rail|train|depot/i, "railway"],
+      [/waste|recycl|sanitat|refuse/i, "waste"],
+      [/telecom|network|isp|software|engineer|developer|technology|data |product|saas|startup/i, "tech"],
+      [/airport|aerodrome/i, "airline"],
+      [/company|office|manufacturing/i, "manufacturing"]
+    ];
+    portfolioCache = null;
+    PORTFOLIO_TTL = 24 * 60 * 60 * 1e3;
+    KNOWN_TECH = [
+      "react",
+      "next.js",
+      "nextjs",
+      "typescript",
+      "javascript",
+      "node",
+      "python",
+      "fastapi",
+      "django",
+      "flask",
+      "postgres",
+      "sqlite",
+      "mysql",
+      "docker",
+      "vercel",
+      "cloud",
+      "rest api",
+      "graphql",
+      "auth",
+      "jwt",
+      "dashboard",
+      "analytics",
+      "automation",
+      "scraping",
+      "crawler",
+      "browser extension",
+      "autofill",
+      "cv",
+      "ats",
+      "matching",
+      "job tracker",
+      "email",
+      "smtp",
+      "outreach",
+      "payment",
+      "api",
+      "web app",
+      "cli",
+      "test",
+      "ci",
+      "schema",
+      "search",
+      "indexing",
+      "export",
+      "csv",
+      "pdf",
+      "resume"
+    ];
+    FILLERS = /\b(very|really|quite|basically|actually|literally|hopefully|maybe|just|simply|somewhat|rather|kind of|sort of)\s+/gi;
+    PASSIVE = /\b(is|are|was|were|be|been|being)\s+\w+ed\s+(by|to)\b/gi;
+    CONSONANT_SOUND = /^(university|union|user|usage|unit|unique|uniform|one|once|european|useful|usual|unicorn|utility|eulogy)/i;
+    VOWEL_SOUND = /^(hour|honest|honor|honour|heir|herb|historic)/i;
+    fixArticles = (s) => s.replace(/\ban\s+([a-z]+)/gi, (m, w) => /^[bcdfgjklmnpqrstvwxyz]/i.test(w) && !VOWEL_SOUND.test(w) ? `a ${w}` : m).replace(
+      /\ba\s+([a-z]+)/gi,
+      (m, w) => /^[aeiou]/i.test(w) && !CONSONANT_SOUND.test(w) || VOWEL_SOUND.test(w) ? `an ${w}` : m
+    );
+    dedupeWords = (s) => s.replace(/\b([a-z]+)\s+\1\b/gi, (_m, w) => w);
+    capitalizeSentences = (s) => s.replace(/(^|[.!?]\s+|\n)([a-z])/g, (_m, pre, c) => pre + c.toUpperCase());
+    varyOpeners = (sentences) => {
+      for (let i = 1; i < sentences.length; i++) {
+        const prev = (sentences[i - 1].match(/^[\"\']?([A-Za-z]+)/) ?? [])[1]?.toLowerCase();
+        const cur = (sentences[i].match(/^[\"\']?([A-Za-z]+)/) ?? [])[1]?.toLowerCase();
+        if (prev && prev === cur) {
+          const alternatives = ["Second,", "Separately,", "Just as importantly,", "On top of that,", "Alongside that,"];
+          sentences[i] = `${alternatives[i % alternatives.length]} ${sentences[i].charAt(0).toLowerCase()}${sentences[i].slice(1)}`;
+        }
+      }
+      return sentences;
+    };
+    GREETINGS_FORMAL = ["Dear {{company}} team,", "Hello {{company}} team,", "Good day {{company}} team,"];
+    GREETINGS_CASUAL = ["Hi {{company}} team,", "Hello {{company}} team,", "Hey {{company}} team,"];
+    SIGNOFFS_FORMAL = ["Kind regards,", "Best regards,", "Yours sincerely,"];
+    SIGNOFFS_CASUAL = ["Best,", "Kind regards,", "Thanks,"];
+    CTAS = [
+      "If this is useful, I am happy to send a short proposal for one concrete improvement you could make this month.",
+      "If it fits, reply here and I will send a one-page plan for the first piece of work.",
+      "Either way, I would be glad to hear what is already on your roadmap for this year.",
+      "Open to a short call this week if that is easier \u2014 I can show a working example rather than a deck.",
+      "If someone else owns this, a pointer in their direction is just as helpful. Thank you."
+    ];
+    APPLICATION_CTAS = [
+      "My CV is attached; I would welcome a short conversation about the role this week.",
+      "I have attached my CV and would be glad to walk through the most relevant project on a call.",
+      "Happy to provide samples or do a short working session if that helps you decide."
+    ];
+    SUBJECT_PITCH = [
+      "{{company}} x {{focus}}",
+      "A concrete build idea for {{company}}",
+      "{{company}} \u2014 software help, one month in",
+      "Quick idea for {{company}}'s {{word}} operations",
+      "{{company}} and a small piece of software I would take on"
+    ];
+    SUBJECT_APPLICATION = ["Application: {{role}}", "{{role}} \u2014 {{company}}", "Interest in the {{role}} position"];
+    fill = (template, vars) => template.replace(/\{\{(\w+)\}\}/g, (_m, key) => vars[key] ?? "");
+  }
+});
+
 // src/services/classify.service.ts
 function classify(msg) {
   const headers = lowercaseKeys(msg.headers ?? {});
@@ -54891,10 +55663,41 @@ async function smtpForUser(userId) {
 async function smtpReadyFor(userId) {
   return !!await smtpForUser(userId);
 }
+async function pitchContext(userId, app) {
+  if (app.kind === "pitch") {
+    const t = await get(`SELECT sector FROM pitch_targets WHERE name = ?`, app.company_name);
+    return { category: t?.sector ?? null, role: null };
+  }
+  const posting = app.url ? await get(`SELECT career_category, title FROM job_postings WHERE user_id = ? AND url = ? LIMIT 1`, userId, app.url) : null;
+  return { category: posting?.career_category ?? null, role: app.role_title ?? posting?.title ?? null };
+}
 async function autoApply(userId, appId) {
   const app = await get("SELECT * FROM applications WHERE id = ? AND user_id = ?", appId, userId);
   if (!app) throw notFound("Application");
-  const contact = app.contact_id ? await get("SELECT * FROM contacts WHERE id = ? AND user_id = ?", app.contact_id, userId) : await get("SELECT * FROM contacts WHERE user_id = ? AND company_id IS NOT NULL AND company_id = ? AND email IS NOT NULL LIMIT 1", userId, app.company_id ?? "__none__");
+  let contact = app.contact_id ? await get("SELECT * FROM contacts WHERE id = ? AND user_id = ?", app.contact_id, userId) : await get("SELECT * FROM contacts WHERE user_id = ? AND company_id IS NOT NULL AND company_id = ? AND email IS NOT NULL LIMIT 1", userId, app.company_id ?? "__none__");
+  if (!contact?.email) {
+    const posting = app.url ? await get(`SELECT contact_email, career_category FROM job_postings WHERE user_id = ? AND url = ? AND contact_email IS NOT NULL LIMIT 1`, userId, app.url) : null;
+    if (posting?.contact_email) {
+      const email = posting.contact_email.toLowerCase();
+      let c = await get(`SELECT id FROM contacts WHERE user_id = ? AND lower(email) = ?`, userId, email);
+      if (!c) {
+        const cid = newId();
+        await run(
+          `INSERT INTO contacts (id, user_id, company_id, name, role, email, source_note, never_contact, created_at)
+           VALUES (?, ?, ?, 'Apply-by-email', NULL, ?, ?, 0, ?)`,
+          cid,
+          userId,
+          app.company_id ?? null,
+          email,
+          `published in the posting for ${app.role_title ?? "this role"}`,
+          nowIso()
+        );
+        c = { id: cid };
+      }
+      await run(`UPDATE applications SET contact_id = ? WHERE id = ?`, c.id, appId);
+      contact = { id: c.id, email };
+    }
+  }
   if (!contact?.email) {
     return {
       mode: "open",
@@ -54909,11 +55712,19 @@ async function autoApply(userId, appId) {
     appId
   );
   if (!msg) {
+    const ctx = await pitchContext(userId, app);
+    const composed = await composePitch({
+      kind: app.kind === "pitch" ? "pitch" : "application",
+      category: ctx.category,
+      company: app.company_name,
+      role: ctx.role,
+      seed: appId
+    });
     msg = await createOutreach(userId, {
       app_id: appId,
       contact_id: contact.id,
-      subject: app.kind === "pitch" ? PITCH_SUBJECT : AUTO_SUBJECT,
-      body: app.kind === "pitch" ? PITCH_BODY : AUTO_BODY
+      subject: composed.subject,
+      body: composed.body
     });
   }
   const direct = await smtpReadyFor(userId);
@@ -55056,7 +55867,6 @@ async function getThread(userId, id) {
   if (!t) throw notFound("Thread");
   return { ...t, messages: await all("SELECT * FROM email_messages WHERE thread_id = ? ORDER BY received_at ASC", id) };
 }
-var PITCH_SUBJECT, PITCH_BODY, AUTO_SUBJECT, AUTO_BODY;
 var init_outreach_service = __esm({
   "src/services/outreach.service.ts"() {
     "use strict";
@@ -55066,45 +55876,26 @@ var init_outreach_service = __esm({
     init_config();
     init_nodemailer();
     init_cv_service();
+    init_pitch_rewrite();
     init_application_service();
     init_streak_service();
     init_classify_service();
     init_date();
-    PITCH_SUBJECT = `{{company.name}} x software engineering`;
-    PITCH_BODY = `Hi {{company.name}} team,
-
-I came across your work and wanted to introduce myself directly, since I did not see an open engineering role on your careers page.
-
-I am a software engineer who builds typed, well-tested product surfaces end to end: web apps, APIs and the automation that saves teams manual work. A few things I could take off your plate:
-
-- internal tools and dashboards for operations, stock or scheduling
-- a proper website / booking flow that your team controls
-- integrations (payments, email, WhatsApp) with monitoring so issues surface early
-
-If useful, my CV and a couple of sample builds are one reply away. Happy to send a short proposal for one concrete improvement you could make this month.
-
-Best regards,
-{{profile.first_name}} {{profile.last_name}}`;
-    AUTO_SUBJECT = `Application: {{posting.role}}`;
-    AUTO_BODY = `Hello,
-
-I applied for {{posting.role}} and wanted to make sure my application reached a human directly.
-
-I am a software engineer focused on typed, well-tested product work: web apps, APIs and automation. My CV is attached; happy to walk through a relevant project on a short call.
-
-Thank you for your time,
-{{profile.first_name}} {{profile.last_name}}`;
   }
 });
 
 // src/services/logcluster.ts
-function parseContactList(html, sector) {
+function parseContactList(html, sector, pageSlug) {
   const tables = [...html.matchAll(/<table[\s\S]*?<\/table>/g)].map((m) => m[0]);
   const out = [];
   const seen = /* @__PURE__ */ new Set();
+  const prefix = `list:${sector}:${pageSlug ? `${pageSlug}:` : ""}`;
   for (const table of tables) {
     for (const tr of [...table.matchAll(/<tr[\s\S]*?<\/tr>/g)].map((m) => m[0])) {
-      const cells = [...tr.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/g)].map((m) => decode2(m[1]));
+      const rawCells = [...tr.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/g)].map((m) => m[1]);
+      if (rawCells.length < 4) continue;
+      const mailtoEmails = rawCells.flatMap((c) => findEmails(decode2((c.match(/mailto:([^"'?\s]+)/gi) ?? []).join(" "))));
+      const cells = rawCells.map((c) => decode2(c));
       if (cells.length < 4) continue;
       const siteCell = cells.find((c) => !EMAIL_RE.test(c) && looksLikeSite(c));
       const phoneCell = cells.find((c) => looksLikePhone(c) && !EMAIL_RE.test(c));
@@ -55127,12 +55918,13 @@ function parseContactList(html, sector) {
           email = found[0];
         }
       }
+      if (!email && mailtoEmails.length) email = mailtoEmails[0];
       const siteToken = (siteCell ?? "").split(/\s/)[0].replace(/&[a-z0-9]*;?$/i, "").replace(/[.,;]+$/, "");
       const website = looksLikeSite(siteToken) ? /^https?:\/\//i.test(siteToken) ? siteToken : `https://${siteToken}` : null;
       const derived = !email && website;
       if (!email && !website) continue;
       out.push({
-        external_id: `list:${sector}:${slugName(name2)}`,
+        external_id: `${prefix}${slugName(name2)}`,
         name: name2,
         sector,
         city: detectCity(address ?? ""),
@@ -55146,31 +55938,102 @@ function parseContactList(html, sector) {
   }
   return out;
 }
+function pageFromSlug(slug) {
+  if (!/contact-?list/.test(slug)) return null;
+  const parts = slug.split("-");
+  if (!/^\d+$/.test(parts[0])) return null;
+  const rest = parts.slice(1);
+  const cut = rest.findIndex((t) => CATEGORY_TOKENS.test(t));
+  const countryTokens = cut > 0 ? rest.slice(0, cut) : cut === 0 ? [] : rest;
+  const categoryTokens = cut >= 0 ? rest.slice(cut) : rest;
+  const category = categoryTokens.join("-");
+  const rule = CATEGORY_RULES.find(([re]) => re.test(category));
+  return {
+    slug,
+    country: countryTokens.join(" ").replace(/\b\w/g, (m) => m.toUpperCase()) || "Worldwide",
+    sector: rule ? rule[1] : null
+  };
+}
+async function discoverListPages(force = false) {
+  if (!force && catalogCache && Date.now() - catalogCache.at < CATALOG_TTL) return catalogCache.pages;
+  const urls = [];
+  for (let shard = 1; shard <= 8; shard++) {
+    const res = await fetch(`https://lca.logcluster.org/sitemap.xml?page=${shard}`, { headers: UA3, signal: AbortSignal.timeout(2e4) });
+    if (!res.ok) break;
+    const xml = await res.text();
+    const found = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+    if (!found.length) break;
+    urls.push(...found);
+    if (found.length < 500 && shard > 1) break;
+  }
+  const seen = /* @__PURE__ */ new Set();
+  const pages = [];
+  for (const url of urls) {
+    const slug = url.replace(/^https?:\/\/lca\.logcluster\.org\//, "").replace(/\/$/, "").split("?")[0];
+    if (seen.has(slug)) continue;
+    seen.add(slug);
+    const page = pageFromSlug(slug);
+    if (page?.sector) pages.push(page);
+  }
+  catalogCache = { at: Date.now(), pages };
+  return pages;
+}
+async function fetchText(url, timeout = 2e4, tries = 2) {
+  let lastErr = null;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await fetch(url, { headers: UA3, signal: AbortSignal.timeout(timeout) });
+      if (res.status === 406 || res.status === 403) throw new Error(`logcluster HTTP ${res.status} (${url})`);
+      if (!res.ok) throw new Error(`logcluster HTTP ${res.status} (${url})`);
+      return await res.text();
+    } catch (e) {
+      lastErr = e;
+      if (i < tries - 1) await new Promise((r) => setTimeout(r, 1200));
+    }
+  }
+  throw lastErr ?? new Error(`fetch failed (${url})`);
+}
+async function pool(items, limit, fn) {
+  let cursor = 0;
+  const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
+    while (cursor < items.length) {
+      const i = cursor++;
+      await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+}
+async function ingestPage(page) {
+  const html = await fetchText(`https://lca.logcluster.org/${page.slug}`);
+  const rows = parseContactList(html, page.sector, page.slug);
+  const now = nowIso();
+  for (const r of rows) {
+    if (r.city === "Nigeria" && page.country.toLowerCase() !== "nigeria") r.city = page.country;
+    await upsertRow(r, page.country);
+  }
+  await run(
+    `INSERT INTO sources (name, last_run_at, items_found, error_streak, last_error)
+     VALUES (?, ?, ?, 0, NULL)
+     ON CONFLICT(name) DO UPDATE SET last_run_at = excluded.last_run_at, items_found = excluded.items_found, error_streak = 0, last_error = NULL`,
+    `pitch:page:${page.slug}`,
+    now,
+    rows.length
+  );
+  return rows;
+}
 async function fetchContactList(sector) {
-  const res = await fetch(`https://lca.logcluster.org/${LIST_SOURCES[sector]}`, { headers: UA3, signal: AbortSignal.timeout(2e4) });
-  if (!res.ok) throw new Error(`logcluster HTTP ${res.status} (${sector})`);
-  return parseContactList(await res.text(), sector);
+  const slugs = LIST_SOURCES[sector] ?? [];
+  const out = [];
+  for (const slug of slugs) {
+    const html = await fetchText(`https://lca.logcluster.org/${slug}`);
+    out.push(...parseContactList(html, sector, slug));
+  }
+  return out;
 }
 async function refreshContactList(sector) {
   const rows = await fetchContactList(sector);
   const now = nowIso();
-  for (const r of rows) {
-    await run(
-      `INSERT INTO pitch_targets (external_id, name, sector, city, website, email, email_derived, phone, lat, lon, fetched_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)
-       ON CONFLICT(external_id) DO UPDATE SET name = excluded.name, city = excluded.city, website = excluded.website,
-         email = excluded.email, email_derived = excluded.email_derived, phone = excluded.phone, fetched_at = excluded.fetched_at`,
-      r.external_id,
-      r.name,
-      r.sector,
-      r.city,
-      r.website,
-      r.email,
-      r.email_derived,
-      r.phone,
-      now
-    );
-  }
+  for (const r of rows) await upsertRow(r, "Nigeria");
   await run(
     `INSERT INTO sources (name, last_run_at, items_found, error_streak, last_error)
      VALUES (?, ?, ?, 0, NULL)
@@ -55181,23 +56044,129 @@ async function refreshContactList(sector) {
   );
   return rows.length;
 }
-var LIST_SOURCES, LIST_SECTORS, UA3, decode2, slugName, EMAIL_RE, STRICT_EMAIL, findEmails, looksLikeSite, looksLikePhone, NG_CITIES, detectCity, deriveFromSite;
+function startRescan(opts = {}) {
+  if (rescanState.status === "running") return { ...rescanState };
+  rescanState = { ...idleState(), status: "running", scope: opts.scope ?? "all", started_at: nowIso() };
+  void runRescan(opts).catch((e) => {
+    rescanState.status = "error";
+    rescanState.errors.push(String(e.message ?? e));
+    rescanState.finished_at = nowIso();
+  });
+  return { ...rescanState };
+}
+async function runRescan(opts) {
+  const pages = await discoverListPages(!!opts.force);
+  let selected = pages;
+  if (opts.scope === "nigeria") selected = selected.filter((p) => p.country.toLowerCase() === "nigeria");
+  if (opts.categories?.length) selected = selected.filter((p) => !!p.sector && opts.categories.includes(p.sector));
+  if (opts.limit && opts.limit > 0) selected = selected.slice(0, opts.limit);
+  rescanState.pages_total = selected.length;
+  const fresh = opts.force ? /* @__PURE__ */ new Set() : new Set(
+    (await all(
+      `SELECT name, last_run_at FROM sources WHERE name LIKE 'pitch:page:%' AND last_run_at >= ?`,
+      new Date(Date.now() - PAGE_FRESH_MS).toISOString()
+    )).map((r) => r.name.slice("pitch:page:".length))
+  );
+  let delay = 0;
+  await pool(selected, 4, async (page) => {
+    if (fresh.has(page.slug)) {
+      rescanState.pages_skipped++;
+      rescanState.pages_done++;
+      return;
+    }
+    await new Promise((r) => setTimeout(r, delay));
+    delay = (delay + 150) % 900;
+    try {
+      const rows = await ingestPage(page);
+      rescanState.pages_done++;
+      rescanState.rows_found += rows.length;
+      rescanState.rows_with_email += rows.filter((r) => !!r.email && !r.email_derived).length;
+    } catch (e) {
+      rescanState.pages_done++;
+      rescanState.pages_failed++;
+      if (rescanState.errors.length < 20) rescanState.errors.push(`${page.slug}: ${e.message}`);
+    }
+  });
+  await run(
+    `INSERT INTO sources (name, last_run_at, items_found, error_streak, last_error)
+     VALUES ('pitch:list:all', ?, ?, 0, NULL)
+     ON CONFLICT(name) DO UPDATE SET last_run_at = excluded.last_run_at, items_found = excluded.items_found, error_streak = 0, last_error = NULL`,
+    nowIso(),
+    rescanState.rows_found
+  );
+  if (opts.enrich !== false) {
+    rescanState.phase = "enrich";
+    rescanState.emails_found += await enrichEmails({ limit: 4e3 });
+  }
+  rescanState.status = "done";
+  rescanState.finished_at = nowIso();
+}
+async function enrichEmails(opts = {}) {
+  const limit = opts.limit ?? 500;
+  const rows = await all(
+    `SELECT external_id, website, email, email_derived FROM pitch_targets
+     WHERE website IS NOT NULL AND website <> '' AND (email IS NULL OR email_derived = 1)
+     ORDER BY fetched_at DESC LIMIT ?`,
+    limit
+  );
+  let found = 0;
+  await pool(rows, opts.concurrency ?? 4, async (r) => {
+    try {
+      const html = await fetchText(r.website, 9e3, 1);
+      const all2 = strictEmails(html);
+      const mailto = strictEmails((html.match(/mailto:([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/gi) ?? []).join(" "));
+      const pick2 = mailto[0] ?? all2.find((e) => !FREE_DOMAINS2.has(e.split("@")[1])) ?? all2[0];
+      if (!pick2) return;
+      const wasGuess = !r.email || r.email_derived === 1;
+      if (!wasGuess) return;
+      await run(`UPDATE pitch_targets SET email = ?, email_derived = 0 WHERE external_id = ?`, pick2, r.external_id);
+      found++;
+    } catch {
+    }
+  });
+  return found;
+}
+var LIST_SOURCES, LIST_SECTORS, LIST_LABELS, UA3, decode2, slugName, EMAIL_RE, STRICT_EMAIL2, findEmails, looksLikeSite, looksLikePhone, NG_CITIES, detectCity, deriveFromSite, catalogCache, CATALOG_TTL, CATEGORY_RULES, CATEGORY_TOKENS, upsertRow, idleState, rescanState, rescanProgress, PAGE_FRESH_MS, FREE_DOMAINS2, strictEmails;
 var init_logcluster = __esm({
   "src/services/logcluster.ts"() {
     "use strict";
     init_db();
     init_id();
     LIST_SOURCES = {
-      airline: "45-nigeria-airport-companies-contact-list",
-      port: "44-nigeria-port-and-waterways-company-contact-list"
+      airline: ["45-nigeria-airport-companies-contact-list"],
+      port: ["44-nigeria-port-and-waterways-company-contact-list"],
+      government: ["41-nigeria-government-contact-list"],
+      humanitarian: ["42-nigeria-humanitarian-agency-contact-list"],
+      laboratory: ["43-nigeria-laboratory-and-quality-testing-companies-contactlist"],
+      fuel: ["47-nigeria-fuel-providers-contact-list"],
+      transporter: ["48-nigeria-transporter-contact-list"],
+      railway: ["49-nigeria-railway-companies-contact-list"],
+      waste: ["412-nigeria-waste-management-companies-contact-list"],
+      supplier: ["410-nigeria-supplier-contact-list"],
+      services: ["411-nigeria-additional-services-contact-list"],
+      agriculture: ["46-nigeria-storage-and-milling-companies-contact-list"]
     };
     LIST_SECTORS = Object.keys(LIST_SOURCES);
-    UA3 = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) JAMS-Ingest/0.1" };
+    LIST_LABELS = {
+      airline: "Airlines & aviation (curated)",
+      port: "Ports & waterways (curated)",
+      government: "Government & public sector (curated)",
+      humanitarian: "Humanitarian & NGOs (curated)",
+      laboratory: "Laboratory & quality testing (curated)",
+      fuel: "Fuel & energy suppliers (curated)",
+      transporter: "Transporters & logistics (curated)",
+      railway: "Railway companies (curated)",
+      waste: "Waste management (curated)",
+      supplier: "Suppliers & distributors (curated)",
+      services: "Additional services (curated)",
+      agriculture: "Agriculture & milling (curated)"
+    };
+    UA3 = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" };
     decode2 = (s) => s.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&nbsp;?/gi, " ").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
     slugName = (name2) => name2.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
-    STRICT_EMAIL = /^[a-z0-9._%+-]+@(?:[a-z0-9-]+\.)+[a-z]{2,}$/i;
-    findEmails = (s) => (s.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) ?? []).map((e) => e.toLowerCase().replace(/[.,;]+$/, "")).filter((e) => STRICT_EMAIL.test(e));
+    STRICT_EMAIL2 = /^[a-z0-9._%+-]+@(?:[a-z0-9-]+\.)+[a-z]{2,}$/i;
+    findEmails = (s) => (s.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) ?? []).map((e) => e.toLowerCase().replace(/[.,;]+$/, "")).filter((e) => STRICT_EMAIL2.test(e));
     looksLikeSite = (s) => /^(www\.|https?:\/\/|\w+\.(com|ng|aero|net|org|co)(\/|$))/i.test(s.trim());
     looksLikePhone = (s) => {
       const t = s.replace(/\b(tel|phone|fax|mobile|call)\b\s*[:.]?/gi, "").trim();
@@ -55217,6 +56186,61 @@ var init_logcluster = __esm({
         return null;
       }
     };
+    catalogCache = null;
+    CATALOG_TTL = 12 * 60 * 60 * 1e3;
+    CATEGORY_RULES = [
+      [/^(airport|airline|aviation)/, "airline"],
+      [/^port/, "port"],
+      [/^government/, "government"],
+      [/^humanitarian/, "humanitarian"],
+      [/^laborator/, "laboratory"],
+      [/^fuel/, "fuel"],
+      [/^(transporter|transport|logistics)/, "transporter"],
+      [/^railway/, "railway"],
+      [/^waste/, "waste"],
+      [/^supplier/, "supplier"],
+      [/^(storage|milling)/, "agriculture"],
+      [/^(additional|service)/, "services"]
+    ];
+    CATEGORY_TOKENS = /^(airport|airline|aviation|port|government|humanitarian|laborator|fuel|transporter|transport|logistics|railway|waste|supplier|storage|milling|additional|service|quality|companies|company|contact)/;
+    upsertRow = (r, country) => run(
+      `INSERT INTO pitch_targets (external_id, name, sector, city, country, website, email, email_derived, phone, lat, lon, fetched_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)
+     ON CONFLICT(external_id) DO UPDATE SET name = excluded.name, city = excluded.city, country = excluded.country,
+       website = excluded.website, email = CASE WHEN pitch_targets.email_derived = 0 THEN pitch_targets.email ELSE excluded.email END,
+       email_derived = CASE WHEN pitch_targets.email_derived = 0 THEN 1 ELSE excluded.email_derived END,
+       phone = excluded.phone, fetched_at = excluded.fetched_at`,
+      r.external_id,
+      r.name,
+      r.sector,
+      r.city,
+      country,
+      r.website,
+      r.email,
+      r.email_derived,
+      r.phone,
+      nowIso()
+    );
+    idleState = () => ({
+      status: "idle",
+      phase: "lists",
+      scope: "all",
+      pages_total: 0,
+      pages_done: 0,
+      pages_failed: 0,
+      pages_skipped: 0,
+      rows_found: 0,
+      rows_with_email: 0,
+      emails_found: 0,
+      errors: [],
+      started_at: null,
+      finished_at: null
+    });
+    rescanState = idleState();
+    rescanProgress = () => ({ ...rescanState, errors: [...rescanState.errors] });
+    PAGE_FRESH_MS = 7 * 24 * 60 * 60 * 1e3;
+    FREE_DOMAINS2 = /* @__PURE__ */ new Set(["gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.uk", "hotmail.com", "outlook.com", "live.com", "aol.com", "icloud.com", "mail.com", "ymail.com", "proton.me", "protonmail.com"]);
+    strictEmails = (html) => (html.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) ?? []).map((e) => e.toLowerCase().replace(/[.,;]+$/, "")).filter((e) => /^[a-z0-9._%+-]+@(?:[a-z0-9-]+\.)+[a-z]{2,}$/i.test(e));
   }
 });
 
@@ -55497,6 +56521,11 @@ async function searchPitchTargets(p = {}) {
     pagination: { page, page_size: pageSize, total_count: total, total_pages: Math.max(1, Math.ceil(total / pageSize)) }
   };
 }
+async function targetByExternalId(externalId) {
+  const target = await get(`SELECT * FROM pitch_targets WHERE external_id = ?`, externalId);
+  if (!target) throw notFound("Pitch target");
+  return target;
+}
 async function preparePitch(userId, externalId) {
   const target = await get(`SELECT * FROM pitch_targets WHERE external_id = ?`, externalId);
   if (!target) throw notFound("Pitch target");
@@ -55534,6 +56563,13 @@ async function preparePitch(userId, externalId) {
   }
   const appId = newId();
   const now = nowIso();
+  const composed = await composePitch({
+    kind: "pitch",
+    category: target.sector,
+    company: target.name,
+    city: target.city,
+    seed: target.external_id
+  });
   await run(
     `INSERT INTO applications (id, user_id, company_id, contact_id, kind, status, role_title, company_name, source, url, created_at, updated_at)
      VALUES (?, ?, ?, ?, 'pitch', 'saved', ?, ?, 'pitch_target', ?, ?, ?)`,
@@ -55541,13 +56577,13 @@ async function preparePitch(userId, externalId) {
     userId,
     companyId,
     contactId,
-    `Software help pitch`,
+    `Software help pitch (${composed.category})`,
     target.name,
     target.website,
     now,
     now
   );
-  const msg = await createOutreach(userId, { app_id: appId, contact_id: contactId, subject: PITCH_SUBJECT, body: PITCH_BODY });
+  const msg = await createOutreach(userId, { app_id: appId, contact_id: contactId, subject: composed.subject, body: composed.body });
   return {
     application_id: appId,
     outreach_id: msg.id,
@@ -55558,6 +56594,8 @@ async function preparePitch(userId, externalId) {
     smtp_ready: await smtpReadyFor(userId),
     company: { id: companyId, name: target.name },
     contact: { id: contactId, email: target.email, email_derived: !!target.email_derived },
+    // the composer's own audit: score + per-check detail, surfaced by the preview
+    compose: { score: composed.score, checks: composed.checks, category: composed.category, variant: composed.variant },
     target
   };
 }
@@ -55570,15 +56608,23 @@ var init_pitch_service = __esm({
     init_id();
     init_outreach_service();
     init_logcluster();
+    init_pitch_rewrite();
     init_stargate();
-    SECTORS = ["supermarket", "airport", "manufacturing", "company", "airline", "port"];
+    SECTORS = [
+      "supermarket",
+      "airport",
+      "manufacturing",
+      "company",
+      "bank",
+      ...LIST_SECTORS
+    ];
     SECTOR_LABELS = {
       supermarket: "Supermarkets & retail",
       airport: "Airports & aviation",
       manufacturing: "Manufacturing & industry",
       company: "Company offices",
-      airline: "Airlines (curated list)",
-      port: "Ports & waterways (curated list)"
+      bank: "Banks & financial services",
+      ...LIST_LABELS
     };
     isListSector = (s) => LIST_SECTORS.includes(s);
     CITIES = {
@@ -55592,9 +56638,22 @@ var init_pitch_service = __esm({
       airport: [`["aeroway"="aerodrome"]`],
       manufacturing: [`["industrial"="manufacturing"]`, `["industrial"="factory"]`, `["craft"="manufacturer"]`, `["man_made"="factory"]`],
       company: [`["office"="company"]`, `["office"="it"]`, `["office"="telecommunication"]`],
-      // airline/port are curated-list sectors and never reach Overpass; tags kept for completeness
+      // banks publish contact:email and websites on OSM, which is where the inbox comes from
+      bank: [`["amenity"="bank"]`, `["office"="bank"]`, `["office"="financial"]`],
+      // every curated-list sector below is served by lca.logcluster.org, never Overpass;
+      // tags are kept only so the Record<Sector, string[]> shape stays honest
       airline: [`["office"="airline"]`],
-      port: [`["landuse"="port"]`, `["harbour"="yes"]`]
+      port: [`["landuse"="port"]`, `["harbour"="yes"]`],
+      government: [`["office"="government"]`],
+      humanitarian: [`["office"="ngo"]`, `["amenity"="social_facility"]`],
+      laboratory: [`["amenity"="laboratory"]`, `["healthcare"="laboratory"]`],
+      fuel: [`["amenity"="fuel"]`],
+      transporter: [`["office"="transportation"]`],
+      railway: [`["railway"="station"]`],
+      waste: [`["amenity"="recycling"]`, `["shop"="trash_disposal"]`],
+      supplier: [`["office"="company"]`],
+      services: [`["office"="service"]`],
+      agriculture: [`["landuse"="farm"]`, `["shop"="farm"]`]
     };
     TAG = (t, ...keys) => {
       for (const k of keys) {
@@ -55613,6 +56672,104 @@ var init_pitch_service = __esm({
   }
 });
 
+// src/services/attachments.ts
+async function saveAttachment(userId, input) {
+  const b64 = input.content_b64.replace(/^data:[^,]+,/, "").replace(/\s+/g, "");
+  const size = Math.floor(b64.length * 3 / 4);
+  if (!b64) throw validation("Empty file");
+  if (size > MAX_BYTES) throw validation(`File is too large (limit ${Math.round(MAX_BYTES / 1024 / 1024)}MB)`);
+  const id = newId();
+  const filename = input.filename.slice(0, 200);
+  const contentType = (input.content_type || "application/octet-stream").slice(0, 120);
+  await run(
+    `INSERT INTO pitch_attachments (id, user_id, filename, content_type, size_bytes, content_b64, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    id,
+    userId,
+    filename,
+    contentType,
+    size,
+    b64,
+    nowIso()
+  );
+  return { id, filename, content_type: contentType, size_bytes: size, url: attachmentUrl(id) };
+}
+async function getAttachment(id) {
+  const row = await get(`SELECT * FROM pitch_attachments WHERE id = ?`, id);
+  if (!row) throw notFound("Attachment");
+  return row;
+}
+async function saveCvAttachment(userId, cvId) {
+  const cv = await get(`SELECT * FROM cvs WHERE id = ? AND user_id = ?`, cvId, userId);
+  if (!cv) throw notFound("CV");
+  const profile = await get(`SELECT * FROM profiles WHERE user_id = ?`, userId);
+  const identity = profile ? parseJson(profile.identity, {}) : {};
+  const blocks = parseJson(cv.blocks, []);
+  const name2 = [identity.first_name, identity.last_name].filter(Boolean).join(" ") || cv.name;
+  const section = (title, inner) => inner.trim() ? `<section><h2>${esc(title)}</h2>${inner}</section>` : "";
+  const parts = [];
+  for (const b of blocks) {
+    if (b.type === "summary") {
+      parts.push(section("Profile", `<p>${esc(b.text ?? "")}</p>`));
+    } else if (b.type === "experience") {
+      const exps = await childrenOf(userId, "profile_experiences");
+      const inner = exps.map((e) => {
+        const dates = e.start_date ? `<span class="meta">${esc(e.start_date)}${e.end_date ? ` \u2013 ${esc(e.end_date)}` : ""}</span>` : "";
+        const bullets = e.bullets ? `<ul>${parseJson(e.bullets, []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "";
+        return `<div class="item"><strong>${esc(e.title ?? "")}</strong>${e.company ? ` \u2014 ${esc(e.company)}` : ""}${dates}${bullets}</div>`;
+      }).join("");
+      parts.push(section("Experience", inner));
+    } else if (b.type === "skills") {
+      const skills = await childrenOf(userId, "profile_skills");
+      parts.push(section("Skills", `<p>${skills.map((s) => esc(s.name)).join(" \xB7 ")}</p>`));
+    } else if (b.type === "education") {
+      const edu = await childrenOf(userId, "profile_education");
+      const inner = edu.map((e) => `<div class="item"><strong>${esc(e.school ?? "")}</strong>${e.degree ? ` \u2014 ${esc(e.degree)}` : ""}${e.end_date ? `<span class="meta">${esc(e.end_date)}</span>` : ""}</div>`).join("");
+      parts.push(section("Education", inner));
+    } else if (b.text || b.title) {
+      const inner = b.bullets ? `<ul>${b.bullets.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p>${esc(b.text ?? "")}</p>`;
+      parts.push(section(b.title ?? "Notes", inner));
+    }
+  }
+  const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>${esc(name2)} \u2014 CV</title>
+<style>
+  body{font-family:Georgia,'Times New Roman',serif;color:#14181f;max-width:760px;margin:40px auto;padding:0 24px;line-height:1.55}
+  h1{font-size:26px;margin:0 0 4px}h2{font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#5b6472;margin:26px 0 8px;border-bottom:1px solid #e3e7ee;padding-bottom:4px}
+  .meta{color:#5b6472;font-weight:400;margin-left:8px;font-size:14px}.item{margin-bottom:12px}ul{margin:6px 0 0 18px;padding:0}li{margin-bottom:4px}
+  .head{border-bottom:2px solid #14181f;padding-bottom:12px}.contact{color:#5b6472;font-size:14px}
+</style></head><body>
+<div class="head"><h1>${esc(name2)}</h1><div class="contact">${esc(identity.headline ?? "")}${identity.email ? ` \xB7 ${esc(identity.email)}` : ""}</div></div>
+${parts.join("\n")}
+</body></html>`;
+  return saveAttachment(userId, {
+    filename: `${(cv.name || "CV").replace(/[^a-z0-9]+/gi, "-")}.html`,
+    content_type: "text/html; charset=utf-8",
+    content_b64: Buffer.from(html, "utf8").toString("base64")
+  });
+}
+var publicBase, attachmentUrl, MAX_BYTES, esc, profileOf, childrenOf;
+var init_attachments = __esm({
+  "src/services/attachments.ts"() {
+    "use strict";
+    init_db();
+    init_errors2();
+    init_id();
+    init_config();
+    publicBase = () => process.env.PUBLIC_API_BASE || process.env.API_BASE_URL || (process.env.VERCEL ? "https://backend-v0-3aeu-omega.vercel.app" : `http://localhost:${config.port}`);
+    attachmentUrl = (id) => `${publicBase()}/api/v1/pitch-targets/attachments/${id}/download`;
+    MAX_BYTES = 4 * 1024 * 1024;
+    esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+    profileOf = (userId) => get(`SELECT id FROM profiles WHERE user_id = ?`, userId);
+    childrenOf = async (userId, table) => {
+      const p = await profileOf(userId);
+      if (!p) return [];
+      const order = table === "profile_skills" ? "sort_order" : "sort_order";
+      return all(`SELECT * FROM ${table} WHERE profile_id = ? ORDER BY ${order}`, p.id);
+    };
+  }
+});
+
 // src/routes/pitch.ts
 var import_express4, pitchRouter;
 var init_pitch = __esm({
@@ -55621,8 +56778,12 @@ var init_pitch = __esm({
     import_express4 = __toESM(require_express2(), 1);
     init_zod();
     init_envelope();
+    init_errors2();
     init_security();
     init_pitch_service();
+    init_pitch_rewrite();
+    init_logcluster();
+    init_attachments();
     pitchRouter = (0, import_express4.Router)();
     pitchRouter.use(requireAuth);
     pitchRouter.get("/", async (req, res, next) => {
@@ -55671,6 +56832,95 @@ var init_pitch = __esm({
       try {
         const externalId = decodeURIComponent(String(req.params.externalId));
         ok(res, "Pitch prepared (draft)", await preparePitch(req.userId, externalId), 201);
+      } catch (e) {
+        next(e);
+      }
+    });
+    pitchRouter.post("/rewrite", async (req, res, next) => {
+      try {
+        const body = external_exports.object({
+          external_id: external_exports.string().optional(),
+          company: external_exports.string().optional(),
+          role: external_exports.string().optional(),
+          kind: external_exports.enum(["pitch", "application"]).optional(),
+          seed: external_exports.union([external_exports.string(), external_exports.number()]).optional()
+        }).parse(req.body ?? {});
+        let company = body.company;
+        let category;
+        let city;
+        if (body.external_id) {
+          const t = await targetByExternalId(body.external_id);
+          company = company ?? t.name;
+          category = t.sector;
+          city = t.city;
+        }
+        if (!company) throw validation("external_id or company is required");
+        const composed = await composePitch({
+          kind: body.kind ?? "pitch",
+          category,
+          company,
+          role: body.role,
+          city,
+          seed: body.seed ?? `${Date.now()}`
+        });
+        ok(res, "Wording regenerated", composed);
+      } catch (e) {
+        next(e);
+      }
+    });
+    pitchRouter.post("/rescan", async (req, res, next) => {
+      try {
+        const body = external_exports.object({
+          scope: external_exports.enum(["all", "nigeria"]).optional(),
+          categories: external_exports.array(external_exports.string()).optional(),
+          limit: external_exports.number().int().positive().max(2e3).optional(),
+          force: external_exports.boolean().optional(),
+          enrich: external_exports.boolean().optional()
+        }).default({}).parse(req.body ?? {});
+        const state = startRescan({ ...body, categories: body.categories });
+        ok(res, state.status === "running" ? "Rescan already running" : "Rescan enqueued", state, 202);
+      } catch (e) {
+        next(e);
+      }
+    });
+    pitchRouter.get("/rescan", async (_req, res, next) => {
+      try {
+        const pages = await discoverListPages().catch(() => []);
+        ok(res, "Rescan progress", {
+          progress: rescanProgress(),
+          catalog: {
+            lists_available: pages.length,
+            countries: new Set(pages.map((p) => p.country)).size,
+            by_sector: pages.reduce((acc, p) => (acc[p.sector] = (acc[p.sector] ?? 0) + 1, acc), {})
+          }
+        });
+      } catch (e) {
+        next(e);
+      }
+    });
+    pitchRouter.post("/enrich", async (req, res, next) => {
+      try {
+        const body = external_exports.object({ limit: external_exports.number().int().positive().max(5e3).optional() }).default({}).parse(req.body ?? {});
+        const updated = await enrichEmails({ limit: body.limit ?? 500 });
+        ok(res, `${updated} emails discovered from company websites`, { updated });
+      } catch (e) {
+        next(e);
+      }
+    });
+    pitchRouter.post("/attach", async (req, res, next) => {
+      try {
+        const body = external_exports.object({
+          filename: external_exports.string().min(1).max(200),
+          content_type: external_exports.string().max(120).optional(),
+          content_b64: external_exports.string().optional(),
+          cv_id: external_exports.string().optional()
+        }).parse(req.body ?? {});
+        const saved = body.cv_id ? await saveCvAttachment(req.userId, body.cv_id) : await saveAttachment(req.userId, {
+          filename: body.filename,
+          content_type: body.content_type ?? "application/octet-stream",
+          content_b64: body.content_b64 ?? ""
+        });
+        ok(res, "Attachment stored", saved, 201);
       } catch (e) {
         next(e);
       }
@@ -56080,8 +57330,8 @@ async function medianTimeToReply(userId) {
   );
   if (!rows.length) return { p50: null, p90: null };
   const vals = rows.map((r) => Number(r.first_reply_days));
-  const pick = (q) => vals[Math.min(vals.length - 1, Math.floor(q * vals.length))];
-  return { p50: pick(0.5), p90: pick(0.9) };
+  const pick2 = (q) => vals[Math.min(vals.length - 1, Math.floor(q * vals.length))];
+  return { p50: pick2(0.5), p90: pick2(0.9) };
 }
 async function funnelCounts(userId, from, to) {
   const f = from ?? "1970-01-01";
@@ -56377,6 +57627,7 @@ var init_routes = __esm({
     init_ingest();
     init_zod();
     init_security();
+    init_attachments();
     init_streak_service();
     init_db();
     init_config();
@@ -56398,6 +57649,17 @@ var init_routes = __esm({
     apiRouter.use("/searches", searchRouter);
     apiRouter.use("/applications", applicationRouter);
     apiRouter.use("/companies", companyRouter);
+    apiRouter.get("/pitch-targets/attachments/:id/download", async (req, res, next) => {
+      try {
+        const row = await getAttachment(String(req.params.id));
+        res.setHeader("Content-Type", row.content_type || "application/octet-stream");
+        res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(row.filename)}"`);
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        res.send(Buffer.from(row.content_b64, "base64"));
+      } catch (e) {
+        next(e);
+      }
+    });
     apiRouter.use("/pitch-targets", pitchRouter);
     apiRouter.use("/capture", captureRouter);
     apiRouter.use("/autofill", autofillRouter);
@@ -56443,7 +57705,7 @@ function createApp() {
       credentials: true
     })
   );
-  app.use(import_express9.default.json({ limit: "2mb" }));
+  app.use(import_express9.default.json({ limit: "8mb" }));
   app.use(requestContext);
   startRateLimitSweeper();
   app.use("/api/v1", apiRouter);
