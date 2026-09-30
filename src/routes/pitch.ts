@@ -203,7 +203,7 @@ pitchRouter.post("/import", async (req: AuthedRequest, res, next) => {
         rows: z
           .array(
             z.object({
-              external_id: z.string().min(3).max(220),
+              external_id: z.string().min(3).max(512),
               name: z.string().min(1).max(200),
               sector: z.string().min(2).max(40),
               city: z.string().max(80).nullish(),

@@ -56983,7 +56983,7 @@ var init_pitch = __esm({
         const body = external_exports.object({
           rows: external_exports.array(
             external_exports.object({
-              external_id: external_exports.string().min(3).max(220),
+              external_id: external_exports.string().min(3).max(512),
               name: external_exports.string().min(1).max(200),
               sector: external_exports.string().min(2).max(40),
               city: external_exports.string().max(80).nullish(),
