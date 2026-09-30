@@ -191,6 +191,57 @@ pitchRouter.post("/catalog", async (req: AuthedRequest, res, next) => {
   }
 });
 
+/**
+ * POST /pitch-targets/import {rows} — bulk upsert of crawled contact-list rows.
+ * Mirrors refreshContactList's shape, so a machine with a friendlier network can do
+ * the walking (696 pages) and push the companies here in chunks.
+ */
+pitchRouter.post("/import", async (req: AuthedRequest, res, next) => {
+  try {
+    const body = z
+      .object({
+        rows: z
+          .array(
+            z.object({
+              external_id: z.string().min(3).max(220),
+              name: z.string().min(1).max(200),
+              sector: z.string().min(2).max(40),
+              city: z.string().max(80).nullish(),
+              country: z.string().max(80).nullish(),
+              website: z.string().max(300).nullish(),
+              email: z.string().max(200).nullish(),
+              email_derived: z.number().int().min(0).max(1).optional(),
+              phone: z.string().max(200).nullish(),
+            })
+          )
+          .min(1)
+          .max(2000),
+      })
+      .parse(req.body ?? {});
+    const now = nowIso();
+    let stored = 0;
+    for (const r of body.rows) {
+      if (!LIST_SECTORS.includes(r.sector as ListSector)) continue;
+      await run(
+        `INSERT INTO pitch_targets (external_id, name, sector, city, country, website, email, email_derived, phone, lat, lon, fetched_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)
+         ON CONFLICT(external_id) DO UPDATE SET name = excluded.name, sector = excluded.sector, city = excluded.city,
+           country = excluded.country, website = excluded.website,
+           email = CASE WHEN pitch_targets.email_derived = 0 THEN pitch_targets.email ELSE excluded.email END,
+           email_derived = CASE WHEN pitch_targets.email_derived = 0 THEN 1 ELSE excluded.email_derived END,
+           phone = excluded.phone, fetched_at = excluded.fetched_at`,
+        r.external_id, r.name, r.sector, r.city ?? null, r.country ?? null, r.website ?? null,
+        r.email ?? null, r.email_derived ?? (r.email ? 0 : 1), r.phone ?? null, now
+      );
+      stored++;
+    }
+    const total = (await get<{ n: number }>(`SELECT count(*) AS n FROM pitch_targets`))?.n ?? stored;
+    ok(res, `${stored} rows imported, ${total} companies on file`, { stored, total });
+  } catch (e) {
+    next(e);
+  }
+});
+
 /** POST /pitch-targets/enrich {limit} — visit company sites and pick up published inboxes. */
 pitchRouter.post("/enrich", async (req: AuthedRequest, res, next) => {
   try {

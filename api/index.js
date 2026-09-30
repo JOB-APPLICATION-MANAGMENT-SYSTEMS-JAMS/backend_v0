@@ -56978,6 +56978,54 @@ var init_pitch = __esm({
         next(e);
       }
     });
+    pitchRouter.post("/import", async (req, res, next) => {
+      try {
+        const body = external_exports.object({
+          rows: external_exports.array(
+            external_exports.object({
+              external_id: external_exports.string().min(3).max(220),
+              name: external_exports.string().min(1).max(200),
+              sector: external_exports.string().min(2).max(40),
+              city: external_exports.string().max(80).nullish(),
+              country: external_exports.string().max(80).nullish(),
+              website: external_exports.string().max(300).nullish(),
+              email: external_exports.string().max(200).nullish(),
+              email_derived: external_exports.number().int().min(0).max(1).optional(),
+              phone: external_exports.string().max(200).nullish()
+            })
+          ).min(1).max(2e3)
+        }).parse(req.body ?? {});
+        const now = nowIso();
+        let stored = 0;
+        for (const r of body.rows) {
+          if (!LIST_SECTORS.includes(r.sector)) continue;
+          await run(
+            `INSERT INTO pitch_targets (external_id, name, sector, city, country, website, email, email_derived, phone, lat, lon, fetched_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)
+         ON CONFLICT(external_id) DO UPDATE SET name = excluded.name, sector = excluded.sector, city = excluded.city,
+           country = excluded.country, website = excluded.website,
+           email = CASE WHEN pitch_targets.email_derived = 0 THEN pitch_targets.email ELSE excluded.email END,
+           email_derived = CASE WHEN pitch_targets.email_derived = 0 THEN 1 ELSE excluded.email_derived END,
+           phone = excluded.phone, fetched_at = excluded.fetched_at`,
+            r.external_id,
+            r.name,
+            r.sector,
+            r.city ?? null,
+            r.country ?? null,
+            r.website ?? null,
+            r.email ?? null,
+            r.email_derived ?? (r.email ? 0 : 1),
+            r.phone ?? null,
+            now
+          );
+          stored++;
+        }
+        const total = (await get(`SELECT count(*) AS n FROM pitch_targets`))?.n ?? stored;
+        ok(res, `${stored} rows imported, ${total} companies on file`, { stored, total });
+      } catch (e) {
+        next(e);
+      }
+    });
     pitchRouter.post("/enrich", async (req, res, next) => {
       try {
         const body = external_exports.object({ limit: external_exports.number().int().positive().max(5e3).optional() }).default({}).parse(req.body ?? {});
