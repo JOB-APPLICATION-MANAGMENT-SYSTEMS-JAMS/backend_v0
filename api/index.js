@@ -5148,7 +5148,7 @@ var require_lib = __commonJS({
       var trail = encoder.end();
       return trail && trail.length > 0 ? Buffer2.concat([res, trail]) : res;
     };
-    module.exports.decode = function decode2(buf, encoding, options) {
+    module.exports.decode = function decode3(buf, encoding, options) {
       if (typeof buf === "string") {
         if (!module.exports.skipDecodeWarning) {
           console.error("Iconv-lite warning: decode()-ing strings is deprecated. Refer to https://github.com/ashtuchkin/iconv-lite/wiki/Use-Buffers-when-decoding");
@@ -17613,7 +17613,7 @@ var require_utils2 = __commonJS({
         return acc;
       }, target);
     };
-    var decode2 = function(str, defaultDecoder, charset) {
+    var decode3 = function(str, defaultDecoder, charset) {
       var strWithoutPlus = str.replace(/\+/g, " ");
       if (charset === "iso-8859-1") {
         return strWithoutPlus.replace(/%[0-9a-f]{2}/gi, unescape);
@@ -17743,7 +17743,7 @@ var require_utils2 = __commonJS({
       assign: assign2,
       combine,
       compact,
-      decode: decode2,
+      decode: decode3,
       encode: encode4,
       isBuffer,
       isOverflow,
@@ -20281,14 +20281,14 @@ var require_dist2 = __commonJS({
       };
     }
     function match(path5, options = {}) {
-      const { decode: decode2 = decodeURIComponent, delimiter: delimiter2 = DEFAULT_DELIMITER } = options;
+      const { decode: decode3 = decodeURIComponent, delimiter: delimiter2 = DEFAULT_DELIMITER } = options;
       const { regexp, keys } = pathToRegexp(path5, options);
       const decoders = keys.map((key) => {
-        if (decode2 === false)
+        if (decode3 === false)
           return NOOP_VALUE;
         if (key.type === "param")
-          return decode2;
-        return (value) => value.split(delimiter2).map(decode2);
+          return decode3;
+        return (value) => value.split(delimiter2).map(decode3);
       });
       return function match2(input) {
         const m = regexp.exec(input);
@@ -22463,7 +22463,7 @@ var require_cookie = __commonJS({
       var obj = {};
       var len = str.length;
       if (len < 2) return obj;
-      var dec = opt && opt.decode || decode2;
+      var dec = opt && opt.decode || decode3;
       var index = 0;
       var eqIdx = 0;
       var endIdx = 0;
@@ -22594,15 +22594,15 @@ var require_cookie = __commonJS({
       }
       return str;
     }
-    function decode2(str) {
+    function decode3(str) {
       return str.indexOf("%") !== -1 ? decodeURIComponent(str) : str;
     }
     function isDate(val) {
       return __toString.call(val) === "[object Date]";
     }
-    function tryDecode(str, decode3) {
+    function tryDecode(str, decode4) {
       try {
-        return decode3(str);
+        return decode4(str);
       } catch (e) {
         return str;
       }
@@ -22782,7 +22782,7 @@ var require_send = __commonJS({
     SendStream.prototype.pipe = function pipe(res) {
       var root2 = this._root;
       this.res = res;
-      var path6 = decode2(this.path);
+      var path6 = decode3(this.path);
       if (path6 === -1) {
         this.error(400);
         return res;
@@ -23032,7 +23032,7 @@ var require_send = __commonJS({
       }
       return err instanceof Error ? createError(status, err, { expose: false }) : createError(status, err);
     }
-    function decode2(path6) {
+    function decode3(path6) {
       try {
         return decodeURIComponent(path6);
       } catch (err) {
@@ -31133,7 +31133,7 @@ var require_verify = __commonJS({
     var JsonWebTokenError = require_JsonWebTokenError();
     var NotBeforeError = require_NotBeforeError();
     var TokenExpiredError = require_TokenExpiredError();
-    var decode2 = require_decode();
+    var decode3 = require_decode();
     var timespan = require_timespan();
     var validateAsymmetricKey = require_validateAsymmetricKey();
     var PS_SUPPORTED = require_psSupported();
@@ -31187,7 +31187,7 @@ var require_verify = __commonJS({
       }
       let decodedToken;
       try {
-        decodedToken = decode2(jwtString, { complete: true });
+        decodedToken = decode3(jwtString, { complete: true });
       } catch (err) {
         return done(err);
       }
@@ -33768,6 +33768,14 @@ var init_config = __esm({
         user: process.env.SMTP_USER ?? "",
         pass: process.env.SMTP_PASS ?? "",
         from: process.env.SMTP_FROM ?? process.env.SMTP_USER ?? ""
+      },
+      /**
+       * InfobelPro Stargate (firmographics) is an optional richer company directory.
+       * Unset → pitch search falls back to OpenStreetMap + curated contact lists only.
+       */
+      stargate: {
+        key: process.env.STARGATE_API_KEY ?? "",
+        base: process.env.STARGATE_BASE ?? "https://stargate.infobelpro.com"
       }
     };
     smtpReady = () => !!(config.smtp.host && config.smtp.user && config.smtp.pass);
@@ -54826,23 +54834,24 @@ async function sendOutreach(userId, id, opts) {
   let state;
   let composeUrl;
   if (opts.via === "smtp") {
-    if (!smtpReady()) {
+    const smtp = await smtpForUser(userId);
+    if (!smtp) {
       throw new AppError(
         "SMTP_NOT_CONFIGURED",
         403,
-        "Direct sending is not configured on this deployment",
-        "set SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS (and optionally SMTP_FROM), or send via gmail_open"
+        "Direct sending is not configured for this account",
+        "connect a mailbox with an app password in Inbox & Sync, or set SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS on the host, or send via gmail_open"
       );
     }
     if (!to) throw validation("No recipient email on this message; attach a contact with an email first");
     const transport = nodemailer_default.createTransport({
-      host: config.smtp.host,
-      port: config.smtp.port,
-      secure: config.smtp.port === 465,
-      auth: { user: config.smtp.user, pass: config.smtp.pass }
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.port === 465,
+      auth: { user: smtp.user, pass: smtp.pass }
     });
     await transport.sendMail({
-      from: config.smtp.from || config.smtp.user,
+      from: smtp.from,
       to,
       subject: mergeTemplate(r.subject, ctx),
       text: mergeTemplate(r.body, ctx)
@@ -54864,6 +54873,23 @@ async function sendOutreach(userId, id, opts) {
     }
   }
   return { id, state, compose_url: composeUrl, via: opts.via === "smtp" ? "smtp" : "gmail_open", sent_today: used + 1, daily_cap: cap };
+}
+async function smtpForUser(userId) {
+  if (smtpReady()) {
+    return { host: config.smtp.host, port: config.smtp.port, user: config.smtp.user, pass: config.smtp.pass, from: config.smtp.from || config.smtp.user };
+  }
+  const mb = await get("SELECT * FROM mailboxes WHERE user_id = ? ORDER BY created_at DESC LIMIT 1", userId);
+  if (!mb) return null;
+  const cfg = parseJson(mb.config, {});
+  const pass = cfg.app_password ?? cfg.smtp_pass ?? null;
+  if (!pass) return null;
+  const host = cfg.smtp_host ?? "smtp.gmail.com";
+  const port = Number(cfg.smtp_port ?? 465);
+  const user = cfg.smtp_user ?? mb.address;
+  return { host, port, user, pass, from: user };
+}
+async function smtpReadyFor(userId) {
+  return !!await smtpForUser(userId);
 }
 async function autoApply(userId, appId) {
   const app = await get("SELECT * FROM applications WHERE id = ? AND user_id = ?", appId, userId);
@@ -54890,7 +54916,7 @@ async function autoApply(userId, appId) {
       body: app.kind === "pitch" ? PITCH_BODY : AUTO_BODY
     });
   }
-  const direct = smtpReady();
+  const direct = await smtpReadyFor(userId);
   const res = await sendOutreach(userId, msg.id, { via: direct ? "smtp" : "gmail_open", confirm: true });
   return {
     mode: direct ? "sent" : "compose",
@@ -55071,6 +55097,213 @@ Thank you for your time,
   }
 });
 
+// src/services/logcluster.ts
+function parseContactList(html, sector) {
+  const tables = [...html.matchAll(/<table[\s\S]*?<\/table>/g)].map((m) => m[0]);
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const table of tables) {
+    for (const tr of [...table.matchAll(/<tr[\s\S]*?<\/tr>/g)].map((m) => m[0])) {
+      const cells = [...tr.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/g)].map((m) => decode2(m[1]));
+      if (cells.length < 4) continue;
+      const siteCell = cells.find((c) => !EMAIL_RE.test(c) && looksLikeSite(c));
+      const phoneCell = cells.find((c) => looksLikePhone(c) && !EMAIL_RE.test(c));
+      const nameCell = cells.find(
+        (c) => c.length > 2 && !EMAIL_RE.test(c) && !looksLikeSite(c) && !looksLikePhone(c) && /[a-z]/i.test(c) && !/^sn$/i.test(c)
+      );
+      if (!nameCell) continue;
+      const name2 = nameCell.trim();
+      if (/^(airline name|terminals? operator name|company|name|sn)$/i.test(name2)) continue;
+      if (seen.has(name2.toLowerCase())) continue;
+      seen.add(name2.toLowerCase());
+      const addressCell = cells.find((c) => c !== nameCell && c.length > 12 && /[a-z]/i.test(c) && !EMAIL_RE.test(c) && !looksLikeSite(c) && !looksLikePhone(c) && c !== phoneCell && c !== siteCell);
+      const address = addressCell ?? null;
+      let email = null;
+      let emailCount = 0;
+      for (const c of cells) {
+        const found = findEmails(c);
+        if (found.length > 0 && found.length >= emailCount) {
+          emailCount = found.length;
+          email = found[0];
+        }
+      }
+      const siteToken = (siteCell ?? "").split(/\s/)[0].replace(/&[a-z0-9]*;?$/i, "").replace(/[.,;]+$/, "");
+      const website = looksLikeSite(siteToken) ? /^https?:\/\//i.test(siteToken) ? siteToken : `https://${siteToken}` : null;
+      const derived = !email && website;
+      if (!email && !website) continue;
+      out.push({
+        external_id: `list:${sector}:${slugName(name2)}`,
+        name: name2,
+        sector,
+        city: detectCity(address ?? ""),
+        address,
+        website,
+        email: email ?? (derived ? deriveFromSite(website) : null),
+        email_derived: email ? 0 : 1,
+        phone: phoneCell?.trim() ?? null
+      });
+    }
+  }
+  return out;
+}
+async function fetchContactList(sector) {
+  const res = await fetch(`https://lca.logcluster.org/${LIST_SOURCES[sector]}`, { headers: UA3, signal: AbortSignal.timeout(2e4) });
+  if (!res.ok) throw new Error(`logcluster HTTP ${res.status} (${sector})`);
+  return parseContactList(await res.text(), sector);
+}
+async function refreshContactList(sector) {
+  const rows = await fetchContactList(sector);
+  const now = nowIso();
+  for (const r of rows) {
+    await run(
+      `INSERT INTO pitch_targets (external_id, name, sector, city, website, email, email_derived, phone, lat, lon, fetched_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)
+       ON CONFLICT(external_id) DO UPDATE SET name = excluded.name, city = excluded.city, website = excluded.website,
+         email = excluded.email, email_derived = excluded.email_derived, phone = excluded.phone, fetched_at = excluded.fetched_at`,
+      r.external_id,
+      r.name,
+      r.sector,
+      r.city,
+      r.website,
+      r.email,
+      r.email_derived,
+      r.phone,
+      now
+    );
+  }
+  await run(
+    `INSERT INTO sources (name, last_run_at, items_found, error_streak, last_error)
+     VALUES (?, ?, ?, 0, NULL)
+     ON CONFLICT(name) DO UPDATE SET last_run_at = excluded.last_run_at, items_found = excluded.items_found, error_streak = 0, last_error = NULL`,
+    `pitch:list:${sector}`,
+    now,
+    rows.length
+  );
+  return rows.length;
+}
+var LIST_SOURCES, LIST_SECTORS, UA3, decode2, slugName, EMAIL_RE, STRICT_EMAIL, findEmails, looksLikeSite, looksLikePhone, NG_CITIES, detectCity, deriveFromSite;
+var init_logcluster = __esm({
+  "src/services/logcluster.ts"() {
+    "use strict";
+    init_db();
+    init_id();
+    LIST_SOURCES = {
+      airline: "45-nigeria-airport-companies-contact-list",
+      port: "44-nigeria-port-and-waterways-company-contact-list"
+    };
+    LIST_SECTORS = Object.keys(LIST_SOURCES);
+    UA3 = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) JAMS-Ingest/0.1" };
+    decode2 = (s) => s.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&nbsp;?/gi, " ").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
+    slugName = (name2) => name2.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
+    STRICT_EMAIL = /^[a-z0-9._%+-]+@(?:[a-z0-9-]+\.)+[a-z]{2,}$/i;
+    findEmails = (s) => (s.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) ?? []).map((e) => e.toLowerCase().replace(/[.,;]+$/, "")).filter((e) => STRICT_EMAIL.test(e));
+    looksLikeSite = (s) => /^(www\.|https?:\/\/|\w+\.(com|ng|aero|net|org|co)(\/|$))/i.test(s.trim());
+    looksLikePhone = (s) => {
+      const t = s.replace(/\b(tel|phone|fax|mobile|call)\b\s*[:.]?/gi, "").trim();
+      if (!/^[\d+]/.test(t) || !/^[\d\s+.,/()|;:-]+$/.test(t)) return false;
+      return (t.match(/\d/g) ?? []).length >= 7;
+    };
+    NG_CITIES = ["lagos", "abuja", "port harcourt", "ikeja", "apapa", "onne", "kano", "calabar", "uyo", "enugu", "ibadan", "kaduna", "warri", "benin", "onitsha", "abroad"];
+    detectCity = (address) => {
+      const a = (address ?? "").toLowerCase();
+      for (const c of NG_CITIES) if (a.includes(c)) return c.replace(/\b\w/g, (m) => m.toUpperCase());
+      return "Nigeria";
+    };
+    deriveFromSite = (website) => {
+      try {
+        return `info@${new URL(website).hostname.replace(/^www\./i, "").toLowerCase()}`;
+      } catch {
+        return null;
+      }
+    };
+  }
+});
+
+// src/search/stargate.ts
+function mapFirmographicsRecord(rec, sector) {
+  const name2 = (rec?.businessName ?? rec?.companyName ?? "").trim();
+  if (!name2) return null;
+  const email = typeof rec.email === "string" && /@/.test(rec.email) ? rec.email.trim().split(/[\s,]+/)[0].toLowerCase() : null;
+  const website = typeof rec.website === "string" && rec.website.trim() ? /^https?:\/\//i.test(rec.website) ? rec.website : `https://${rec.website.trim()}` : null;
+  const city = (rec.city ?? "").trim() || "Nigeria";
+  return {
+    external_id: `stargate:${rec.uniqueID ?? name2.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    name: name2,
+    sector,
+    city,
+    website: website ?? (rec.webDomain ? `https://${rec.webDomain}` : null),
+    email,
+    email_derived: 0,
+    // directory rows carry published emails
+    phone: typeof rec.phone === "string" && rec.phone.trim() ? rec.phone.trim() : null
+  };
+}
+async function stargateSearch(sector, city, pageSize = 25) {
+  if (!stargateEnabled()) return [];
+  const body = {
+    dataType: 1,
+    pageSize,
+    countryCodes: ["NG"],
+    hasEmail: true,
+    sortingOrder: [5]
+  };
+  const keyword = SECTOR_KEYWORDS[sector] ?? sector;
+  if (keyword) body.who = keyword;
+  if (city && city !== "all" && city !== "Nigeria") body.cityNames = [city];
+  const res = await fetch(`${config.stargate.base}/firmographics/v1/search`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.stargate.key}` },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(2e4)
+  });
+  if (!res.ok) throw new Error(`Stargate HTTP ${res.status}`);
+  const json = await res.json();
+  const records = json?.data?.firstPageRecords ?? [];
+  return records.map((r) => mapFirmographicsRecord(r, sector)).filter(Boolean);
+}
+async function refreshStargate(sector, city) {
+  if (!stargateEnabled()) return 0;
+  const rows = await stargateSearch(sector, city);
+  const now = nowIso();
+  for (const r of rows) {
+    await run(
+      `INSERT INTO pitch_targets (external_id, name, sector, city, website, email, email_derived, phone, lat, lon, fetched_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)
+       ON CONFLICT(external_id) DO UPDATE SET name = excluded.name, city = excluded.city, website = excluded.website,
+         email = excluded.email, phone = excluded.phone, fetched_at = excluded.fetched_at`,
+      r.external_id,
+      r.name,
+      r.sector,
+      r.city,
+      r.website,
+      r.email,
+      r.email_derived,
+      r.phone,
+      now
+    );
+  }
+  return rows.length;
+}
+var stargateEnabled, SECTOR_KEYWORDS;
+var init_stargate = __esm({
+  "src/search/stargate.ts"() {
+    "use strict";
+    init_config();
+    init_db();
+    init_id();
+    stargateEnabled = () => !!config.stargate.key;
+    SECTOR_KEYWORDS = {
+      supermarket: "supermarket",
+      airport: "airport",
+      manufacturing: "manufacturing",
+      company: "services",
+      airline: "airline",
+      port: "port terminal"
+    };
+  }
+});
+
 // src/services/pitch.service.ts
 function overpassQuery(city, sector, timeout = 20) {
   const [s, w, n, e] = CITIES[city].bbox;
@@ -55176,10 +55409,54 @@ async function refreshCitySector(city, sector) {
     now,
     kept
   );
+  if (stargateEnabled()) {
+    try {
+      const n = await refreshStargate(sector, CITIES[city].label);
+      kept += n;
+    } catch (e) {
+      console.warn(`[pitch] stargate refresh failed for ${city}/${sector}:`, e.message);
+    }
+  }
 }
 async function searchPitchTargets(p = {}) {
   const sector = p.sector ?? "supermarket";
   if (!SECTORS.includes(sector)) throw validation("Unknown sector");
+  if (isListSector(sector)) {
+    const src = await get(`SELECT last_run_at FROM sources WHERE name = ?`, `pitch:list:${sector}`);
+    const ranRecently = !!src?.last_run_at && Date.now() - Date.parse(src.last_run_at) < FRESH_MS;
+    if (p.refresh || !ranRecently) {
+      try {
+        await refreshContactList(sector);
+      } catch (e) {
+        const stale = await get(`SELECT count(*) AS n FROM pitch_targets WHERE sector = ?`, sector);
+        if (!stale?.n) throw e;
+        console.warn(`[pitch] list refresh failed for ${sector}, serving cache:`, e.message);
+      }
+    }
+    const page2 = Math.max(1, Number(p.page ?? 1));
+    const pageSize2 = Math.min(100, Math.max(1, Number(p.page_size ?? 50)));
+    const where2 = [`sector = ?`];
+    const args2 = [sector];
+    if (p.q?.trim()) {
+      where2.push(`lower(name) LIKE ?`);
+      args2.push(`%${p.q.trim().toLowerCase()}%`);
+    }
+    const whereSql2 = where2.join(" AND ");
+    const total2 = (await get(`SELECT count(*) AS n FROM pitch_targets WHERE ${whereSql2}`, ...args2)).n;
+    const items2 = await all(
+      `SELECT * FROM pitch_targets WHERE ${whereSql2} ORDER BY email_derived ASC, name ASC LIMIT ? OFFSET ?`,
+      ...args2,
+      pageSize2,
+      (page2 - 1) * pageSize2
+    );
+    return {
+      items: items2,
+      sector,
+      cities: ["Nationwide"],
+      source: "curated contact lists (lca.logcluster.org), refreshed daily",
+      pagination: { page: page2, page_size: pageSize2, total_count: total2, total_pages: Math.max(1, Math.ceil(total2 / pageSize2)) }
+    };
+  }
   const cities = p.city === "all" || !p.city ? CITY_KEYS : [p.city];
   if (p.city && p.city !== "all" && !CITY_KEYS.includes(p.city)) throw validation("Unknown city");
   for (let i = 0; i < cities.length; i++) {
@@ -55274,12 +55551,17 @@ async function preparePitch(userId, externalId) {
   return {
     application_id: appId,
     outreach_id: msg.id,
+    // merged (final) text: this is exactly what preview/edit shows before sending
+    subject: msg.subject,
+    body: msg.body,
+    // tells the UI whether Send goes out over SMTP or hands off to Gmail
+    smtp_ready: await smtpReadyFor(userId),
     company: { id: companyId, name: target.name },
     contact: { id: contactId, email: target.email, email_derived: !!target.email_derived },
     target
   };
 }
-var SECTORS, SECTOR_LABELS, CITIES, CITY_KEYS, SECTOR_TAGS, TAG, OVERPASS_ENDPOINTS, FRESH_MS;
+var SECTORS, SECTOR_LABELS, isListSector, CITIES, CITY_KEYS, SECTOR_TAGS, TAG, OVERPASS_ENDPOINTS, FRESH_MS;
 var init_pitch_service = __esm({
   "src/services/pitch.service.ts"() {
     "use strict";
@@ -55287,13 +55569,18 @@ var init_pitch_service = __esm({
     init_errors2();
     init_id();
     init_outreach_service();
-    SECTORS = ["supermarket", "airport", "manufacturing", "company"];
+    init_logcluster();
+    init_stargate();
+    SECTORS = ["supermarket", "airport", "manufacturing", "company", "airline", "port"];
     SECTOR_LABELS = {
       supermarket: "Supermarkets & retail",
       airport: "Airports & aviation",
       manufacturing: "Manufacturing & industry",
-      company: "Company offices"
+      company: "Company offices",
+      airline: "Airlines (curated list)",
+      port: "Ports & waterways (curated list)"
     };
+    isListSector = (s) => LIST_SECTORS.includes(s);
     CITIES = {
       lagos: { label: "Lagos", bbox: [6.35, 3.28, 6.72, 3.68] },
       abuja: { label: "Abuja (FCT)", bbox: [8.4, 6.7, 9.4, 7.7] },
@@ -55304,7 +55591,10 @@ var init_pitch_service = __esm({
       supermarket: [`["shop"="supermarket"]`, `["shop"="convenience"]`],
       airport: [`["aeroway"="aerodrome"]`],
       manufacturing: [`["industrial"="manufacturing"]`, `["industrial"="factory"]`, `["craft"="manufacturer"]`, `["man_made"="factory"]`],
-      company: [`["office"="company"]`, `["office"="it"]`, `["office"="telecommunication"]`]
+      company: [`["office"="company"]`, `["office"="it"]`, `["office"="telecommunication"]`],
+      // airline/port are curated-list sectors and never reach Overpass; tags kept for completeness
+      airline: [`["office"="airline"]`],
+      port: [`["landuse"="port"]`, `["harbour"="yes"]`]
     };
     TAG = (t, ...keys) => {
       for (const k of keys) {
@@ -55329,6 +55619,7 @@ var init_pitch = __esm({
   "src/routes/pitch.ts"() {
     "use strict";
     import_express4 = __toESM(require_express2(), 1);
+    init_zod();
     init_envelope();
     init_security();
     init_pitch_service();
@@ -55350,14 +55641,28 @@ var init_pitch = __esm({
         next(e);
       }
     });
-    pitchRouter.get("/meta", (_req, res, next) => {
+    pitchRouter.get("/meta", async (_req, res, next) => {
       try {
         ok(res, "Pitch search metadata", {
-          sectors: SECTORS.map((s) => ({ key: s, label: SECTOR_LABELS[s] })),
+          sectors: SECTORS.map((s) => ({
+            key: s,
+            label: SECTOR_LABELS[s],
+            // list sectors are nationwide curated tables: the UI hides the city picker for them
+            source: isListSector(s) ? "curated list" : "OpenStreetMap",
+            nationwide: isListSector(s)
+          })),
           cities: CITY_KEYS.map((k) => ({ key: k, label: CITIES[k].label })),
-          source: "OpenStreetMap Overpass API (live, refreshed every 24h)",
+          source: "OpenStreetMap Overpass + curated contact lists (lca.logcluster.org), refreshed every 24h",
           note: "Emails are published contact addresses when available, otherwise derived as info@<website domain> and flagged derived."
         });
+      } catch (e) {
+        next(e);
+      }
+    });
+    pitchRouter.post("/prepare", async (req, res, next) => {
+      try {
+        const body = external_exports.object({ external_id: external_exports.string().min(1) }).parse(req.body ?? {});
+        ok(res, "Pitch prepared (draft)", await preparePitch(req.userId, body.external_id), 201);
       } catch (e) {
         next(e);
       }

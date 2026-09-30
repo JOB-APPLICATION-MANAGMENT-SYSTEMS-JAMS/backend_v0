@@ -11,18 +11,25 @@
 import { all, get, run } from "../core/db";
 import { notFound, validation } from "../core/errors";
 import { newId, nowIso } from "../util/id";
-import { createOutreach, PITCH_SUBJECT, PITCH_BODY } from "./outreach.service";
+import { createOutreach, PITCH_SUBJECT, PITCH_BODY, smtpReadyFor } from "./outreach.service";
+import { LIST_SECTORS, refreshContactList } from "./logcluster";
+import { refreshStargate, stargateEnabled } from "../search/stargate";
 
-export type Sector = "supermarket" | "airport" | "manufacturing" | "company";
+export type Sector = "supermarket" | "airport" | "manufacturing" | "company" | "airline" | "port";
 
-export const SECTORS: Sector[] = ["supermarket", "airport", "manufacturing", "company"];
+export const SECTORS: Sector[] = ["supermarket", "airport", "manufacturing", "company", "airline", "port"];
 
 export const SECTOR_LABELS: Record<Sector, string> = {
   supermarket: "Supermarkets & retail",
   airport: "Airports & aviation",
   manufacturing: "Manufacturing & industry",
   company: "Company offices",
+  airline: "Airlines (curated list)",
+  port: "Ports & waterways (curated list)",
 };
+
+/** Sectors served by curated contact lists instead of OpenStreetMap (nationwide). */
+export const isListSector = (s: string): boolean => (LIST_SECTORS as string[]).includes(s);
 
 /** Bounding boxes are (south, west, north, east), Overpass order. */
 export const CITIES = {
@@ -40,6 +47,9 @@ const SECTOR_TAGS: Record<Sector, string[]> = {
   airport: [`["aeroway"="aerodrome"]`],
   manufacturing: [`["industrial"="manufacturing"]`, `["industrial"="factory"]`, `["craft"="manufacturer"]`, `["man_made"="factory"]`],
   company: [`["office"="company"]`, `["office"="it"]`, `["office"="telecommunication"]`],
+  // airline/port are curated-list sectors and never reach Overpass; tags kept for completeness
+  airline: [`["office"="airline"]`],
+  port: [`["landuse"="port"]`, `["harbour"="yes"]`],
 };
 
 /** Build the Overpass QL for a city/sector pair. Pure, so tests can assert it. */
@@ -168,6 +178,15 @@ async function refreshCitySector(city: CityKey, sector: Sector): Promise<void> {
     now,
     kept
   );
+  // richer directory when a Stargate key is configured; failure never breaks the OSM path
+  if (stargateEnabled()) {
+    try {
+      const n = await refreshStargate(sector, CITIES[city].label);
+      kept += n;
+    } catch (e) {
+      console.warn(`[pitch] stargate refresh failed for ${city}/${sector}:`, (e as Error).message);
+    }
+  }
 }
 
 export interface PitchSearchParams {
@@ -181,8 +200,47 @@ export interface PitchSearchParams {
 
 /** Cached-then-live search over pitch targets; refreshes stale city/sector pairs. */
 export async function searchPitchTargets(p: PitchSearchParams = {}) {
-  const sector = p.sector ?? "supermarket";
+  const sector = (p.sector ?? "supermarket") as Sector;
   if (!SECTORS.includes(sector)) throw validation("Unknown sector");
+
+  /* Curated list sectors: nationwide, refreshed from lca.logcluster.org, no city scoping. */
+  if (isListSector(sector)) {
+    const src = await get<{ last_run_at: string | null }>(`SELECT last_run_at FROM sources WHERE name = ?`, `pitch:list:${sector}`);
+    const ranRecently = !!src?.last_run_at && Date.now() - Date.parse(src.last_run_at) < FRESH_MS;
+    if (p.refresh || !ranRecently) {
+      try {
+        await refreshContactList(sector as any);
+      } catch (e) {
+        const stale = await get<{ n: number }>(`SELECT count(*) AS n FROM pitch_targets WHERE sector = ?`, sector);
+        if (!stale?.n) throw e;
+        console.warn(`[pitch] list refresh failed for ${sector}, serving cache:`, (e as Error).message);
+      }
+    }
+    const page = Math.max(1, Number(p.page ?? 1));
+    const pageSize = Math.min(100, Math.max(1, Number(p.page_size ?? 50)));
+    const where = [`sector = ?`];
+    const args: any[] = [sector];
+    if (p.q?.trim()) {
+      where.push(`lower(name) LIKE ?`);
+      args.push(`%${p.q.trim().toLowerCase()}%`);
+    }
+    const whereSql = where.join(" AND ");
+    const total = (await get<{ n: number }>(`SELECT count(*) AS n FROM pitch_targets WHERE ${whereSql}`, ...args))!.n;
+    const items = await all(
+      `SELECT * FROM pitch_targets WHERE ${whereSql} ORDER BY email_derived ASC, name ASC LIMIT ? OFFSET ?`,
+      ...args,
+      pageSize,
+      (page - 1) * pageSize
+    );
+    return {
+      items,
+      sector,
+      cities: ["Nationwide"],
+      source: "curated contact lists (lca.logcluster.org), refreshed daily",
+      pagination: { page, page_size: pageSize, total_count: total, total_pages: Math.max(1, Math.ceil(total / pageSize)) },
+    };
+  }
+
   const cities: CityKey[] = p.city === "all" || !p.city ? CITY_KEYS : [p.city];
   if (p.city && p.city !== "all" && !CITY_KEYS.includes(p.city as CityKey)) throw validation("Unknown city");
 
@@ -271,11 +329,16 @@ export async function preparePitch(userId: string, externalId: string) {
     appId, userId, companyId, contactId, `Software help pitch`, target.name, target.website, now, now
   );
 
-  const msg = await createOutreach(userId, { app_id: appId, contact_id: contactId, subject: PITCH_SUBJECT, body: PITCH_BODY });
+  const msg: any = await createOutreach(userId, { app_id: appId, contact_id: contactId, subject: PITCH_SUBJECT, body: PITCH_BODY });
 
   return {
     application_id: appId,
-    outreach_id: (msg as any).id,
+    outreach_id: msg.id,
+    // merged (final) text: this is exactly what preview/edit shows before sending
+    subject: msg.subject,
+    body: msg.body,
+    // tells the UI whether Send goes out over SMTP or hands off to Gmail
+    smtp_ready: await smtpReadyFor(userId),
     company: { id: companyId, name: target.name },
     contact: { id: contactId, email: target.email, email_derived: !!target.email_derived },
     target,

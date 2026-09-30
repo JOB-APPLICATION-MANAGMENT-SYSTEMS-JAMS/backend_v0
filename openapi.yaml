@@ -1,0 +1,1770 @@
+openapi: 3.1.0
+info:
+  title: Stargate API
+  version: '1.0.0'
+  summary: InfobelPro Stargate API platform
+  description: |
+    Unified API platform for the InfobelPro data products.
+    Both hosts require bearer authentication: a production key on
+    stargate.infobelpro.com, a sandbox key (ifp_test_) on the sandbox hostname,
+    which answers documented demo values from fixtures and draws no credit.
+
+    Every answer is JSON in one envelope, including a request that matches no
+    operation: a wrong method answers `405 method_not_allowed` with an `Allow`
+    header, and a trailing slash, a missing `/v1` segment or a typo answers
+    `404 not_found` with the nearest operation named. Send `https://` from the
+    start: the edge redirects `http://` with a 301, and most clients resend a
+    POST as a GET.
+servers:
+  - url: https://stargate.infobelpro.com
+    description: Production
+  - url: https://stargate-sandbox.infobelpro.com
+    description: Sandbox
+security:
+  - bearerAuth: []
+tags:
+  - name: metadata
+    description: Public metadata endpoints.
+  - name: vatsearch
+    description: VAT Search endpoints (find by name, verify a VAT number).
+  - name: firmographics
+    description: Firmographics Data endpoints (company search).
+  - name: financials
+    description: Company Financials endpoints.
+  - name: account
+    description: What a key can read about itself. Draws no credit.
+paths:
+  /v1/products:
+    get:
+      security: []
+      tags: [metadata]
+      operationId: listPublicProducts
+      summary: List public product metadata
+      description: Public product names and documentation paths used by the documentation site.
+      responses:
+        '200':
+          description: Public product metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicProductList'
+
+  # ─── VAT Search ────────────────────────────────────────────────────────────
+  /sandbox/status:
+    get:
+      tags: [metadata]
+      operationId: sandboxStatus
+      summary: List the sandbox fixtures
+      description: |
+        Served by `https://stargate-sandbox.infobelpro.com` only, without a key.
+        Answers the demo values each product recognises, so an integration can
+        discover them instead of inferring them from failed calls: the VAT demo
+        numbers and company-name keywords, the numbers reserved to answer
+        "not registered" and those refused as structurally impossible, the
+        deregistered number and the number that answers `status: "unknown"`,
+        the firmographics and financials demo ids, and the triggers that
+        produce a `402` or `429` on demand.
+
+        Production has no such route and answers `404`.
+      security: []
+      responses:
+        '200':
+          description: Fixture inventory, grouped by product.
+          headers:
+            X-Stargate-Environment: { $ref: '#/components/headers/StargateEnvironment' }
+            X-Stargate-Sandbox: { $ref: '#/components/headers/StargateSandbox' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sandbox, status, request_id, fixtures]
+                properties:
+                  sandbox: { type: boolean, enum: [true] }
+                  status: { type: string, example: operational }
+                  request_id: { type: string }
+                  fixtures:
+                    type: object
+                    description: One entry per product, each listing its demo values.
+                    additionalProperties: true
+
+  /vatsearch/v1/search:
+    get:
+      tags: [vatsearch]
+      operationId: vatsearchSearch
+      summary: Search VAT numbers by company name
+      description: |
+        Find VAT numbers by searching for a company name, optionally narrowed
+        with address fields. Returns a ranked list of normalized matches.
+        One request draws one credit; a search answered with an empty `results`
+        array draws none, and the credit headers on that `200` show the refunded
+        balance.
+      parameters:
+        - name: company_name
+          in: query
+          required: false
+          schema: { type: string, minLength: 1, maxLength: 500 }
+          description: |
+            Company name to search for. Required unless `company_register_number`
+            is provided. Names are matched as the register stores them, which
+            differs by country (measured 2026-09-28): Greek names are stored
+            without accents and with a final `σ` (send `Οργανισμοσ`, or use
+            `fuzzy=true`); Taiwanese names are held in Chinese only and match
+            in full (`台灣大哥大股份有限公司`, not `台灣大哥大` or an English
+            name); a search is a ranked list and a name that shares a word with
+            the register answers rows, so read `score` (a cutoff around 2
+            separates a match from noise in practice).
+        - name: country_code
+          in: query
+          required: false
+          schema: { type: string, default: at }
+          description: ISO 3166-1 alpha-2 country code (lowercase) or `all`.
+        - name: full_address
+          in: query
+          required: false
+          schema: { type: string, maxLength: 500 }
+        - name: city
+          in: query
+          required: false
+          schema: { type: string, maxLength: 200 }
+        - name: postal_code
+          in: query
+          required: false
+          schema: { type: string, maxLength: 20 }
+        - name: address_line1
+          in: query
+          required: false
+          schema: { type: string, maxLength: 300 }
+        - name: address_line2
+          in: query
+          required: false
+          schema: { type: string, maxLength: 300 }
+        - name: cutoff_score
+          in: query
+          required: false
+          schema: { type: number, minimum: 0 }
+          description: Drop matches scoring below this threshold, on the same BM25 scale as `score` (no fixed upper bound; rarely above 15 in practice). When a cutoff is applied, `total_results` reports the number of results actually returned.
+        - name: fuzzy
+          in: query
+          required: false
+          schema: { type: boolean }
+        - name: live_check
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: |
+            Request a real-time check against the tax authority. Without it,
+            `status` is the cached view of the registration. A requested check
+            that does not complete within `livecheck_timeout` answers the cached
+            record, with a cached `inactive` answered as `unknown` because the
+            authority was not reached.
+        - name: livecheck_timeout
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 60 }
+          description: Maximum wait for real-time validation, in seconds.
+        - name: highlight
+          in: query
+          required: false
+          schema: { type: boolean }
+        - name: additional_checks
+          in: query
+          required: false
+          schema:
+            type: string
+            description: Comma-separated list of `bzst`, `eori`.
+        - name: company_register_number
+          in: query
+          required: false
+          schema: { type: string, maxLength: 50 }
+          description: Official company register number (for example a Companies House number). Can carry the search alone. Register-number coverage is country-dependent in the underlying data; United Kingdom numbers are verified to resolve.
+      responses:
+        '200':
+          description: Ranked list of VAT matches.
+          headers:
+            X-Stargate-Environment: { $ref: '#/components/headers/StargateEnvironment' }
+            X-Stargate-Sandbox: { $ref: '#/components/headers/StargateSandbox' }
+            X-Stargate-Fixture: { $ref: '#/components/headers/StargateFixture' }
+            X-Stargate-Live-Check: { $ref: '#/components/headers/StargateLiveCheck' }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VatSearchEnvelope'
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '403': { $ref: '#/components/responses/ForbiddenAccess' }
+        '402': { $ref: '#/components/responses/CreditsExhausted' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502': { $ref: '#/components/responses/ServiceError' }
+        '503': { $ref: '#/components/responses/LiveCheckUnavailable' }
+        '504': { $ref: '#/components/responses/ServiceTimeout' }
+
+  /account/v1/credits:
+    get:
+      tags: [account]
+      operationId: accountCredits
+      summary: Read the key's credit position
+      description: |
+        The credit position of the calling key for every product it is
+        entitled to, read from the ledger on every call. Draws no credit and
+        reserves nothing, so a client can poll it to size its own usage. The
+        figures match the `X-Stargate-Credits-*` headers on the next charged
+        request. `limit` and `remaining` are `null` for an unlimited
+        entitlement. The product code is the public one used in paths
+        (`firmographics`, `vatsearch`, `financials`, `poi`). `operations`
+        names what the key may call on the product, as operation codes: a
+        Firmographics key that lists `getdata.search` receives full records
+        on search; one that lists `getdata.search_preview` and not
+        `getdata.search` receives preview rows on search and fetches full
+        records per company with `getdata.company` and `getdata.companies`.
+        An operation the key does not list answers `403 operation_not_entitled`
+        before any credit. `countries` is the country scope as the product
+        reads it: `null` when the product does not restrict this key by
+        country, a list of ISO-2 codes when it does, `[]` when no country is
+        enabled. `data.key.expires_at` is when the key stops answering, or
+        `null` when no expiry is set.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: One entry per entitled product.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  request_id: { type: string }
+                  data:
+                    type: object
+                    required: [key, credits]
+                    properties:
+                      key:
+                        type: object
+                        required: [expires_at]
+                        properties:
+                          expires_at:
+                            type: string
+                            format: date-time
+                            nullable: true
+                            example: '2026-09-26T00:00:00.000Z'
+                            description: When the key stops answering; null when no expiry is set.
+                      credits:
+                        type: array
+                        items: { $ref: '#/components/schemas/CreditPosition' }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '403': { $ref: '#/components/responses/ForbiddenAccess' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /vatsearch/v1/verify:
+    get:
+      tags: [vatsearch]
+      operationId: vatsearchVerify
+      summary: Verify a VAT number
+      description: |
+        Validate a VAT number and return the registered company details.
+        The number is accepted in every official written form: as printed on
+        an invoice (`NO 951 555 282 MVA`, `CHE-105.909.036 MWST`,
+        `BE 0404.484.654`), with the prefix a caller's system stores (`GR` for
+        Greece, `UK` for the United Kingdom, `CH` for Switzerland), or bare with
+        `country_code`. Separators, spaces, pasted invisible characters and
+        casing are dropped, the prefix is applied, the official suffix is
+        removed, and the registry receives the registry form (`NO951555282`).
+        The country is inferred from the prefix when present (`EL…` → Greece,
+        `CHE…` → Switzerland, `XI…` → Northern Ireland). A value that is not a
+        VAT number of its country is refused with `400 invalid_params` before
+        any credit, and the message names the value to send: a domestic
+        identifier (a Swedish organisation number, a French SIREN, a Hungarian
+        tax number, a German Steuernummer), an Austrian number without its `U`,
+        or a label pasted with the number (`VAT No.`, `USt-IdNr.`, `P.IVA`).
+        The accepted written forms per country are listed on the documentation
+        page.
+
+        `status` is `active`, `inactive` or `unknown`; the `VatResult` schema
+        says how a live check that times out is answered. One credit is drawn
+        when a status is answered on any row, including "not registered". A
+        call that answers no row, or whose every row answers `unknown`, draws no credit: the reserved
+        credit is refunded and the credit headers show the refunded balance.
+      parameters:
+        - name: vat_number
+          in: query
+          required: true
+          schema: { type: string, minLength: 4, maxLength: 40 }
+          description: >-
+            VAT number in any official written form: separators (spaces, dots,
+            dashes, commas, slashes, including the no-break space and the
+            en dash), pasted invisible characters and casing are dropped, the
+            Norwegian `MVA` and Swiss `MWST`/`TVA`/`IVA` suffixes are accepted
+            and dropped, and `GR`, `UK` and `CH` are read as `EL`, `GB` and
+            `CHE`. A number without a country prefix needs `country_code`, and
+            is then judged exactly as if the prefix had been sent; without
+            either the request answers `400 invalid_params`, and so does a
+            `country_code` that contradicts the prefix. A domestic identifier
+            that is not the VAT number (a Swedish organisation number, a French
+            SIREN, a Hungarian tax number, a German Steuernummer), an Austrian
+            number without its `U`, and a label pasted with the number are
+            refused with `400 invalid_params` naming the value to send. An eight-digit Companies House number is not a VAT
+            number: use `company_register_number` on the search endpoint. A
+            value that cannot be a VAT number of its country returns
+            `400 invalid_params` before any credit, naming the structure that
+            country uses; a well-formed number with no
+            registered match returns `200` carrying one result row with
+            `status: "inactive"`, an empty `name` and an empty `address`, so the
+            two outcomes are distinguishable. `total_results` is `1` for that
+            row: read `status`, not the row count, to decide whether a number is
+            registered. Checksums are not verified.
+        - name: country_code
+          in: query
+          required: false
+          schema: { type: string }
+          description: ISO 3166-1 alpha-2 (lowercase) or `all`. Inferred from the VAT prefix when omitted; required when the number carries no prefix; refused when it contradicts the prefix. An unknown query parameter on either VAT route answers `400 invalid_params` naming it.
+        - name: live_check
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: |
+            Request a real-time check against the tax authority. Without it,
+            `status` is the cached view of the registration. A requested check
+            that does not complete within `livecheck_timeout` answers the cached
+            record, with a cached `inactive` answered as `unknown` because the
+            authority was not reached.
+        - name: livecheck_timeout
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 60 }
+          description: Maximum wait for real-time validation, in seconds.
+        - name: additional_checks
+          in: query
+          required: false
+          schema:
+            type: string
+            description: Comma-separated list of `bzst`, `eori`.
+          description: |
+            `bzst` requests a qualified confirmation under §18e UStG from the
+            German Federal Central Tax Office. The procedure has fixed scope: a
+            German `requester_vat_number` confirms a VAT number of another EU
+            member state. A request outside that scope (no requester, a
+            non-German requester, a German or non-EU `vat_number`) answers
+            `400 invalid_params` naming the rule, before any credit. A request
+            in scope whose check the confirmation service still refuses answers
+            `502 additional_check_failed` naming the check and the refusal, with
+            the credit refunded, rather than a `200` with the refusal inside
+            `matching_results[].http_error`. A completed confirmation answers
+            `200` with its `matching_results` entry. A number that is not
+            registered is answered by its own `status`, without judging the check.
+        - name: requester_vat_number
+          in: query
+          required: false
+          schema: { type: string, maxLength: 20 }
+          description: >-
+            Your German VAT number, required for the BZSt qualification check.
+            Validated for structure the same way as `vat_number`; a requester
+            that is not a German VAT number answers `400 invalid_params`.
+        - name: existing_name
+          in: query
+          required: false
+          schema: { type: string, maxLength: 500 }
+          description: Expected company name (BZSt comparison).
+        - name: existing_postal_code
+          in: query
+          required: false
+          schema: { type: string, maxLength: 20 }
+        - name: existing_city
+          in: query
+          required: false
+          schema: { type: string, maxLength: 200 }
+        - name: existing_street
+          in: query
+          required: false
+          schema: { type: string, maxLength: 300 }
+      responses:
+        '200':
+          description: >-
+            VAT match, usually exactly one, plus result metadata. A number with
+            no registered match is also a `200`, carrying one row with
+            `status: "inactive"`.
+          headers:
+            X-Stargate-Environment: { $ref: '#/components/headers/StargateEnvironment' }
+            X-Stargate-Sandbox: { $ref: '#/components/headers/StargateSandbox' }
+            X-Stargate-Fixture: { $ref: '#/components/headers/StargateFixture' }
+            X-Stargate-Live-Check: { $ref: '#/components/headers/StargateLiveCheck' }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VatSearchEnvelope'
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '403': { $ref: '#/components/responses/ForbiddenAccess' }
+        '402': { $ref: '#/components/responses/CreditsExhausted' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502': { $ref: '#/components/responses/ServiceError' }
+        '503': { $ref: '#/components/responses/LiveCheckUnavailable' }
+        '504': { $ref: '#/components/responses/ServiceTimeout' }
+
+  # ─── Firmographics Data ───────────────────────────────────────────────────
+  /firmographics/v1/search:
+    post:
+      tags: [firmographics]
+      operationId: getdataSearch
+      summary: Search companies or points of interest
+      description: |
+        SearchInput-shaped body for company or point-of-interest search.
+        Stargate applies a few defaults when the
+        corresponding key is missing: `dataType=1` (companies), `pageSize=10`,
+        `displayLanguage="EN"`, `returnFirstPage="true"`.
+        One request draws one credit; a search answered with `counts.total`
+        equal to `0` draws none, and the credit headers on that `200` show the
+        refunded balance.
+
+        **Preview keys.** A key issued with the `getdata.search_preview`
+        operation receives, instead of full records, one preview row per
+        company: `uniqueID`, `businessName`, `address1`, `city`, `country` and
+        `matchScore`, with `counts.total` and `searchId` in the envelope. The
+        full record is fetched per company through
+        `GET /firmographics/v1/company/{uniqueID}` or
+        `POST /firmographics/v1/companies`, one credit each. A preview search
+        draws no credit unless your agreement says otherwise. No identifier,
+        contact, activity or status field is part of the preview. `matchScore`
+        is computed by Stargate from your own search terms against the full
+        row (name agreement across the business, company and trade names, and
+        agreement of the city, country and postcode you supplied), from 0 to
+        100, and
+        `null` when the search carried no name to match against; rows are
+        returned best first. The source returns no score of its own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetDataSearchRequest'
+            examples:
+              companies:
+                summary: Belgian companies named "Acme"
+                value:
+                  dataType: 1
+                  countryCodes: [BE]
+                  businessName: [Acme]
+                  pageSize: 10
+      responses:
+        '200':
+          description: Firmographics search results.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDataSearchEnvelope'
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '403': { $ref: '#/components/responses/ForbiddenAccess' }
+        '402': { $ref: '#/components/responses/CreditsExhausted' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502': { $ref: '#/components/responses/ServiceError' }
+        '504': { $ref: '#/components/responses/ServiceTimeout' }
+
+  /firmographics/v1/search/{searchId}/records/{page}:
+    get:
+      tags: [firmographics]
+      operationId: getdataSearchRecords
+      summary: Fetch a page of records for an existing search
+      description: |
+        Retrieve a page of records for a search created by
+        `POST /firmographics/v1/search`. `page` is 1-indexed (`page=1` equals the
+        POST response's `firstPageRecords`). Records are returned under `records`,
+        alongside `page`, `recordCount`, and `totalRecordCount`. Each record
+        contains the fields the bundle is entitled to, the same set on every
+        page as in `firstPageRecords`. Pages are read in order from 1: a page
+        requested out of order, or past the end before the pages before it,
+        answers `400 invalid_params` naming the rule; once the last page has
+        been read, the next page answers `200` with an empty `records` array.
+        One request draws one credit; a page answered with an empty `records`
+        array draws none, and the credit headers on that `200` show the
+        refunded balance.
+        A `searchId` is valid only for the API key that created it. A
+        `searchId` issued to another key, or one that has expired, answers
+        `404 search_not_found` and draws no credit.
+      parameters:
+        - name: searchId
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+          description: The searchId returned by POST /firmographics/v1/search (an integer id).
+        - name: page
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+          description: 1-indexed page number.
+        - name: languageCode
+          in: query
+          required: false
+          schema: { type: string }
+          description: ISO 639-1 language code for label translations.
+        - name: internationalPhoneFormat
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: When true, phone numbers carry a "+xxx" prefix.
+      responses:
+        '200':
+          description: A page of firmographics records.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDataRecordsEnvelope'
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '403': { $ref: '#/components/responses/ForbiddenAccess' }
+        '402': { $ref: '#/components/responses/CreditsExhausted' }
+        '404':
+          description: The searchId is unknown or has expired.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorBody' }
+              examples:
+                search_not_found:
+                  value:
+                    error: search_not_found
+                    message: Search not found. The searchId is unknown or has expired; run a new search.
+                    request_id: req_01J4Z6V8C3K7
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502': { $ref: '#/components/responses/ServiceError' }
+        '504': { $ref: '#/components/responses/ServiceTimeout' }
+
+  /firmographics/v1/company/{uniqueID}:
+    get:
+      tags: [firmographics]
+      operationId: getdataCompany
+      summary: Fetch one company's full record by identifier
+      description: |
+        The full record of one company, under the fields your bundle allows,
+        for one credit. The identifier is the `uniqueID` a search row carries.
+        An identifier no record is held under answers `404 company_not_found`
+        and the credit is refunded. Available on keys issued with the
+        `getdata.company` operation.
+      parameters:
+        - name: uniqueID
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[0-9A-Za-z]{4,32}$' }
+          description: The record identifier, as returned in `uniqueID` on a search row.
+          example: '0888783282'
+      responses:
+        '200':
+          description: The company record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, request_id]
+                properties:
+                  request_id: { type: string }
+                  data: { $ref: '#/components/schemas/GetDataRecord' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '402': { $ref: '#/components/responses/CreditsExhausted' }
+        '403': { $ref: '#/components/responses/ForbiddenAccess' }
+        '404':
+          description: No company is held under this identifier. The credit is refunded.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorBody' }
+              examples:
+                company_not_found:
+                  value:
+                    error: company_not_found
+                    message: 'No company is held under the identifier 0000000001. Identifiers come from the uniqueID field of a search result. No credit was drawn.'
+                    request_id: req_01J4Z6V8C3K7
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502': { $ref: '#/components/responses/ServiceError' }
+        '504': { $ref: '#/components/responses/ServiceTimeout' }
+
+  /firmographics/v1/companies:
+    post:
+      tags: [firmographics]
+      operationId: getdataCompanies
+      summary: Fetch up to 100 companies' full records in one request
+      description: |
+        The full records of up to 100 companies, under the fields your bundle
+        allows, one credit per record returned. The whole batch is reserved
+        before the lookup: a pool that cannot pay for every identifier refuses
+        the request with `402 credits_exhausted` naming what it can pay for,
+        and charges nothing. Identifiers no record is held under are listed
+        under `notFound` and their credits refunded. Duplicate identifiers are
+        folded and counted once. Available on keys issued with the
+        `getdata.companies` operation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GetDataCompaniesRequest' }
+            examples:
+              two-companies:
+                value:
+                  uniqueIDs: ['0888783282', '0888783283']
+      responses:
+        '200':
+          description: The records found, and the identifiers that were not.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetDataCompaniesEnvelope' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '402':
+          description: The pool cannot pay for the whole batch. Nothing was charged; `remaining` is what it can pay for.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreditsExhaustedBody' }
+        '403': { $ref: '#/components/responses/ForbiddenAccess' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502': { $ref: '#/components/responses/ServiceError' }
+        '504': { $ref: '#/components/responses/ServiceTimeout' }
+
+  # ─── Company Financials ────────────────────────────────────────────────────
+  /financials/v1/search:
+    post:
+      tags: [financials]
+      operationId: financialsSearch
+      summary: Search company financials
+      description: |
+        Search using `{page, size, filters}`. One request draws one credit; a
+        search answered with an empty `searchResult.content` draws none, and the
+        credit headers on that `200` show the refunded balance. The `filters`
+        object supports
+        documented selectors for identity, location, industry, ownership,
+        P&L, balance-sheet, ratio, and transfer-pricing criteria. An
+        unrecognised parameter or filter key, or an invalid `dataset` value,
+        is refused with `400 invalid_params` naming it. `sort` and
+        `historySearch` are not supported and are refused with an explanation.
+
+        Stargate sets `filters.dataset = { value: "Private" }` when the caller
+        doesn't provide `dataset`.
+
+        **Identifier lookup.** `filters.infoCompanyIdNumber` names one to 200
+        identifiers, each the two-letter country prefix followed by the
+        registry number as the register writes it (`gb00445790`, not
+        `445790`), and answers exactly those companies on one page, with no
+        row for an identifier the product does not hold. The search is
+        narrowed to the countries the prefixes name unless
+        `infoCountryWithExclusion` is sent. An identifier list that is not an
+        array, is empty, or carries a value without its prefix is refused with
+        `400 invalid_params`.
+
+        **Preview keys.** A key issued with the `financials.search_preview`
+        operation receives, instead of full rows, one identity row per
+        company: `companyInfo.id`, `companyNumber`, `name`, `country`,
+        `statuses` and `lastAvailableYear`, and fetches the sections it needs
+        through `GET /financials/v1/company/{id}/{section}`, one credit each.
+        A preview search draws no credit unless your agreement says otherwise.
+        Keys issued before this operation existed, and keys issued with
+        `financials.search`, keep receiving full rows.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinancialsSearchRequest'
+            examples:
+              by-country:
+                summary: Belgian private companies, page 0
+                value:
+                  page: 0
+                  size: 10
+                  filters:
+                    dataset: { value: Private }
+                    infoCountryWithExclusion:
+                      value:
+                        tags:
+                          includeValues: [be]
+                          excludeValues: []
+              by-id:
+                summary: Resolve companies by identifier, prefix required
+                value:
+                  filters:
+                    dataset: { value: Private }
+                    infoCompanyIdNumber:
+                      value: [be0415557896, gb00445790]
+              high-turnover:
+                summary: Software firms with FY23 turnover ≥ €1M
+                value:
+                  page: 0
+                  size: 25
+                  filters:
+                    dataset: { value: Private }
+                    infoCountryWithExclusion:
+                      value:
+                        tags: { includeValues: [be], excludeValues: [] }
+                    activityIndustryCodeNace:
+                      value:
+                        tags: { includeValues: ['J62.0.1'], excludeValues: [] }
+                      isPrimaryOnly: true
+                    plTurnover:
+                      value:
+                        from: 1000000
+                        years: { from: 2023, to: 2023 }
+                        criteria: LAST
+      responses:
+        '200':
+          description: Company financials search results.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialsSearchEnvelope'
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '403': { $ref: '#/components/responses/ForbiddenAccess' }
+        '402': { $ref: '#/components/responses/CreditsExhausted' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502': { $ref: '#/components/responses/ServiceError' }
+        '504': { $ref: '#/components/responses/ServiceTimeout' }
+
+  /financials/v1/company/{id}/{section}:
+    get:
+      tags: [financials]
+      operationId: financialsCompanyDetail
+      summary: Fetch company financials detail section
+      description: |
+        Fetch a company detail section after resolving a company ID with
+        `/financials/v1/search`. Supported sections are `general`, `finance`,
+        `ratio`, `ownership`, `ownership-graph`, `branch`, `file`, and
+        `raw-finance`.
+        Within the fields the caller's entitlement grants, a part of the answer
+        that holds nothing is present and reads as an empty array rather than an
+        absent key, so branch on the length of the array rather than on whether
+        the key exists. Which array depends on the section: the container-shaped
+        blocks (`ownerDetail`, `managerDetail`, `holdingDetail`, `branchDetails`)
+        answer with `currentDetail` and `historicDetail`, while `finance`,
+        `ratio`, `file`, `raw-finance` and `ownership-graph` answer with
+        top-level arrays such as `profitLossDetails` or `links`. A field outside
+        the entitlement is omitted from the response altogether.
+        One request draws one credit; a section whose every entry is empty draws
+        none, and the credit headers on that `200` show the refunded balance. A
+        section that returns a director without an owner is charged, because a
+        record was delivered.
+        The query string accepts `dataset` and `dbVersion` only. Any other key
+        is refused with `400 invalid_params` naming it, before any credit, so a
+        parameter that is not part of the contract is never silently ignored.
+        Owner rows are filtered by the caller on `ownerType` and
+        `ownershipType`; the service does not filter them.
+        Three outcomes are distinct. A company the product holds answers `200`,
+        with empty arrays where its register publishes nothing, and draws no
+        credit when every array is empty. An identifier the product holds no
+        company for, including one in a market the product does not hold,
+        answers `404 company_not_found` and draws no credit. A failure of the
+        service answers `502 service_error` or `504 service_timeout`, refunded,
+        and is the only answer worth retrying.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          description: >
+            Company ID as returned by `/financials/v1/search` in
+            `companyInfo.id`, which is the reliable way to obtain one. The value
+            is the lower-case ISO 3166-1 alpha-2 country code followed by the
+            registry's own reference: in most countries the company or
+            registration number (`be0404484654`), and in Germany the register
+            type, register number and court code (`dehra100265p2716` for
+            HRA 100265), because a German register number alone occurs at more
+            than one court. The identifier is sent without a version suffix: a
+            `companyInfo.id` that carries one (`be0404484654:v1.2608.02`) is
+            refused with `400 invalid_params`; send the part before the colon and
+            pin the release with `dbVersion` if needed.
+        - name: section
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - general
+              - finance
+              - ratio
+              - ownership
+              - ownership-graph
+              - branch
+              - file
+              - raw-finance
+        - name: dataset
+          in: query
+          required: false
+          schema:
+            type: string
+            default: Private
+            enum: [Private, Public]
+        - name: dbVersion
+          in: query
+          required: false
+          schema: { type: string }
+          description: Optional data-release pin.
+      responses:
+        '200':
+          description: Company detail response for the requested section.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialsDetailEnvelope'
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '403': { $ref: '#/components/responses/ForbiddenAccess' }
+        '402': { $ref: '#/components/responses/CreditsExhausted' }
+        '404':
+          description: |
+            `company_not_found`: no company is held under this identifier in the
+            selected dataset. This is also the answer for a market the product
+            does not hold. The credit is refunded. `not_found`: the section name
+            is not one of the eight documented sections; refused before any
+            credit. Neither is a service failure, so neither should be retried
+            unchanged.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorBody' }
+              examples:
+                company_not_found:
+                  value:
+                    error: company_not_found
+                    message: 'No company is held under the identifier be9999999999 in the Private dataset. This is also the answer for a market the product does not hold. Check the country prefix and the registry number, or resolve the company through POST /financials/v1/search. No credit was drawn.'
+                    request_id: req_01J4Z6V8C3K7
+                not_found:
+                  value:
+                    error: not_found
+                    message: 'Unknown Company Financials detail section. Supported sections: general, finance, ratio, ownership, ownership-graph, branch, file, raw-finance.'
+                    request_id: req_01J4Z6V8C3K7
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502':
+          description: |
+            `service_error`: the upstream failed. An identifier that does not
+            resolve is not a service error and answers `404 company_not_found`.
+            The credit is refunded.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorBody' }
+              examples:
+                service_error:
+                  value:
+                    error: service_error
+                    message: The service returned an error.
+                    request_id: req_01J4Z6V8C3K7
+        '504': { $ref: '#/components/responses/ServiceTimeout' }
+
+components:
+  headers:
+    StargateEnvironment:
+      schema: { type: string, enum: [production, sandbox] }
+      description: >-
+        Which environment answered. Present on every response from both hosts.
+        Assert on this in a test suite that must not silently run against
+        fixtures.
+    StargateSandbox:
+      schema: { type: string, enum: ['true'] }
+      description: >-
+        Present, with the value `true`, only on a sandbox response. Absent in
+        production.
+    StargateFixture:
+      schema: { type: string }
+      description: >-
+        Sandbox only. Names the fixture that produced the answer, so a demo hit
+        and a demo miss are distinguishable even though their bodies match the
+        production shape. A VAT number held as a demo company answers
+        `vat_<VAT NUMBER>`; a well-formed number outside the demo set answers
+        `vat_not_registered`.
+    StargateLiveCheck:
+      schema: { type: string }
+      description: >-
+        Whether a real-time registry check ran for this answer. The sandbox
+        sends `skipped` on the VAT routes: `live_check` was accepted and no
+        registry was consulted, because sandbox answers come from fixtures.
+        Production performs the check and does not send this header today;
+        further values may be added, so treat the header as an open string
+        rather than a closed set.
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: ifp_live_or_ifp_test
+  responses:
+    InvalidRequest:
+      description: Invalid request.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorBody' }
+          examples:
+            invalid_params:
+              value:
+                error: invalid_params
+                message: company_name must be a non-empty string
+                request_id: req_01J4Z6V8C3K7
+    InvalidApiKey:
+      description: Missing, invalid, expired, or revoked API key.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorBody' }
+          examples:
+            invalid_api_key:
+              value:
+                error: invalid_api_key
+                message: Invalid API key.
+                request_id: req_01J4Z6V8C3K7
+    ForbiddenAccess:
+      description: >-
+        Product, field, operation or country access is not enabled for the
+        current key. A key issued for a named set of countries is refused
+        outside that set with `country_not_entitled`, before any credit is
+        reserved.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorBody' }
+          examples:
+            product_not_enabled:
+              value:
+                error: product_not_enabled
+                message: This product is not enabled for the current API key.
+                request_id: req_01J4Z6V8C3K7
+            country_not_entitled:
+              value:
+                error: country_not_entitled
+                message: This API key is not entitled to country CZ.
+                request_id: req_01J4Z6V8C3K7
+            no_entitled_fields:
+              value:
+                error: no_entitled_fields
+                message: No fields are allowed for this bundle on this endpoint.
+                request_id: req_01J4Z6V8C3K7
+    NotFound:
+      description: >-
+        The requested resource was not found, or the path matches no operation
+        (a trailing slash, a missing `/v1` segment, a typo): the message names
+        the nearest operation. A path that exists under another HTTP method
+        answers `405 method_not_allowed` with an `Allow` header instead. Neither
+        draws a credit.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorBody' }
+          examples:
+            not_found:
+              value:
+                error: not_found
+                message: Unknown Company Financials detail section.
+                request_id: req_01J4Z6V8C3K7
+            path_matches_no_operation:
+              summary: The version segment was left out of the path
+              value:
+                error: not_found
+                message: 'GET /vatsearch/verify is not an operation: the version segment is missing. Send GET /vatsearch/v1/verify.'
+                request_id: req_01J4Z6V8C3K7
+    CreditsExhausted:
+      description: Purchased credits are exhausted for this API key and product.
+      headers:
+        X-Stargate-Credits-Used:
+          schema: { type: string }
+          description: Credits already consumed.
+        X-Stargate-Credits-Limit:
+          schema: { type: string }
+          description: Purchased credit limit, or `unlimited`.
+        X-Stargate-Credits-Remaining:
+          schema: { type: string }
+          description: Remaining credits.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CreditsExhaustedBody' }
+          examples:
+            credits_exhausted:
+              value:
+                error: credits_exhausted
+                message: This API key has consumed all of its purchased credits. Top up to continue.
+                used: 1000
+                limit: 1000
+                remaining: 0
+                request_id: req_01J4Z6V8C3K7
+    RateLimited:
+      description: Burst rate limit exceeded.
+      headers:
+        Retry-After:
+          schema: { type: string }
+          description: Seconds to wait before retrying.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/RateLimitedBody' }
+          examples:
+            rate_limited:
+              value:
+                error: rate_limited
+                retry_after_seconds: 60
+                request_id: req_01J4Z6V8C3K7
+    LiveCheckUnavailable:
+      description: >-
+        The live check is temporarily unavailable for the requested jurisdiction,
+        or the registry for the country did not answer within the time allowed
+        (its own budget of about 22 seconds, or the `livecheck_timeout` sent).
+        The message says which, and names the wait. No credit is drawn. This is a
+        transient, retryable condition. Retry with capped exponential backoff
+        and jitter, honouring the Retry-After header, or send a larger
+        `livecheck_timeout` (up to 60 seconds) where the registry is known to be
+        slow.
+      headers:
+        Retry-After:
+          schema: { type: string }
+          description: Seconds to wait before retrying.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorBody' }
+          examples:
+            live_check_unavailable:
+              value:
+                error: live_check_unavailable
+                message: Live VAT verification is temporarily unavailable for this jurisdiction. Please retry later.
+                request_id: req_01J4Z6V8C3K7
+            registry_did_not_answer:
+              summary: The country's registry did not answer within the time allowed
+              value:
+                error: live_check_unavailable
+                message: The VAT registry for this country did not answer within 22 seconds, so the number could not be verified. No credit was drawn. Retry later, or send a larger livecheck_timeout (up to 60 seconds).
+                request_id: req_01J4Z6V8C3K7
+    ServiceError:
+      description: The service could not complete the request.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorBody' }
+          examples:
+            service_error:
+              value:
+                error: service_error
+                message: The service returned an error.
+                request_id: req_01J4Z6V8C3K7
+            additional_check_failed:
+              summary: VAT verify, a requested additional check the confirmation service refused
+              value:
+                error: additional_check_failed
+                message: >-
+                  The requested additional check was not performed: bzst (the
+                  confirmation service answered 403). The VAT status itself is
+                  available by verifying the number without additional_checks;
+                  the qualified confirmation is not. No credit was drawn.
+                request_id: req_01J4Z6V8C3K7
+    ServiceTimeout:
+      description: >-
+        The upstream service did not respond within the gateway timeout. The
+        message text is human readable and varies by product; integrations
+        should key on the error code and the HTTP status.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorBody' }
+          examples:
+            service_timeout:
+              value:
+                error: service_timeout
+                message: The service timed out.
+                request_id: req_01J4Z6V8C3K7
+
+  schemas:
+    CreditPosition:
+      type: object
+      required: [product, status, operations, countries, used, limit, remaining]
+      properties:
+        product: { type: string, example: firmographics }
+        status: { type: string, enum: [active, trial], description: Entitlement status. }
+        operations:
+          type: array
+          items: { type: string }
+          example: [getdata.companies, getdata.company, getdata.search_preview]
+          description: >-
+            The operations the key may call on this product, as operation
+            codes, sorted. The list is what the routes enforce. A key issued
+            without an operation scope lists the operations the product served
+            when the key was issued, and an operation added later that carries
+            its own charge appears only once the agreement names it.
+        countries:
+          type: array
+          items: { type: string }
+          nullable: true
+          example: [NZ]
+          description: The countries the key may read on this product, as ISO-2 codes, sorted. null when the product does not restrict this key by country; [] when no country is enabled.
+        used: { type: integer, example: 40 }
+        limit: { type: integer, nullable: true, example: 4600, description: Purchased credits; null when unlimited. }
+        remaining: { type: integer, nullable: true, example: 4560, description: limit minus used, floored at zero; null when unlimited. }
+    ErrorBody:
+      type: object
+      required: [error, message, request_id]
+      properties:
+        error: { type: string, description: Machine-readable error code. }
+        message: { type: string, description: Human-readable error message. }
+        request_id: { type: string, description: Request identifier for support and logs. }
+
+    RateLimitedBody:
+      type: object
+      required: [error, retry_after_seconds, request_id]
+      properties:
+        error: { type: string, const: rate_limited }
+        retry_after_seconds: { type: integer }
+        request_id: { type: string }
+
+    CreditsExhaustedBody:
+      allOf:
+        - $ref: '#/components/schemas/ErrorBody'
+        - type: object
+          required: [used, limit, remaining]
+          properties:
+            error: { type: string, const: credits_exhausted }
+            used: { type: integer }
+            limit:
+              type: [integer, 'null']
+            remaining: { type: integer }
+
+    PublicProductList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            required: [code, name, docs_path]
+            properties:
+              code: { type: string }
+              name: { type: string }
+              description:
+                type: [string, 'null']
+              docs_path: { type: string }
+
+    # ─── VAT Search ────────────────────────────────────────────────────────
+    VatSearchEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        request_id: { type: string }
+        data:
+          type: object
+          required: [request_id, total_results, results, raw]
+          properties:
+            request_id: { type: string }
+            total_results: { type: integer }
+            results:
+              type: array
+              items: { $ref: '#/components/schemas/VatResult' }
+            raw:
+              type: object
+              description: Sanitized result metadata.
+              properties:
+                Info:
+                  type: object
+                  properties:
+                    NumberOfResults: { type: integer }
+                    MaxScore: { type: number }
+                Results:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+                error:
+                  oneOf:
+                    - { type: boolean }
+                    - { type: string }
+
+    VatResult:
+      type: object
+      required: [score, vat_number, name, address, country, status]
+      properties:
+        score: { type: number, description: BM25 relevance score across name, address and their variants; no fixed upper bound, rarely above 15 in practice. Orders candidates within one response; not a match-confidence percentage. }
+        vat_number: { type: string, description: VAT number with country prefix (BE…, EL…, CHE…, GB/XI…). }
+        name: { type: string }
+        address: { type: string, description: Single-line address. }
+        country: { type: string, description: Lowercase ISO 3166-1 alpha-2. }
+        live_checked:
+          type: boolean
+          nullable: true
+          description: |
+            Whether `status` is the authority's answer on this call: `true` when
+            `live_check=true` was sent and the check completed, `false` when it
+            was sent and the check did not run or did not complete (the cached
+            record is answered), `null` when no live check was requested. Sits
+            outside `raw`, so it is readable on every key.
+        status:
+          type: string
+          enum: [active, inactive, unknown]
+          description: |
+            `active` and `inactive` are the registration status; `unknown` means
+            the status could not be confirmed. Without `live_check` the value is
+            the cached view. With `live_check=true` it is the authority's answer
+            when the check completes (`raw.Results[].LiveChecked` is `1`); when
+            the check does not complete within `livecheck_timeout` the cached
+            record is answered (`LiveChecked` is `"timed out"`), and a cached
+            `inactive` is answered as `unknown`, since a number the cache has
+            never confirmed reads `inactive` there without the authority having
+            been reached. `unknown` is also answered for a number the authority
+            holds without a status, such as a Taiwanese branch establishment,
+            whose status is published against the legal entity. Treat `unknown`
+            as not confirmed, never as not registered.
+        incorporation_date:
+          type: [string, 'null']
+          format: date
+        vat_registration_date:
+          type: [string, 'null']
+          format: date
+        vat_deregistration_date:
+          type: [string, 'null']
+          format: date
+          description: |
+            The date the VAT registration ended, when the source publishes one.
+            Only a deregistered number can carry it, and not every country's
+            source records it, so `null` means no end date is on file — never
+            that the number is still registered. Read it together with
+            `status`: `inactive` with a date gives the date registration ended;
+            `inactive` with `null` means the number is not registered today,
+            with no end date available. The date is index data rather than a
+            live verdict, so it is answered whether or not `live_check` was
+            requested, and it survives on a row whose `status` is `unknown`.
+        matching_results:
+          type: array
+          description: |
+            Present only when `additional_checks` was requested. One entry per
+            performed check. For `bzst` (BZSt qualified confirmation per §18e
+            UStG, requires a German `requester_vat_number` and a target VAT ID
+            from another EU member state): `id` is the confirmation reference
+            issued by the tax office, `date`/`time` are its issue timestamp,
+            `status` is the eVatR code (`evatr-0000` = confirmed) and
+            `error_code` is `200` when the check completed. A check the service
+            refused is not answered under `200`: a shape outside the procedure
+            is refused with `400 invalid_params` before the call, and a refusal
+            on a registered number answers `502 additional_check_failed`, so
+            `http_error` is populated only on rows this route does not judge
+            (a number that is not registered or not confirmed). The
+            per-field codes (`name`, `city`, `postal_code`, `street`) compare
+            the supplied `existing_*` values against the registered record
+            (`A` = matches). An `InternalMatching` entry reports the service's
+            own name/address comparison when expected values were supplied.
+          items: { $ref: '#/components/schemas/VatMatchingResult' }
+
+    VatMatchingResult:
+      type: object
+      properties:
+        type: { type: string, description: '`BZST` or `InternalMatching`.' }
+        date:
+          type: [string, 'null']
+          format: date
+        time:
+          type: [string, 'null']
+        id:
+          type: [string, 'null']
+          description: Confirmation reference issued by the checking authority.
+        status:
+          type: [string, 'null']
+          description: eVatR status code (`evatr-0000` = confirmed).
+        error_code:
+          type: [number, 'null']
+        http_error:
+          type: [number, 'null']
+          description: Refusal code when the check was not performed.
+        name:
+          type: [string, 'null']
+        city:
+          type: [string, 'null']
+        postal_code:
+          type: [string, 'null']
+        street:
+          type: [string, 'null']
+        address:
+          type: [string, 'null']
+
+    # ─── Firmographics Data ────────────────────────────────────────────────
+    GetDataSearchRequest:
+      type: object
+      description: |
+        SearchInput request. The keys below are the ones Stargate validates
+        explicitly, together with every category and industry filter. The wider
+        SearchInput surface (contact, has-flags, size, hierarchy and technographic
+        filters) is accepted and listed key by key on the documentation page,
+        section "Categories & industry" onwards, at `/docs/firmographics/search`.
+
+        The has-flags (`hasWebsite`, `hasEmail`, `HasPhone`, `hasNationalID`,
+        `HasContact`, …) take only `true`, which restricts the search to
+        records that have the thing; omit the field for no restriction. Any
+        other value is refused with `400 invalid_params`, because the source
+        applied it as no restriction. A `cityNames` value the source does not
+        know is dropped by the source and the whole country is answered, so
+        compare `counts.total` with your expectation and bound a list by area
+        with `postCodes`.
+
+        Field names are matched without regard to case, so `countryCodes`,
+        `CountryCodes` and `COUNTRYCODES` are one field. A key that is not a field
+        of the search body returns 400 `invalid_params` and names the field that
+        does the job instead, rather than being accepted and ignored; `pageNumber`
+        is among those refused, since this body has no page-number field and pages
+        beyond the first come from the records endpoint.
+      additionalProperties: true
+      properties:
+        dataType:
+          type: integer
+          description: >-
+            `1` companies (default), `2` YellowPages, `3` WhitePages. Points of
+            interest are not served by this endpoint: `dataType=5` returns
+            `400 invalid_params` before any credit, on the search and on the
+            count path alike. Place data is supplied as a dataset delivery.
+          enum: [1, 2, 3]
+        pageSize: { type: integer, minimum: 1, maximum: 500 }
+        displayLanguage: { type: string }
+        returnFirstPage:
+          oneOf:
+            - { type: boolean }
+            - { type: string, enum: ['true', 'false'] }
+        sortingOrder:
+          type: array
+          items: { type: integer }
+          description: >-
+            Sort-order identifiers as a priority list. Measured 2026-09-28:
+            3 = name ascending, 5 = relevance, 6 = size ascending, 7 = size
+            descending. 1 and 2 are refused with `400 invalid_params`, because
+            the source answers its default order for them. Omitted, the source
+            answers its default order.
+        countryCodes:
+          type: array
+          description: >-
+            Two-letter codes of the countries to restrict the search to, in either
+            case. A code this product does not serve returns 400 `invalid_params`
+            naming the value, because the upstream would otherwise drop the
+            restriction and answer with the worldwide record pool.
+          items: { type: string, minLength: 2, maxLength: 2 }
+        internationalCodes:
+          type: array
+          description: SIC or international activity codes (Infobel international classification).
+          items: { type: string }
+        internationalCodesExclusive:
+          type: array
+          description: Exclude records matching the supplied international codes.
+          items: { type: string }
+        altInternationalCodes:
+          type: array
+          description: >-
+            NACE Rev 2 class codes, written as digits only: class 62.01 is sent as
+            `6201`. The filter matches classes, so a division or group such as `62`
+            is refused with `400 invalid_params` naming the classes to enumerate,
+            and a code carrying separators or letters (`62.01`, `J62.0.1`) is
+            refused with the same class rewritten as digits. A well-formed code that
+            names no existing class returns a zero total.
+          items: { type: string, pattern: '^[0-9]{4,5}$' }
+          example: ['6201', '6202']
+        altInternationalCodesExclusive:
+          type: array
+          description: >-
+            Exclude records matching the supplied NACE codes, in the same
+            digits-only class form as `altInternationalCodes`.
+          items: { type: string, pattern: '^[0-9]{4,5}$' }
+        InfobelCodes:
+          type: array
+          description: Infobel internal category codes (proprietary taxonomy).
+          items: { type: string }
+        InfobelCodesExclusive:
+          type: array
+          description: Exclude records matching the supplied Infobel category codes.
+          items: { type: string }
+        LocalCodes:
+          type: array
+          description: Local (per-country) category codes.
+          items: { type: string }
+        LocalCodesExclusive:
+          type: array
+          description: Exclude records matching the supplied local category codes.
+          items: { type: string }
+        RestrictOnMainCategory:
+          type: boolean
+          description: >-
+            When true, category filters are evaluated against each record's primary
+            category only, instead of every category the record carries.
+        who:
+          type: string
+        where:
+          type: string
+        uniqueIDs:
+          type: array
+          items: { type: string }
+        businessName:
+          type: array
+          items: { type: string }
+        cityNames:
+          type: array
+          items: { type: string }
+        categoriesKeywords:
+          type: array
+          items: { type: string }
+        nationalID:
+          type: array
+          items: { type: string }
+          description: >-
+            National identifiers (registration number, KBO, SIREN, Companies
+            House number). Exact: the answer holds only records whose identifier
+            equals a value sent, separators and case aside, on page one and every
+            later page; a value nobody holds answers `counts.total` 0 and draws no
+            credit. Send the number as the register writes it, with its leading
+            zeros (`00445790`, not `445790`). For a search restricted to GB alone,
+            a numeric value of one to seven digits is padded with leading zeros to
+            the eight-character Companies House form before the call.
+        nationalIdentificationTypeCodes:
+          type: array
+          items: { type: string }
+        isVAT:
+          description: Restricts results to records whose nationalID type indicates VAT. This is not a VAT-number lookup field.
+          type: boolean
+        postCodes:
+          type: array
+          items: { type: string }
+        phoneNumber:
+          type: array
+          items: { type: string }
+        email:
+          type: array
+          items: { type: string }
+        website:
+          type: array
+          items: { type: string }
+
+    GetDataSearchEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        request_id: { type: string }
+        data:
+          type: object
+          additionalProperties: true
+          required: [request_id]
+          properties:
+            request_id: { type: string }
+            searchId: { type: integer }
+            counts:
+              type: object
+              additionalProperties: true
+              properties:
+                total: { type: integer }
+                hasAddress: { type: integer }
+                hasPhone: { type: integer }
+                hasEmail: { type: integer }
+                hasWebsite: { type: integer }
+                hasNationalID: { type: integer }
+            firstPageRecords:
+              type: array
+              items: { $ref: '#/components/schemas/GetDataRecord' }
+
+    GetDataCompaniesRequest:
+      type: object
+      additionalProperties: false
+      required: [uniqueIDs]
+      properties:
+        uniqueIDs:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { type: string, pattern: '^[0-9A-Za-z]{4,32}$' }
+          description: Record identifiers as returned in `uniqueID` on a search row. Duplicates are folded.
+
+    GetDataCompaniesEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        request_id: { type: string }
+        data:
+          type: object
+          required: [companies, notFound, request_id]
+          properties:
+            request_id: { type: string }
+            companies:
+              type: array
+              description: One full record per identifier found, in the order the identifiers were sent.
+              items: { $ref: '#/components/schemas/GetDataRecord' }
+            notFound:
+              type: array
+              description: The identifiers no record is held under. Their credits were refunded.
+              items: { type: string }
+
+    GetDataRecordsEnvelope:
+      type: object
+      required: [data, request_id]
+      description: A single page of records for an existing search (FetchResult model).
+      properties:
+        request_id: { type: string }
+        data:
+          type: object
+          additionalProperties: true
+          required: [request_id]
+          properties:
+            request_id: { type: string }
+            searchId: { type: integer }
+            page: { type: integer }
+            recordCount: { type: integer }
+            totalRecordCount: { type: integer }
+            records:
+              type: array
+              items: { $ref: '#/components/schemas/GetDataRecord' }
+
+    GetDataRecord:
+      type: object
+      additionalProperties: true
+      description: |
+        Firmographics record (companies / POI). All fields are optional; the
+        most commonly used keys are listed here for documentation.
+      properties:
+        uniqueID: { type: string }
+        matchScore:
+          type: [integer, 'null']
+          minimum: 0
+          maximum: 100
+          description: >-
+            Present on preview rows only (keys with the `getdata.search_preview`
+            operation). Computed by Stargate from your search terms against the
+            row; `null` when the search carried no name term. Not a source field.
+        universalPublicationId: { type: string }
+        companyName: { type: string }
+        businessName: { type: string }
+        tradeName: { type: string }
+        directoryName: { type: string }
+        addressStreet: { type: string }
+        addressHouseNumber: { type: string }
+        addressBoxNumber: { type: string }
+        address1: { type: string }
+        address2: { type: string }
+        postCode: { type: string }
+        city: { type: string }
+        cityCode: { type: string }
+        province: { type: string }
+        provinceCode: { type: string }
+        region: { type: string }
+        regionCode: { type: string }
+        country: { type: string }
+        countryCode: { type: string }
+        phone: { type: string }
+        phoneOrMobile: { type: string }
+        mobile: { type: string }
+        fax: { type: string }
+        website: { type: string }
+        email: { type: string }
+        latitude: { type: string }
+        longitude: { type: string }
+        nationalID: { type: string }
+        nationalIdentificationTypeCode: { type: integer }
+        nationalIdentificationTypeCodeDescription: { type: string }
+        nationalIDIsVat: { type: boolean }
+        internationalLabel01: { type: string }
+        altInternationalLabel01: { type: string }
+
+    # ─── Company Financials ────────────────────────────────────────────────
+    FinancialsSearchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1, maximum: 200 }
+        filters:
+          type: object
+          description: |
+            Financials filter object. Documented filter keys only; an
+            unrecognised key, or a documented key in the wrong shape, is
+            refused with `400 invalid_params` naming it and the accepted
+            shape. Country codes are ISO 3166-1 alpha-2 in any casing.
+          properties:
+            dataset:
+              type: object
+              description: '`{ "value": "Private" | "Public" }`; Private when omitted.'
+              properties:
+                value: { type: string, enum: [Private, Public] }
+            dbVersion:
+              type: object
+              description: 'Pin a data release, `{ "value": "1.YYMM.patch" }`; the latest when omitted.'
+              properties:
+                value: { type: string }
+            companyName:
+              type: object
+              description: 'Name terms; a trailing `*` matches a prefix.'
+              required: [value]
+              properties:
+                value: { type: array, minItems: 1, items: { type: string } }
+            infoCompanyIdNumber:
+              type: object
+              description: |
+                One to 200 company identifiers, each the two-letter country
+                prefix followed by the registry number as the register writes
+                it. Answers exactly those companies; see the operation notes.
+              required: [value]
+              properties:
+                value:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items: { type: string, example: gb00445790 }
+            infoCountryWithExclusion:
+              $ref: '#/components/schemas/FinancialsTagFilter'
+            infoLegalForm:
+              $ref: '#/components/schemas/FinancialsTagFilter'
+            infoStatus:
+              $ref: '#/components/schemas/FinancialsTagFilter'
+            activityIndustryCodeNace:
+              allOf:
+                - $ref: '#/components/schemas/FinancialsTagFilter'
+                - type: object
+                  properties:
+                    isPrimaryOnly: { type: boolean }
+            activityIndustryCodeSic:
+              $ref: '#/components/schemas/FinancialsTagFilter'
+            plTurnover: { $ref: '#/components/schemas/FinancialsCriteriaFilter' }
+            plEbitda: { $ref: '#/components/schemas/FinancialsCriteriaFilter' }
+            plProfitLoss: { $ref: '#/components/schemas/FinancialsCriteriaFilter' }
+            balTotalAssets: { $ref: '#/components/schemas/FinancialsCriteriaFilter' }
+            balCurrentAssets: { $ref: '#/components/schemas/FinancialsCriteriaFilter' }
+            balFixedAssets: { $ref: '#/components/schemas/FinancialsCriteriaFilter' }
+            employeeCount: { $ref: '#/components/schemas/FinancialsCriteriaFilter' }
+
+    FinancialsTagFilter:
+      type: object
+      description: 'A tag set: `{ "value": { "tags": { "includeValues": [...], "excludeValues": [...] } } }`.'
+      required: [value]
+      properties:
+        value:
+          type: object
+          required: [tags]
+          properties:
+            tags:
+              type: object
+              required: [includeValues]
+              properties:
+                includeValues: { type: array, items: { type: string } }
+                excludeValues: { type: array, items: { type: string } }
+
+    FinancialsCriteriaFilter:
+      type: object
+      description: |
+        A numeric criterion: `{ "value": { "from"?, "to"?, "years": { "from", "to" }, "criteria": "LAST" | ... } }`.
+        The bare `{ "from", "years", "criteria" }` shape is refused.
+      required: [value]
+      properties:
+        value:
+          type: object
+          required: [years, criteria]
+          properties:
+            from: { type: number }
+            to: { type: number }
+            years:
+              type: object
+              properties:
+                from: { type: integer }
+                to: { type: integer }
+            criteria: { type: string }
+
+    FinancialsSearchEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        request_id: { type: string }
+        data:
+          type: object
+          additionalProperties: true
+          required: [request_id]
+          properties:
+            request_id: { type: string }
+            searchId: { type: string }
+            dataset: { type: string }
+            dbVersion: { type: string }
+            totalCount: { type: integer }
+            searchResult:
+              type: object
+              additionalProperties: true
+              properties:
+                totalElements: { type: integer }
+                content:
+                  type: array
+                  items: { $ref: '#/components/schemas/FinancialsSearchEntry' }
+
+    FinancialsDetailEnvelope:
+      type: object
+      required: [data, request_id]
+      properties:
+        request_id: { type: string }
+        data:
+          type: object
+          additionalProperties: true
+          required: [request_id, companyNumber]
+          properties:
+            request_id: { type: string }
+            companyNumber: { type: string }
+      description: |
+        Detail responses are section-specific. The field catalogue and bundle
+        attached to the API key determine which leaves are returned.
+
+    FinancialsSearchEntry:
+      type: object
+      additionalProperties: true
+      properties:
+        companyInfo:
+          type: object
+          additionalProperties: true
+          properties:
+            id: { type: string }
+            releaseVersion: { type: string }
+            companyNumber: { type: string }
+            name: { type: string }
+            originalFullName: { type: string }
+            vatNumber: { type: string }
+            country: { type: string }
+            statuses:
+              type: array
+              items: { type: string }
+            legalForm: { type: string }
+            startDate: { type: string, format: date }
+            cessationDate: { type: string, format: date }
+            address: { $ref: '#/components/schemas/AddressInfo' }
+            naceCodes:
+              type: array
+              items: { type: string }
+            primaryNaceCode: { type: string }
+            sicCodes:
+              type: array
+              items: { type: string }
+            websites:
+              type: array
+              items: { type: string }
+            emailAddresses:
+              type: array
+              items: { type: string }
+            phones:
+              type: array
+              items: { type: string }
+            currencyOfAccounts: { type: string }
+            lastAvailableYear: { type: integer }
+            typeOfAccounts: { type: string }
+            accountingStandard: { type: string }
+        financialInfo:
+          type: object
+          additionalProperties: true
+          description: |
+            Latest financial snapshot. Numeric metrics are exposed as
+            `{ value, year }` objects.
+          properties:
+            employeeAverage: { $ref: '#/components/schemas/FinValue' }
+            fte: { $ref: '#/components/schemas/FinValue' }
+            turnover: { $ref: '#/components/schemas/FinValue' }
+            grossProfitLoss: { $ref: '#/components/schemas/FinValue' }
+            ebitda: { $ref: '#/components/schemas/FinValue' }
+            operatingProfitLoss: { $ref: '#/components/schemas/FinValue' }
+            profitLossBeforeTax: { $ref: '#/components/schemas/FinValue' }
+            profitLossAfterTax: { $ref: '#/components/schemas/FinValue' }
+            totalAssets: { $ref: '#/components/schemas/FinValue' }
+            fixedAssets: { $ref: '#/components/schemas/FinValue' }
+            currentAssets: { $ref: '#/components/schemas/FinValue' }
+            shareholdersFunds: { $ref: '#/components/schemas/FinValue' }
+            cashFlow: { $ref: '#/components/schemas/FinValue' }
+        yearlyFinancialInfo:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    AddressInfo:
+      type: object
+      additionalProperties: true
+      properties:
+        type: { type: string }
+        address: { type: string }
+        postalCode: { type: string }
+        city: { type: string }
+        country: { type: string }
+        officialValidFrom: { type: string, format: date }
+        officialValidTo: { type: string, format: date }
+
+    FinValue:
+      type: object
+      properties:
+        value:
+          oneOf:
+            - { type: number }
+            - { type: string }
+            - { type: boolean }
+        year: { type: integer }

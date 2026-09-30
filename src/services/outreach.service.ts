@@ -125,24 +125,25 @@ export async function sendOutreach(userId: string, id: string, opts: { via?: "gm
   let composeUrl: string | undefined;
 
   if (opts.via === "smtp") {
-    // direct send: requires SMTP_* env; the human already confirmed via the flag (§26.1)
-    if (!smtpReady()) {
+    // direct send: SMTP_* env or the mailbox's app password; confirm flag is the human press (§26.1)
+    const smtp = await smtpForUser(userId);
+    if (!smtp) {
       throw new AppError(
         "SMTP_NOT_CONFIGURED",
         403,
-        "Direct sending is not configured on this deployment",
-        "set SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS (and optionally SMTP_FROM), or send via gmail_open"
+        "Direct sending is not configured for this account",
+        "connect a mailbox with an app password in Inbox & Sync, or set SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS on the host, or send via gmail_open"
       );
     }
     if (!to) throw validation("No recipient email on this message; attach a contact with an email first");
     const transport = nodemailer.createTransport({
-      host: config.smtp.host,
-      port: config.smtp.port,
-      secure: config.smtp.port === 465,
-      auth: { user: config.smtp.user, pass: config.smtp.pass },
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.port === 465,
+      auth: { user: smtp.user, pass: smtp.pass },
     });
     await transport.sendMail({
-      from: config.smtp.from || config.smtp.user,
+      from: smtp.from,
       to,
       subject: mergeTemplate(r.subject, ctx),
       text: mergeTemplate(r.body, ctx),
@@ -184,6 +185,31 @@ If useful, my CV and a couple of sample builds are one reply away. Happy to send
 
 Best regards,
 {{profile.first_name}} {{profile.last_name}}`;
+
+/**
+ * Direct-send credentials for this user: deployment-wide SMTP_* env first, else the
+ * mailbox they connected in Settings (config.app_password; Gmail defaults to
+ * smtp.gmail.com:465). This is what makes "connect my Gmail once" end automatic.
+ */
+async function smtpForUser(userId: string): Promise<{ host: string; port: number; user: string; pass: string; from: string } | null> {
+  if (smtpReady()) {
+    return { host: config.smtp.host, port: config.smtp.port, user: config.smtp.user, pass: config.smtp.pass, from: config.smtp.from || config.smtp.user };
+  }
+  const mb = await get<any>("SELECT * FROM mailboxes WHERE user_id = ? ORDER BY created_at DESC LIMIT 1", userId);
+  if (!mb) return null;
+  const cfg = parseJson<Record<string, any>>(mb.config, {});
+  const pass = cfg.app_password ?? cfg.smtp_pass ?? null;
+  if (!pass) return null;
+  const host = cfg.smtp_host ?? "smtp.gmail.com";
+  const port = Number(cfg.smtp_port ?? 465);
+  const user = cfg.smtp_user ?? mb.address;
+  return { host, port, user, pass, from: user };
+}
+
+/** Whether auto-apply will send directly instead of handing off to Gmail. */
+export async function smtpReadyFor(userId: string): Promise<boolean> {
+  return !!(await smtpForUser(userId));
+}
 
 const AUTO_SUBJECT = `Application: {{posting.role}}`;
 const AUTO_BODY = `Hello,
@@ -232,7 +258,7 @@ export async function autoApply(userId: string, appId: string) {
     })) as any;
   }
 
-  const direct = smtpReady();
+  const direct = await smtpReadyFor(userId);
   const res = await sendOutreach(userId, msg.id, { via: direct ? "smtp" : "gmail_open", confirm: true });
   return {
     mode: (direct ? "sent" : "compose") as "sent" | "compose",

@@ -33,6 +33,14 @@ export const config = {
     pass: process.env.SMTP_PASS ?? "",
     from: process.env.SMTP_FROM ?? process.env.SMTP_USER ?? "",
   },
+  /**
+   * InfobelPro Stargate (firmographics) is an optional richer company directory.
+   * Unset → pitch search falls back to OpenStreetMap + curated contact lists only.
+   */
+  stargate: {
+    key: process.env.STARGATE_API_KEY ?? "",
+    base: process.env.STARGATE_BASE ?? "https://stargate.infobelpro.com",
+  },
 };
 
 /** True when direct sending is possible (auto-apply sends without a human press). */
