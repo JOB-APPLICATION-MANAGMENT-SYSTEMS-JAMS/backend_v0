@@ -76,7 +76,7 @@ export async function createCV(userId: string, input: CreateCVInput) {
   return getCV(userId, id);
 }
 
-/** A sensible default CV assembled from the profile (§24.1 — CVs are views over profile data). */
+/** A sensible default CV assembled from the profile (§24.1, CVs are views over profile data). */
 async function defaultBlocks(userId: string): Promise<CVBlock[]> {
   const profile = await get<any>("SELECT * FROM profiles WHERE user_id = ?", userId);
   const identity: any = profile ? parseJson(profile.identity, {}) : {};
@@ -155,7 +155,7 @@ export async function duplicateCV(userId: string, id: string, name?: string) {
 
 /**
  * ATS + JD match report (§20.1 / §24.1): parse-ability, keyword coverage, missing keywords.
- * Never fabricates — "add missing keyword" suggestions are advisory.
+ * Never fabricates, "add missing keyword" suggestions are advisory.
  */
 export async function matchCV(userId: string, cvId: string, postingId?: string) {
   const cv = await getCV(userId, cvId);
@@ -177,7 +177,7 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
   const atsChecks = [
     { key: "has_summary", label: "Summary / profile section", ok: sectionTypes.has("summary") || sectionTypes.has("custom"), fix: "Add a 3-line tailored summary" },
     { key: "has_experience", label: "Experience section", ok: sectionTypes.has("experience"), fix: "Add at least one experience block" },
-    { key: "has_skills", label: "Skills section (keyword-friendly)", ok: sectionTypes.has("skills"), fix: "Add a skills group — ATS parsers look for it" },
+    { key: "has_skills", label: "Skills section (keyword-friendly)", ok: sectionTypes.has("skills"), fix: "Add a skills group, ATS parsers look for it" },
     { key: "length", label: "Length ≤ 2 pages worth of text", ok: cvText.length < 6000, fix: "Trim older roles or bullets" },
     { key: "contact", label: "Contact block present", ok: skills.length >= 0 && !!(await profileHasContact(userId)), fix: "Add email/phone to your profile" },
   ];

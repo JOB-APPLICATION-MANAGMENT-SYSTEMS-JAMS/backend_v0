@@ -152,7 +152,7 @@ const BADGES: { key: string; label: string; check: (s: any) => boolean }[] = [
   { key: "goal_hit", label: "Daily goal hit", check: (s) => s.goal_hits >= 1 },
 ];
 
-/** Badges are pure projections of the event log (§23.1) — persisted once on unlock. */
+/** Badges are pure projections of the event log (§23.1), persisted once on unlock. */
 export async function badges(userId: string) {
   const stats = (await get<any>(
     `SELECT
@@ -186,7 +186,7 @@ export async function badges(userId: string) {
   });
 }
 
-/** Victory mode (§23.1 “I got a job”) — inline status write avoids a circular service import. */
+/** Victory mode (§23.1 “I got a job”), inline status write avoids a circular service import. */
 export async function victory(userId: string, payload: { offer_source: "manual" | "email"; application_id?: string }) {
   const p = await get<any>("SELECT * FROM profiles WHERE user_id = ?", userId);
   if (p) {

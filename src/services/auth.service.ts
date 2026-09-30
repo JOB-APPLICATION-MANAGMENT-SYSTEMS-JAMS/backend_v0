@@ -52,7 +52,7 @@ export async function register(email: string, password: string, timezone?: strin
     now,
     now
   );
-  // local mode: no SMTP — the token is surfaced to the dev console + returned in dev (§31.1 MailPit equivalent)
+  // local mode: no SMTP, the token is surfaced to the dev console + returned in dev (§31.1 MailPit equivalent)
   console.log(`[auth] verification link for ${email}: /auth/verify-email?token=${token}`);
   await run(`INSERT INTO profiles (id, user_id, identity, prefs, aliases, version, updated_at) VALUES (?, ?, ?, '{}', '{}', 1, ?)`, newId(), id, identity, now);
   const user = (await get("SELECT * FROM users WHERE id = ?", id))!;
@@ -63,7 +63,7 @@ export async function login(email: string, password: string) {
   const user = await get("SELECT * FROM users WHERE email = ?", email.toLowerCase());
   if (!user || !user.password_hash || !(await verifyPassword(password, user.password_hash))) throw invalidCredentials();
   if (!user.verified) {
-    // rich 403 that drives UI state (§4.3) — machine code + fields for the login form branch
+    // rich 403 that drives UI state (§4.3), machine code + fields for the login form branch
     throw new AppError("REQUIRES_VERIFICATION", 403, "Verify your email to sign in", null, {
       fields: { requires_verification: true, email: user.email },
     });

@@ -124,7 +124,7 @@ export function locationFit(profile: ProfileSignals, posting: PostingSignals): {
 export function salaryFit(profile: ProfileSignals, posting: PostingSignals): { value: number; why: string } {
   const want = profile.salaryExpectation;
   const max = posting.salaryMax ?? posting.salaryMin;
-  if (!max) return { value: 0.5, why: "salary not listed — not penalised" };
+  if (!max) return { value: 0.5, why: "salary not listed, not penalised" };
   if (!want) return { value: 0.7, why: "no salary expectation set" };
   if (max >= want) return { value: 1, why: `top of band ≥ your expectation` };
   if (max >= want * 0.8) return { value: 0.6, why: `within 20% of your expectation` };
@@ -147,7 +147,7 @@ export function companyTierFit(profile: ProfileSignals, posting: PostingSignals)
 }
 
 /**
- * score(profile, posting) per §34.4 — every term bounded, every point explainable,
+ * score(profile, posting) per §34.4, every term bounded, every point explainable,
  * output clamped to [0,100].
  */
 export function scorePosting(

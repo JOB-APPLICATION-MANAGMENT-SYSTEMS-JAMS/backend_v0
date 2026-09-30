@@ -1,6 +1,6 @@
 /**
  * In-process worker (§29.1: "API does request/response, workers do everything slow").
- * No Redis/ARQ in this environment — a single interval scheduler with jittered phases.
+ * No Redis/ARQ in this environment, a single interval scheduler with jittered phases.
  * Jobs: ghost sweep · ingestion refresh · sequence due-check · daily rollups.
  */
 import { ghostSweep } from "../services/application.service";
@@ -58,12 +58,12 @@ async function sequenceReminders() {
       await run("UPDATE outreach_messages SET state = 'paused' WHERE id = ?", d.id); // pause on reply (§26.2)
       continue;
     }
-    console.log(`[worker] follow-up due: outreach ${d.id} (step ${d.step_no}) — surfaced as a chip`);
+    console.log(`[worker] follow-up due: outreach ${d.id} (step ${d.step_no}), surfaced as a chip`);
     if (d.app_id) await run("INSERT INTO application_events (app_id, type, at, actor, payload) VALUES (?, 'note', ?, 'system', ?)", d.app_id, new Date().toISOString(), JSON.stringify({ follow_up_due: d.id }));
   }
 }
 
-/** Nightly rollup cache per day (§37.1) — metrics JSONB projection of the event log. */
+/** Nightly rollup cache per day (§37.1), metrics JSONB projection of the event log. */
 async function buildRollups() {
   const days = await all<{ day: string; user_id: string }>(
     `SELECT DISTINCT day, user_id FROM (SELECT substr(at,1,10) AS day, (SELECT user_id FROM applications WHERE id = app_id) AS user_id FROM application_events ORDER BY day DESC LIMIT 5000)`

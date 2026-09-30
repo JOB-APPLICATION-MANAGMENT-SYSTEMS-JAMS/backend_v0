@@ -1,12 +1,12 @@
 import path from "node:path";
 
-/** Runtime configuration — every value is env-overridable, defaults suit local mode (§31.1). */
+/** Runtime configuration, every value is env-overridable, defaults suit local mode (§31.1). */
 const root = path.resolve(process.cwd());
 
 export const config = {
   mode: (process.env.MODE ?? "local") as "local" | "online",
   port: process.env.PORT && process.env.PORT !== "0" ? Number(process.env.PORT) : 8000, // treat PORT=0 (sandbox default) as "use 8000"
-  // serverless hosts (Vercel) have a read-only project dir — /tmp is the only writable place.
+  // serverless hosts (Vercel) have a read-only project dir, /tmp is the only writable place.
   // Set DATABASE_URL (Neon/Supabase) on Vercel instead for real persistence.
   dbPath: process.env.DB_PATH ?? (process.env.VERCEL ? "/tmp/jams.db" : path.join(root, "data", "jams.db")),
   jwtSecret: process.env.JWT_SECRET ?? "dev-secret-change-me",

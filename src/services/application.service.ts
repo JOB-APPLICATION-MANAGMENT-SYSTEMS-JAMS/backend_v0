@@ -8,7 +8,7 @@ import { localDayIso } from "../util/date";
 export const STATUSES = ["saved", "applied", "viewed", "screen", "interview", "offer", "rejected", "ghosted", "withdrawn"] as const;
 export type Status = (typeof STATUSES)[number];
 
-/** Server-side transition map (§32.2) — every transition writes an application_events row. */
+/** Server-side transition map (§32.2), every transition writes an application_events row. */
 export const TRANSITIONS: Record<Status, Status[]> = {
   saved: ["applied", "withdrawn"],
   applied: ["viewed", "screen", "interview", "offer", "rejected", "ghosted", "withdrawn"],

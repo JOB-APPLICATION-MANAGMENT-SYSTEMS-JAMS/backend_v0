@@ -33742,7 +33742,7 @@ var init_config = __esm({
       mode: process.env.MODE ?? "local",
       port: process.env.PORT && process.env.PORT !== "0" ? Number(process.env.PORT) : 8e3,
       // treat PORT=0 (sandbox default) as "use 8000"
-      // serverless hosts (Vercel) have a read-only project dir — /tmp is the only writable place.
+      // serverless hosts (Vercel) have a read-only project dir, /tmp is the only writable place.
       // Set DATABASE_URL (Neon/Supabase) on Vercel instead for real persistence.
       dbPath: process.env.DB_PATH ?? (process.env.VERCEL ? "/tmp/jams.db" : path.join(root, "data", "jams.db")),
       jwtSecret: process.env.JWT_SECRET ?? "dev-secret-change-me",
@@ -39814,7 +39814,7 @@ var init_auth = __esm({
       try {
         const body = registerSchema.parse(req.body);
         const result = await register(body.email, body.password, body.timezone, body.first_name, body.last_name);
-        ok(res, "Account created \u2014 check your email for the verification link", { ...result, requires_verification: true }, 201);
+        ok(res, "Account created, check your email for the verification link", { ...result, requires_verification: true }, 201);
       } catch (e) {
         next(e);
       }
@@ -39848,7 +39848,7 @@ var init_auth = __esm({
     authRouter.post("/verify-email", async (req, res, next) => {
       try {
         const token = external_exports.object({ token: external_exports.string() }).parse(req.body).token;
-        ok(res, "Email verified \u2014 you can sign in now", await verifyEmail(token));
+        ok(res, "Email verified, you can sign in now", await verifyEmail(token));
       } catch (e) {
         next(e);
       }
@@ -39983,7 +39983,7 @@ async function completeness(userId) {
     { key: "location", label: "Location", weight: 6, done: !!id.location },
     { key: "links", label: "Links (GitHub/LinkedIn/portfolio)", weight: 8, done: Object.keys(id.links ?? {}).length > 0 },
     { key: "pitch", label: "Pitch paragraph", weight: 10, done: !!(id.pitch ?? id.pitch_variants?.length), hint: "Used by template archetypes" },
-    { key: "skills", label: "Skills", weight: 14, done: p.skills.length >= 5, hint: "Add at least 5 \u2014 ranking uses them" },
+    { key: "skills", label: "Skills", weight: 14, done: p.skills.length >= 5, hint: "Add at least 5, ranking uses them" },
     { key: "experience", label: "Experience", weight: 18, done: p.experiences.length >= 1 },
     { key: "education", label: "Education", weight: 6, done: p.education.length >= 1 },
     { key: "work_auth", label: "Work authorization", weight: 4, done: !!id.work_authorization },
@@ -40178,7 +40178,7 @@ function locationFit(profile, posting) {
 function salaryFit(profile, posting) {
   const want = profile.salaryExpectation;
   const max = posting.salaryMax ?? posting.salaryMin;
-  if (!max) return { value: 0.5, why: "salary not listed \u2014 not penalised" };
+  if (!max) return { value: 0.5, why: "salary not listed, not penalised" };
   if (!want) return { value: 0.7, why: "no salary expectation set" };
   if (max >= want) return { value: 1, why: `top of band \u2265 your expectation` };
   if (max >= want * 0.8) return { value: 0.6, why: `within 20% of your expectation` };
@@ -40401,7 +40401,7 @@ async function matchCV(userId, cvId, postingId) {
   const atsChecks = [
     { key: "has_summary", label: "Summary / profile section", ok: sectionTypes.has("summary") || sectionTypes.has("custom"), fix: "Add a 3-line tailored summary" },
     { key: "has_experience", label: "Experience section", ok: sectionTypes.has("experience"), fix: "Add at least one experience block" },
-    { key: "has_skills", label: "Skills section (keyword-friendly)", ok: sectionTypes.has("skills"), fix: "Add a skills group \u2014 ATS parsers look for it" },
+    { key: "has_skills", label: "Skills section (keyword-friendly)", ok: sectionTypes.has("skills"), fix: "Add a skills group, ATS parsers look for it" },
     { key: "length", label: "Length \u2264 2 pages worth of text", ok: cvText.length < 6e3, fix: "Trim older roles or bullets" },
     { key: "contact", label: "Contact block present", ok: skills.length >= 0 && !!await profileHasContact(userId), fix: "Add email/phone to your profile" }
   ];
@@ -41139,7 +41139,7 @@ function parseSalary(text) {
 function guessCompany(title, url, html) {
   const og = html?.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i)?.[1];
   if (og) return og;
-  const m = title.match(/(?:^|[–—|:]\s*)\w[^–—|:]*?\bat\s+([A-Z][\w&.' -]{2,40})$/) ?? title.match(/[–—|]\s*([A-Z][\w&.' -]{2,40})\s*$/);
+  const m = title.match(/(?:^|[–|:]\s*)\w[^–|:]*?\bat\s+([A-Z][\w&.' -]{2,40})$/) ?? title.match(/[–|]\s*([A-Z][\w&.' -]{2,40})\s*$/);
   if (m) return m[1].trim();
   try {
     const host = new URL(url).hostname.replace(/^www\./, "");
@@ -41166,13 +41166,13 @@ async function previewCapture(userId, url, htmlText) {
   const pageTitle = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.trim() ?? "";
   const ogTitle = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1];
   let title = ld?.title ?? ogTitle ?? pageTitle ?? url;
-  title = title.split(/\s+[|–—-]\s+/)[0].trim();
+  title = title.split(/\s+[|–-]\s+/)[0].trim();
   let company = ld?.hiringOrganization?.name ?? guessCompany(title, url, html);
   const location = ld?.jobLocation?.address?.addressLocality ?? ld?.jobLocation?.address?.addressRegion ?? null;
   const remote = !!ld?.jobLocationType || /remote|anywhere|work from home/i.test(`${text.slice(0, 2e3)}`);
   const salaryRaw = ld?.baseSalary?.value?.minValue ? String(ld.baseSalary.value.minValue) : text.match(/(salary|compensation|pay)[:\s]*([€$£]?[\d,.]+\s*[kK]?\s*[-–to]+\s*[€$£]?[\d,.]+\s*[kK]?)/i)?.[2] ?? "";
   const salary = salaryRaw ? parseSalary(salaryRaw) : parseSalary(text.slice(0, 4e3));
-  if (!salary.min) warnings.push("salary not found \u2014 add manually");
+  if (!salary.min) warnings.push("salary not found, add manually");
   const description = (ld?.description ? stripTags(ld.description) : text).slice(0, 8e3);
   const keywords = extractKeywords(`${title} ${description}`);
   let posted_at = ld?.datePosted ?? null;
@@ -41284,7 +41284,7 @@ async function capture(userId, input) {
       posted_at: null,
       warnings: []
     };
-    if (!parsed.salary_min) warnings.push("salary not found \u2014 add manually");
+    if (!parsed.salary_min) warnings.push("salary not found, add manually");
   }
   const upserted = await upsertPosting(userId, input.url, parsed, input.source === "paste" ? "manual" : input.source);
   const action = input.action ?? "create_draft";
@@ -42736,7 +42736,7 @@ async function sendOutreach(userId, id, opts) {
   const used = await sentToday(userId);
   if (used >= cap) throw new AppError("QUOTA_EXCEEDED", 403, `Daily send cap reached (${cap})`, "wait until tomorrow or raise DAILY_SEND_CAP");
   if (used >= cap - 3) {
-    console.warn(`[outreach] ${used}/${cap} sends today \u2014 approaching cap`);
+    console.warn(`[outreach] ${used}/${cap} sends today, approaching cap`);
   }
   if (opts.via === "smtp") {
     const mailbox = await get("SELECT * FROM mailboxes WHERE user_id = ? LIMIT 1", userId);
@@ -42745,7 +42745,7 @@ async function sendOutreach(userId, id, opts) {
       "MAILBOX_NOT_CONNECTED",
       403,
       "Direct SMTP sending is not enabled yet",
-      "use via: 'gmail_open' (human presses Send) \u2014 SMTP send arrives with the mailbox worker"
+      "use via: 'gmail_open' (human presses Send), SMTP send arrives with the mailbox worker"
     );
   }
   const ctx = await mergeContext(userId, r.app_id, r.contact_id);
@@ -42979,7 +42979,7 @@ var init_outreach = __esm({
     outreachRouter.post("/:id/send", async (req, res, next) => {
       try {
         const body = external_exports.object({ via: external_exports.enum(["gmail_open", "smtp"]).default("gmail_open"), confirm: external_exports.boolean().default(false) }).parse(req.body ?? {});
-        ok(res, "Send prepared \u2014 confirm in your mail client", await sendOutreach(req.userId, String(req.params.id), body));
+        ok(res, "Send prepared, confirm in your mail client", await sendOutreach(req.userId, String(req.params.id), body));
       } catch (e) {
         next(e);
       }
@@ -43025,7 +43025,7 @@ var init_outreach = __esm({
     });
     mailboxRouter.post("/:id/sync", (req, res, next) => {
       try {
-        ok(res, "Sync not running in local mode \u2014 use /inbox/messages to ingest", { new: 0, updated: 0, mode: process.env.MODE ?? "local" });
+        ok(res, "Sync not running in local mode, use /inbox/messages to ingest", { new: 0, updated: 0, mode: process.env.MODE ?? "local" });
       } catch (e) {
         next(e);
       }
@@ -43530,7 +43530,7 @@ function createApp() {
   const app = (0, import_express8.default)();
   app.disable("x-powered-by");
   if (process.env.VERCEL && config.jwtSecret === "dev-secret-change-me") {
-    console.warn("[jams] JWT_SECRET is not set \u2014 falling back to the well-known dev secret. Set JWT_SECRET on the deployment.");
+    console.warn("[jams] JWT_SECRET is not set, falling back to the well-known dev secret. Set JWT_SECRET on the deployment.");
   }
   app.use(
     (0, import_cors.default)({

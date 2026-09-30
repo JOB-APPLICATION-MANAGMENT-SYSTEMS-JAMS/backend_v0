@@ -133,7 +133,7 @@ export async function completeness(userId: string) {
     { key: "location", label: "Location", weight: 6, done: !!id.location },
     { key: "links", label: "Links (GitHub/LinkedIn/portfolio)", weight: 8, done: Object.keys(id.links ?? {}).length > 0 },
     { key: "pitch", label: "Pitch paragraph", weight: 10, done: !!(id.pitch ?? id.pitch_variants?.length), hint: "Used by template archetypes" },
-    { key: "skills", label: "Skills", weight: 14, done: p.skills.length >= 5, hint: "Add at least 5 — ranking uses them" },
+    { key: "skills", label: "Skills", weight: 14, done: p.skills.length >= 5, hint: "Add at least 5, ranking uses them" },
     { key: "experience", label: "Experience", weight: 18, done: p.experiences.length >= 1 },
     { key: "education", label: "Education", weight: 6, done: p.education.length >= 1 },
     { key: "work_auth", label: "Work authorization", weight: 4, done: !!id.work_authorization },

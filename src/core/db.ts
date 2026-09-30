@@ -10,8 +10,8 @@ export type Row = Record<string, any>;
 /**
  * Dual-driver data layer.
  *
- * - `sqlite` (default): local dev & tests — node:sqlite file, zero setup, same as before.
- * - `postgres`: set `DATABASE_URL` (Neon/Supabase) — used on serverless hosts like
+ * - `sqlite` (default): local dev & tests, node:sqlite file, zero setup, same as before.
+ * - `postgres`: set `DATABASE_URL` (Neon/Supabase), used on serverless hosts like
  *   Vercel where the filesystem is ephemeral and a file DB would vanish.
  *
  * Every helper is async so one codebase serves both: on the sqlite path the promise
@@ -35,7 +35,7 @@ function getPool(): Promise<pg.Pool> {
         // Neon terminates idle connections and requires TLS; sslmode=require in the URL
         ...(pgUrl?.includes("sslmode=require") ? { ssl: { rejectUnauthorized: false } } : {}),
       });
-      await pool.query(SCHEMA_PG); // idempotent CREATE IF NOT EXISTS — one round-trip per cold start
+      await pool.query(SCHEMA_PG); // idempotent CREATE IF NOT EXISTS, one round-trip per cold start
       return pool;
     })();
     pgPoolPromise.catch(() => {
@@ -88,7 +88,7 @@ function norm(params: any[]): any[] {
 }
 
 /**
- * node-postgres returns `int8` (count/sum) and `numeric` (avg) as *strings* — sqlite
+ * node-postgres returns `int8` (count/sum) and `numeric` (avg) as *strings*, sqlite
  * returns numbers. Coerce those two OIDs back to JS numbers so query code is
  * driver-agnostic (`value.toFixed(...)` etc. would otherwise throw on Postgres).
  * Text/uuid/json columns are left untouched.
@@ -127,7 +127,7 @@ export async function get<T = Row>(sql: string, ...params: any[]): Promise<T | u
   return (await getSqlite()).prepare(sql).get(...norm(params)) as T | undefined;
 }
 
-/** INSERT/UPDATE/DELETE — returns changes count. */
+/** INSERT/UPDATE/DELETE, returns changes count. */
 export async function run(sql: string, ...params: any[]): Promise<number> {
   if (driver === "postgres") {
     const pool = await getPool();

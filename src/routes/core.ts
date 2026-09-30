@@ -137,7 +137,7 @@ cvRouter.get("/:id/suggest", async (req: AuthedRequest, res, next) => {
   }
 });
 
-/** Print-ready A4 HTML — the browser's print pipeline (Chromium) renders the PDF (§24.1). */
+/** Print-ready A4 HTML, the browser's print pipeline (Chromium) renders the PDF (§24.1). */
 cvRouter.get("/:id/html", async (req: AuthedRequest, res, next) => {
   try {
     const c = await cv.getCV(req.userId!, String(req.params.id));

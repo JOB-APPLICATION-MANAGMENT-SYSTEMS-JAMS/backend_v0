@@ -22,7 +22,7 @@ authRouter.post("/register", limiter, async (req, res, next) => {
   try {
     const body = registerSchema.parse(req.body);
     const result = await auth.register(body.email, body.password, body.timezone, body.first_name, body.last_name);
-    ok(res, "Account created — check your email for the verification link", { ...result, requires_verification: true }, 201);
+    ok(res, "Account created, check your email for the verification link", { ...result, requires_verification: true }, 201);
   } catch (e) {
     next(e);
   }
@@ -60,7 +60,7 @@ authRouter.post("/refresh", limiter, (req, res, next) => {
 authRouter.post("/verify-email", async (req, res, next) => {
   try {
     const token = z.object({ token: z.string() }).parse(req.body).token;
-    ok(res, "Email verified — you can sign in now", await auth.verifyEmail(token));
+    ok(res, "Email verified, you can sign in now", await auth.verifyEmail(token));
   } catch (e) {
     next(e);
   }

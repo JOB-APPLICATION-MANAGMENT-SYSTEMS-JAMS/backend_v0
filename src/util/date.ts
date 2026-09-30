@@ -1,4 +1,4 @@
-/** Timezone-aware day/period helpers — all buckets computed in the profile timezone (§37.4). */
+/** Timezone-aware day/period helpers, all buckets computed in the profile timezone (§37.4). */
 
 export function localDayIso(d: Date | string = new Date(), tz = "Africa/Lagos"): string {
   const date = typeof d === "string" ? new Date(d) : d;

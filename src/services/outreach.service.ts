@@ -103,7 +103,7 @@ async function sentToday(userId: string): Promise<number> {
 
 /**
  * Send (§26.1 footer): confirm flag is mandatory, daily cap enforced, default path is
- * Gmail hand-off — the human literally presses Send (§36.1).
+ * Gmail hand-off, the human literally presses Send (§36.1).
  */
 export async function sendOutreach(userId: string, id: string, opts: { via?: "gmail_open" | "smtp"; confirm?: boolean }) {
   const r = await get<any>("SELECT * FROM outreach_messages WHERE id = ? AND user_id = ?", id, userId);
@@ -113,8 +113,8 @@ export async function sendOutreach(userId: string, id: string, opts: { via?: "gm
   const used = await sentToday(userId);
   if (used >= cap) throw new AppError("QUOTA_EXCEEDED", 403, `Daily send cap reached (${cap})`, "wait until tomorrow or raise DAILY_SEND_CAP");
   if (used >= cap - 3) {
-    // warn but allow — surfaced in the cadence health panel
-    console.warn(`[outreach] ${used}/${cap} sends today — approaching cap`);
+    // warn but allow, surfaced in the cadence health panel
+    console.warn(`[outreach] ${used}/${cap} sends today, approaching cap`);
   }
 
   if (opts.via === "smtp") {
@@ -124,7 +124,7 @@ export async function sendOutreach(userId: string, id: string, opts: { via?: "gm
       "MAILBOX_NOT_CONNECTED",
       403,
       "Direct SMTP sending is not enabled yet",
-      "use via: 'gmail_open' (human presses Send) — SMTP send arrives with the mailbox worker"
+      "use via: 'gmail_open' (human presses Send), SMTP send arrives with the mailbox worker"
     );
   }
 
@@ -197,7 +197,7 @@ export async function setSequence(userId: string, appId: string, steps: { delay_
 /* --------------------------- inbox sync (v0) --------------------------- */
 
 /**
- * Ingest an inbound message (fixture/manual/IMAP worker all funnel here) — thread matching
+ * Ingest an inbound message (fixture/manual/IMAP worker all funnel here), thread matching
  * by message-id then normalized subject (§36.2), classification, status transition, events.
  */
 export async function ingestInbound(

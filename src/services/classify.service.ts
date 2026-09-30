@@ -1,5 +1,5 @@
 /**
- * Reply classification (§36.2) — deterministic rules first, user-correctable, no LLM in v0.
+ * Reply classification (§36.2), deterministic rules first, user-correctable, no LLM in v0.
  * Order: headers → lexicon/regex → fallback neutral.
  */
 export type Classification = "auto_reply" | "ooo" | "bounce" | "rejected" | "interview_invite" | "interested" | "neutral";

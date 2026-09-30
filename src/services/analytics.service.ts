@@ -34,7 +34,7 @@ async function countsFor(userId: string, from: string, to: string) {
     userId, from, to
   ))!;
   const sent = row.applied + row.pitched;
-  // response rate is cohort-based: of what you SENT this window, how much was ever answered —
+  // response rate is cohort-based: of what you SENT this window, how much was ever answered,
   // event-based replies (to older applications) could push it past 100% (§22.3 donut).
   const cohort = (await get<any>(
     `SELECT count(*) AS sent,
@@ -48,7 +48,7 @@ async function countsFor(userId: string, from: string, to: string) {
   return { ...row, sent, response_rate };
 }
 
-/** KPI wall payload (§33.3) — value + prev + delta in one round-trip (§37.4). */
+/** KPI wall payload (§33.3), value + prev + delta in one round-trip (§37.4). */
 export async function summary(userId: string, period: Period = "week") {
   const tz = await tzOf(userId);
   const { from, to, prevFrom, prevTo } = periodRange(period, tz);
@@ -91,7 +91,7 @@ export async function medianTimeToReply(userId: string): Promise<{ p50: number |
 /** Layered funnel field counts (§22.2). */
 /**
  * Cohort funnel (§22.2): applications applied within the window, with each downstream
- * outcome measured *within that same cohort* — so bands stay ≤ applied and
+ * outcome measured *within that same cohort*, so bands stay ≤ applied and
  * “% reached a human” can never exceed 100% (independent window-events could, e.g. 114%).
  */
 export async function funnelCounts(userId: string, from?: string, to?: string) {
@@ -122,7 +122,7 @@ export async function funnelCounts(userId: string, from?: string, to?: string) {
   ];
 }
 
-/** Timeseries over application_events (§37.3) — bucketed in the profile timezone. */
+/** Timeseries over application_events (§37.3), bucketed in the profile timezone. */
 export async function timeseries(userId: string, metric: "applied" | "replied" | "ghosted" | "rejected" | "interview" | "offer" = "applied", bucket: Period = "day", from?: string) {
   const tz = await tzOf(userId);
   const start = from ?? new Date(Date.now() - (bucket === "day" ? 30 : bucket === "week" ? 84 : bucket === "month" ? 365 : 1460) * 86_400_000).toISOString();

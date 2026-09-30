@@ -2,7 +2,7 @@ import { all, get, run, parseJson } from "../core/db";
 import { newId, nowIso } from "../util/id";
 
 /**
- * Autofill (§35.2) — field matching with confidence tiers.
+ * Autofill (§35.2), field matching with confidence tiers.
  * Pipeline: autocomplete hint → name/id tokens → label similarity → learned history.
  * ≥0.85 fill (green) · 0.55–0.85 fill (amber) · <0.55 leave empty (§35.2).
  */
@@ -109,7 +109,7 @@ export function similarity(a: string, b: string): number {
 
 const isPassword = (f: DetectedField) => /password|passwd|pwd/i.test(`${f.name ?? ""} ${f.id ?? ""} ${f.autocomplete ?? ""} ${f.type ?? ""}`) || f.type === "password";
 
-/** Server-side field matching — easily improved in one place (§35 autofill/match). */
+/** Server-side field matching, easily improved in one place (§35 autofill/match). */
 export async function matchFields(userId: string, host: string, fields: DetectedField[]): Promise<{ mappings: Mapping[]; skipped: string[] }> {
   const schema = await autofillSchema(userId);
   const values = new Map(schema.fields.map((f) => [f.key, f.value ?? ""]));

@@ -16,11 +16,11 @@ import { config } from "../core/config";
 export const apiRouter = Router();
 
 // `driver` is the remote switch for DATABASE_URL: after setting it on the host,
-// healthz must report "postgres" — otherwise traffic is still on ephemeral SQLite.
+// healthz must report "postgres", otherwise traffic is still on ephemeral SQLite.
 apiRouter.get("/healthz", (_req, res) => ok(res, "ok", { status: "up", mode: process.env.MODE ?? "local", driver, time: new Date().toISOString() }));
 
 /**
- * API index at GET /api/v1 — in production the public / redirects here
+ * API index at GET /api/v1, in production the public / redirects here
  * (vercel.json): Vercel's edge fails root-path invocations with
  * FUNCTION_INVOCATION_FAILED, while every other path serves fine.
  */
@@ -48,7 +48,7 @@ apiRouter.use("/mailboxes", mailboxRouter);
 apiRouter.use("/inbox", inboxRouter);
 apiRouter.use("/analytics", analyticsRouter);
 apiRouter.use("/streaks", streakRouter);
-// PUT /goals (§33.2) — separate mount so the path matches the spec exactly
+// PUT /goals (§33.2), separate mount so the path matches the spec exactly
 apiRouter.put("/goals", requireAuth, async (req: AuthedRequest, res, next) => {
   try {
     const body = z.object({ goal: z.number().min(1).max(500), timezone: z.string().optional() }).parse(req.body);

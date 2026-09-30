@@ -120,7 +120,7 @@ streakRouter.post("/victory", async (req: AuthedRequest, res, next) => {
   }
 });
 
-/** Manual effort log (quick-add without an application) — keeps the goal ring honest. */
+/** Manual effort log (quick-add without an application), keeps the goal ring honest. */
 streakRouter.post("/log", async (req: AuthedRequest, res, next) => {
   try {
     const body = z.object({ weight: z.number().min(0.05).max(5).default(1) }).parse(req.body ?? {});

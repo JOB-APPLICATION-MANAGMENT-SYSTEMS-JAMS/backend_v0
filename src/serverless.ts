@@ -1,5 +1,5 @@
 /**
- * Vercel serverless entry — `pnpm run build` bundles this file (and the whole
+ * Vercel serverless entry, `pnpm run build` bundles this file (and the whole
  * app) into `api/index.js` with esbuild, because Vercel compiles the entry in
  * isolation while Node's ESM loader cannot resolve the extensionless relative
  * imports this codebase uses.

@@ -1,7 +1,7 @@
 import type { Response } from "express";
 
 /**
- * The envelope (§12.1 / §33.1) — identical to the reference codebase:
+ * The envelope (§12.1 / §33.1), identical to the reference codebase:
  * success → { status, status_code, message, data }
  * failure → { status: "failure", status_code, message, error: { code, detail, retry_after?, fields? } }
  */

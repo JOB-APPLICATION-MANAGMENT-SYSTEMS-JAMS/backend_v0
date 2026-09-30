@@ -1,5 +1,5 @@
 /**
- * Skill synonym graph (§34.2) — local, curated, no external calls at query time.
+ * Skill synonym graph (§34.2), local, curated, no external calls at query time.
  * Keys are canonical forms; each group is treated as one concept for matching.
  */
 export const SYNONYM_GROUPS: string[][] = [

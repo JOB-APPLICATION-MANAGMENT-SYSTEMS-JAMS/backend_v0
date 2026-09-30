@@ -34,7 +34,7 @@ export interface AuthedRequest extends Request {
   user?: any;
 }
 
-/** Bearer auth — the frontend proxy injects the header server-side (§41.1), so JS never sees tokens. */
+/** Bearer auth, the frontend proxy injects the header server-side (§41.1), so JS never sees tokens. */
 export async function requireAuth(req: AuthedRequest, _res: Response, next: NextFunction) {
   try {
     const header = req.headers.authorization ?? "";
@@ -53,7 +53,7 @@ export async function requireAuth(req: AuthedRequest, _res: Response, next: Next
   }
 }
 
-/** Optional auth — used by endpoints that behave differently when signed in. */
+/** Optional auth, used by endpoints that behave differently when signed in. */
 export async function optionalAuth(req: AuthedRequest, _res: Response, next: NextFunction) {
   const header = req.headers.authorization ?? "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : null;
@@ -63,7 +63,7 @@ export async function optionalAuth(req: AuthedRequest, _res: Response, next: Nex
       req.userId = payload.sub;
       req.user = await get("SELECT * FROM users WHERE id = ?", payload.sub);
     } catch {
-      /* ignore — optional */
+      /* ignore, optional */
     }
   }
   next();

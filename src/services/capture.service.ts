@@ -37,7 +37,7 @@ export interface ParsedPosting {
 
 const UA = "JAMS-Capture/0.1 (+personal job tracker; respects robots.txt)";
 
-/** robots.txt check before a server-side fetch (§38.4 — sanctioned fetching only). */
+/** robots.txt check before a server-side fetch (§38.4, sanctioned fetching only). */
 async function robotsAllows(url: string): Promise<boolean> {
   try {
     const u = new URL(url);
@@ -105,7 +105,7 @@ function parseSalary(text: string): { min: number | null; max: number | null; cu
 function guessCompany(title: string, url: string, html?: string): string {
   const og = html?.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["']/i)?.[1];
   if (og) return og;
-  const m = title.match(/(?:^|[–—|:]\s*)\w[^–—|:]*?\bat\s+([A-Z][\w&.' -]{2,40})$/) ?? title.match(/[–—|]\s*([A-Z][\w&.' -]{2,40})\s*$/);
+  const m = title.match(/(?:^|[–|:]\s*)\w[^–|:]*?\bat\s+([A-Z][\w&.' -]{2,40})$/) ?? title.match(/[–|]\s*([A-Z][\w&.' -]{2,40})\s*$/);
   if (m) return m[1].trim();
   try {
     const host = new URL(url).hostname.replace(/^www\./, "");
@@ -136,13 +136,13 @@ export async function previewCapture(userId: string, url: string, htmlText?: str
   const ogTitle = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1];
 
   let title = ld?.title ?? ogTitle ?? pageTitle ?? url;
-  title = title.split(/\s+[|–—-]\s+/)[0].trim();
+  title = title.split(/\s+[|–-]\s+/)[0].trim();
   let company = ld?.hiringOrganization?.name ?? guessCompany(title, url, html);
   const location = ld?.jobLocation?.address?.addressLocality ?? ld?.jobLocation?.address?.addressRegion ?? null;
   const remote = !!ld?.jobLocationType || /remote|anywhere|work from home/i.test(`${text.slice(0, 2000)}`);
   const salaryRaw = ld?.baseSalary?.value?.minValue ? String(ld.baseSalary.value.minValue) : text.match(/(salary|compensation|pay)[:\s]*([€$£]?[\d,.]+\s*[kK]?\s*[-–to]+\s*[€$£]?[\d,.]+\s*[kK]?)/i)?.[2] ?? "";
   const salary = salaryRaw ? parseSalary(salaryRaw) : parseSalary(text.slice(0, 4000));
-  if (!salary.min) warnings.push("salary not found — add manually");
+  if (!salary.min) warnings.push("salary not found, add manually");
   const description = (ld?.description ? stripTags(ld.description) : text).slice(0, 8000);
   const keywords = extractKeywords(`${title} ${description}`);
   let posted_at: string | null = ld?.datePosted ?? null;
@@ -235,7 +235,7 @@ async function upsertPosting(userId: string, url: string, parsed: ParsedPosting,
 }
 
 /**
- * POST /capture (§35.3) — persists a posting snapshot and (optionally) a draft application.
+ * POST /capture (§35.3), persists a posting snapshot and (optionally) a draft application.
  * Never marks applied on its own: only the human's `mark_submitted` does (§35 principle).
  */
 export async function capture(userId: string, input: CaptureInput) {
@@ -261,7 +261,7 @@ export async function capture(userId: string, input: CaptureInput) {
       posted_at: null,
       warnings: [],
     };
-    if (!parsed.salary_min) warnings.push("salary not found — add manually");
+    if (!parsed.salary_min) warnings.push("salary not found, add manually");
   }
 
   const upserted = await upsertPosting(userId, input.url, parsed, input.source === "paste" ? "manual" : input.source);
@@ -305,7 +305,7 @@ export async function listCompanies(userId: string, filter: { tier?: string; q?:
      FROM companies c WHERE ${where.join(" AND ")} ORDER BY c.name ASC`,
     ...args
   );
-  // stack is a TEXT column — parse it like getCompany does or the client receives a string
+  // stack is a TEXT column, parse it like getCompany does or the client receives a string
   return rows.map((r) => ({ ...r, stack: parseJson(r.stack, []) }));
 }
 

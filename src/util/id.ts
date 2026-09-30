@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 /**
  * UUIDv7-ish id: 48-bit millisecond timestamp + version/variant bits + random.
- * Monotonic enough for a single-process app and sortable by creation time —
+ * Monotonic enough for a single-process app and sortable by creation time,
  * matching the spec's "id (UUIDv7)" rule while staying dependency-free.
  */
 export function newId(): string {

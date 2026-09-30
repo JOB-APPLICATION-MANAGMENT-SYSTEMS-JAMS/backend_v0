@@ -17,7 +17,7 @@ export function requestContext(req: Request, res: Response, next: NextFunction) 
 const configQuiet = (p: string) => p === "/healthz" || p.startsWith("/tracking/");
 
 /**
- * In-memory sliding-window rate limiter — replaces Redis (§33.4 route classes).
+ * In-memory sliding-window rate limiter, replaces Redis (§33.4 route classes).
  * Search 30/min · capture 60/hour · auth 20/15min · general 300/min.
  */
 type Window = { hits: number[] };

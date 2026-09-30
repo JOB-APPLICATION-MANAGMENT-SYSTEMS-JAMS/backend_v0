@@ -126,7 +126,7 @@ applicationRouter.post("/:id/notes", async (req: AuthedRequest, res, next) => {
   }
 });
 
-/** Status vocabulary + transition map — the frontend renders columns from this. */
+/** Status vocabulary + transition map, the frontend renders columns from this. */
 applicationRouter.get("/meta/statuses", (_req, res) => {
   ok(res, "Status vocabulary", { statuses: apps.STATUSES, transitions: apps.TRANSITIONS });
 });

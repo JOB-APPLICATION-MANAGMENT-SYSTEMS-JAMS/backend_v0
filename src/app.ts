@@ -9,8 +9,8 @@ export function createApp() {
   const app = express();
   app.disable("x-powered-by");
   if (process.env.VERCEL && config.jwtSecret === "dev-secret-change-me") {
-    // anyone who reads this repo can forge tokens — say it where the deploy logs show it
-    console.warn("[jams] JWT_SECRET is not set — falling back to the well-known dev secret. Set JWT_SECRET on the deployment.");
+    // anyone who reads this repo can forge tokens, say it where the deploy logs show it
+    console.warn("[jams] JWT_SECRET is not set, falling back to the well-known dev secret. Set JWT_SECRET on the deployment.");
   }
   app.use(
     cors({

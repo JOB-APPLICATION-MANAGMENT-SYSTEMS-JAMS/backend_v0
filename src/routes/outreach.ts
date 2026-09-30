@@ -64,7 +64,7 @@ outreachRouter.put("/:id", async (req: AuthedRequest, res, next) => {
 outreachRouter.post("/:id/send", async (req: AuthedRequest, res, next) => {
   try {
     const body = z.object({ via: z.enum(["gmail_open", "smtp"]).default("gmail_open"), confirm: z.boolean().default(false) }).parse(req.body ?? {});
-    ok(res, "Send prepared — confirm in your mail client", await out.sendOutreach(req.userId!, String(req.params.id), body));
+    ok(res, "Send prepared, confirm in your mail client", await out.sendOutreach(req.userId!, String(req.params.id), body));
   } catch (e) {
     next(e);
   }
@@ -115,7 +115,7 @@ mailboxRouter.get("/", async (req: AuthedRequest, res, next) => {
 
 mailboxRouter.post("/:id/sync", (req: AuthedRequest, res, next) => {
   try {
-    ok(res, "Sync not running in local mode — use /inbox/messages to ingest", { new: 0, updated: 0, mode: process.env.MODE ?? "local" });
+    ok(res, "Sync not running in local mode, use /inbox/messages to ingest", { new: 0, updated: 0, mode: process.env.MODE ?? "local" });
   } catch (e) {
     next(e);
   }
@@ -126,7 +126,7 @@ export const inboxRouter = Router();
 inboxRouter.use(requireAuth);
 
 /**
- * Ingest an inbound message — the free stand-in for IMAP polling: fixtures, MailPit-captured
+ * Ingest an inbound message, the free stand-in for IMAP polling: fixtures, MailPit-captured
  * mail, or a future worker all funnel through the same classification pipeline (§36.2).
  */
 inboxRouter.post("/messages", async (req: AuthedRequest, res, next) => {
@@ -177,7 +177,7 @@ inboxRouter.post("/threads/:id/classify", async (req: AuthedRequest, res, next) 
 /* ------------------------------- tracking ------------------------------ */
 export const trackingRouter = Router();
 
-/** 1×1 open pixel — unguessable token, no PII in URL (§36.4), opt-in per mailbox. */
+/** 1×1 open pixel, unguessable token, no PII in URL (§36.4), opt-in per mailbox. */
 trackingRouter.get("/pixel/:token.gif", async (req, res) => {
   const t = String(req.params.token);
   try {

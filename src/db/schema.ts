@@ -1,10 +1,10 @@
 /**
- * DDL — SQLite dialect of the §32 data model.
+ * DDL, SQLite dialect of the §32 data model.
  * Same table/column shapes as the Postgres blueprint so a future swap is mechanical:
  * UUID text ids, ISO-8601 timestamps, JSON stored as TEXT (parsed at the edges),
  * append-only application_events / streak_events as the analytics truth.
  *
- * SCHEMA_PG below is derived from this single source — the only dialect difference
+ * SCHEMA_PG below is derived from this single source, the only dialect difference
  * in the whole file is the AUTOINCREMENT column (Postgres uses identity columns).
  */
 export const SCHEMA = `
@@ -323,7 +323,7 @@ CREATE TABLE IF NOT EXISTS job_runs (
 `;
 
 /**
- * Postgres dialect, derived from the SQLite schema above — the only difference is
+ * Postgres dialect, derived from the SQLite schema above, the only difference is
  * the AUTOINCREMENT column (Postgres identity column). Everything else in this
  * DDL (TEXT/INTEGER/REAL, inline REFERENCES, composite PKs, UNIQUE, IF NOT EXISTS
  * indexes) is valid in both engines.
