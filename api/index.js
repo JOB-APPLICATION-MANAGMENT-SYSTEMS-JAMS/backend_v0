@@ -42271,7 +42271,7 @@ var init_social = __esm({
 });
 
 // src/ingestion/sources.ts
-async function getJson(url, timeout = 9e3, headers = UA2) {
+async function getJson(url, timeout = 2e4, headers = UA2) {
   const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeout) });
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
   return res.json();
@@ -42542,7 +42542,7 @@ ${(j.description ?? "").replace(/<[^>]+>/g, " ")}`.trim().slice(0, 8e3),
         }));
       }
     };
-    SOURCES = [arbeitnow, remotive, remoteok, jobicy, hnComments, wwr, greenhouse, lever, ashby];
+    SOURCES = [hnComments, arbeitnow, remotive, remoteok, jobicy, wwr, greenhouse, lever, ashby];
   }
 });
 

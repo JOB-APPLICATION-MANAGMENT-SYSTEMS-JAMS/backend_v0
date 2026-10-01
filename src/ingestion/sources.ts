@@ -3,7 +3,8 @@ import type { JobSource, RawPosting } from "./base";
 const UA = { "User-Agent": "JAMS-Ingest/0.1 (personal job tracker)", Accept: "application/json" };
 const BROWSER_UA = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36", Accept: "*/*" };
 
-async function getJson(url: string, timeout = 9000, headers: Record<string, string> = UA): Promise<any> {
+// 20s: serverless egress to Algolia/Arbeitnow often needs longer than a local fetch
+async function getJson(url: string, timeout = 20_000, headers: Record<string, string> = UA): Promise<any> {
   const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeout) });
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
   return res.json();
@@ -298,4 +299,6 @@ const jobicy: JobSource = {
   },
 };
 
-export const SOURCES: JobSource[] = [arbeitnow, remotive, remoteok, jobicy, hnComments, wwr, greenhouse, lever, ashby];
+// HN first: its comment threads are the richest source of publish inboxes, and a
+// refresh cut short by a slow neighbour should still have harvested them
+export const SOURCES: JobSource[] = [hnComments, arbeitnow, remotive, remoteok, jobicy, wwr, greenhouse, lever, ashby];
