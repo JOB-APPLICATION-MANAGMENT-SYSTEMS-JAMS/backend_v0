@@ -55589,6 +55589,10 @@ async function mergeContext(userId, appId, contactId) {
     application: app ?? {}
   };
 }
+async function mergeForUser(userId, subject, body) {
+  const ctx = await mergeContext(userId);
+  return { subject: mergeTemplate(subject, ctx), body: mergeTemplate(body, ctx) };
+}
 async function createOutreach(userId, input) {
   const ctx = await mergeContext(userId, input.app_id, input.contact_id);
   const id = newId();
@@ -56546,6 +56550,14 @@ async function searchPitchTargets(p = {}) {
     const pageSize2 = Math.min(100, Math.max(1, Number(p.page_size ?? 50)));
     const where2 = [`sector = ?`];
     const args2 = [sector];
+    if (p.country && p.country.toLowerCase() !== "all") {
+      if (p.country.toLowerCase() === "nigeria") {
+        where2.push(`(lower(COALESCE(country, 'nigeria')) = 'nigeria')`);
+      } else {
+        where2.push(`lower(country) = ?`);
+        args2.push(p.country.toLowerCase());
+      }
+    }
     if (p.q?.trim()) {
       where2.push(`lower(name) LIKE ?`);
       args2.push(`%${p.q.trim().toLowerCase()}%`);
@@ -56587,6 +56599,10 @@ async function searchPitchTargets(p = {}) {
   const pageSize = Math.min(100, Math.max(1, Number(p.page_size ?? 50)));
   const where = [`sector = ?`, `city IN (${cities.map(() => "?").join(",")})`];
   const args = [sector, ...cities.map((c) => CITIES[c].label)];
+  if (p.country && p.country.toLowerCase() !== "all" && p.country.toLowerCase() !== "nigeria") {
+    where.push(`lower(COALESCE(country, 'nigeria')) = ?`);
+    args.push(p.country.toLowerCase());
+  }
   if (p.q?.trim()) {
     where.push(`lower(name) LIKE ?`);
     args.push(`%${p.q.trim().toLowerCase()}%`);
@@ -56868,6 +56884,7 @@ var init_pitch = __esm({
     init_errors2();
     init_security();
     init_pitch_service();
+    init_outreach_service();
     init_pitch_rewrite();
     init_logcluster();
     init_attachments();
@@ -56879,6 +56896,7 @@ var init_pitch = __esm({
         const result = await searchPitchTargets({
           sector: q.sector || void 0,
           city: q.city || void 0,
+          country: q.country ? String(q.country) : void 0,
           q: q.q,
           refresh: q.refresh === "1" || q.refresh === "true",
           page: q.page ? Number(q.page) : 1,
@@ -56900,6 +56918,11 @@ var init_pitch = __esm({
             nationwide: isListSector(s)
           })),
           cities: CITY_KEYS.map((k) => ({ key: k, label: CITIES[k].label })),
+          // every country that has companies on file (curated lists are worldwide);
+          // Nigeria counts both the curated rows and the OSM city rows (country NULL)
+          countries: (await all(
+            `SELECT COALESCE(country, 'Nigeria') AS country, count(*) AS n FROM pitch_targets GROUP BY COALESCE(country, 'Nigeria') ORDER BY n DESC`
+          )).map((c) => ({ key: c.country, label: c.country, count: c.n })),
           source: "OpenStreetMap Overpass + curated contact lists (lca.logcluster.org), refreshed every 24h",
           note: "Emails are published contact addresses when available, otherwise derived as info@<website domain> and flagged derived."
         });
@@ -56950,7 +56973,8 @@ var init_pitch = __esm({
           city,
           seed: body.seed ?? `${Date.now()}`
         });
-        ok(res, "Wording regenerated", composed);
+        const merged = await mergeForUser(req.userId, composed.subject, composed.body);
+        ok(res, "Wording regenerated", { ...composed, subject: merged.subject, body: merged.body });
       } catch (e) {
         next(e);
       }

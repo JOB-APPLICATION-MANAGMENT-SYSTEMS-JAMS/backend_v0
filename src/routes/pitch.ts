@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { z } from "zod";
 import { ok } from "../core/envelope";
-import { get, run } from "../core/db";
+import { all, get, run } from "../core/db";
 import { nowIso } from "../util/id";
 import { validation } from "../core/errors";
 import { requireAuth, type AuthedRequest } from "../core/security";
 import * as pitch from "../services/pitch.service";
+import { mergeForUser } from "../services/outreach.service";
 import { composePitch } from "../services/pitch-rewrite";
 import { startRescan, rescanProgress, discoverListPages, enrichEmails, LIST_SECTORS, type ListSector } from "../services/logcluster";
 import { saveAttachment, saveCvAttachment } from "../services/attachments";
@@ -20,6 +21,7 @@ pitchRouter.get("/", async (req: AuthedRequest, res, next) => {
     const result = await pitch.searchPitchTargets({
       sector: (q.sector as pitch.Sector) || undefined,
       city: (q.city as pitch.CityKey | "all") || undefined,
+      country: q.country ? String(q.country) : undefined,
       q: q.q,
       refresh: q.refresh === "1" || q.refresh === "true",
       page: q.page ? Number(q.page) : 1,
@@ -43,6 +45,13 @@ pitchRouter.get("/meta", async (_req, res, next) => {
         nationwide: pitch.isListSector(s),
       })),
       cities: pitch.CITY_KEYS.map((k) => ({ key: k, label: pitch.CITIES[k].label })),
+      // every country that has companies on file (curated lists are worldwide);
+      // Nigeria counts both the curated rows and the OSM city rows (country NULL)
+      countries: (
+        await all<{ country: string; n: number }>(
+          `SELECT COALESCE(country, 'Nigeria') AS country, count(*) AS n FROM pitch_targets GROUP BY COALESCE(country, 'Nigeria') ORDER BY n DESC`
+        )
+      ).map((c) => ({ key: c.country, label: c.country, count: c.n })),
       source: "OpenStreetMap Overpass + curated contact lists (lca.logcluster.org), refreshed every 24h",
       note: "Emails are published contact addresses when available, otherwise derived as info@<website domain> and flagged derived.",
     });
@@ -112,7 +121,10 @@ pitchRouter.post("/rewrite", async (req: AuthedRequest, res, next) => {
       city,
       seed: body.seed ?? `${Date.now()}`,
     });
-    ok(res, "Wording regenerated", composed);
+    // merge the profile in before it reaches the editor: the Refresh button must
+    // show the same finished text prepare shows, never {{profile.first_name}}
+    const merged = await mergeForUser(req.userId!, composed.subject, composed.body);
+    ok(res, "Wording regenerated", { ...composed, subject: merged.subject, body: merged.body });
   } catch (e) {
     next(e);
   }

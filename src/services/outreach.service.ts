@@ -72,6 +72,14 @@ async function mergeContext(userId: string, appId?: string | null, contactId?: s
   };
 }
 
+/** Merge subject/body against this user's live context (profile names/email) before
+ *  a preview shows it: composePitch intentionally leaves {{profile.*}} tokens for the
+ *  send-time merge, but the human must never see raw tokens in the editor. */
+export async function mergeForUser(userId: string, subject: string, body: string): Promise<{ subject: string; body: string }> {
+  const ctx = await mergeContext(userId);
+  return { subject: mergeTemplate(subject, ctx), body: mergeTemplate(body, ctx) };
+}
+
 export async function createOutreach(userId: string, input: CreateOutreachInput) {
   const ctx = await mergeContext(userId, input.app_id, input.contact_id);
   const id = newId();

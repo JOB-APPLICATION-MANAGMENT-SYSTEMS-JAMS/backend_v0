@@ -220,6 +220,8 @@ async function refreshCitySector(city: CityKey, sector: Sector): Promise<void> {
 export interface PitchSearchParams {
   sector?: Sector;
   city?: CityKey | "all";
+  /** Country of the source contact list; "nigeria" also matches OSM city rows (country NULL). */
+  country?: string;
   q?: string;
   refresh?: boolean;
   page?: number;
@@ -248,6 +250,16 @@ export async function searchPitchTargets(p: PitchSearchParams = {}) {
     const pageSize = Math.min(100, Math.max(1, Number(p.page_size ?? 50)));
     const where = [`sector = ?`];
     const args: any[] = [sector];
+    if (p.country && p.country.toLowerCase() !== "all") {
+      // OSM rows carry no country (they are city-scoped Nigerian rows); Nigeria
+      // must still match them, every other country is a curated-list match
+      if (p.country.toLowerCase() === "nigeria") {
+        where.push(`(lower(COALESCE(country, 'nigeria')) = 'nigeria')`);
+      } else {
+        where.push(`lower(country) = ?`);
+        args.push(p.country.toLowerCase());
+      }
+    }
     if (p.q?.trim()) {
       where.push(`lower(name) LIKE ?`);
       args.push(`%${p.q.trim().toLowerCase()}%`);
@@ -296,6 +308,11 @@ export async function searchPitchTargets(p: PitchSearchParams = {}) {
   const pageSize = Math.min(100, Math.max(1, Number(p.page_size ?? 50)));
   const where = [`sector = ?`, `city IN (${cities.map(() => "?").join(",")})`];
   const args: any[] = [sector, ...cities.map((c) => CITIES[c].label)];
+  if (p.country && p.country.toLowerCase() !== "all" && p.country.toLowerCase() !== "nigeria") {
+    // OSM sectors are Nigeria-only; a different country simply has no OSM rows here
+    where.push(`lower(COALESCE(country, 'nigeria')) = ?`);
+    args.push(p.country.toLowerCase());
+  }
   if (p.q?.trim()) {
     where.push(`lower(name) LIKE ?`);
     args.push(`%${p.q.trim().toLowerCase()}%`);
