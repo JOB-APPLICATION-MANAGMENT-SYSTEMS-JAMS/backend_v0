@@ -3,11 +3,22 @@ import type { JobSource, RawPosting } from "./base";
 const UA = { "User-Agent": "JAMS-Ingest/0.1 (personal job tracker)", Accept: "application/json" };
 const BROWSER_UA = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36", Accept: "*/*" };
 
-// 20s: serverless egress to Algolia/Arbeitnow often needs longer than a local fetch
+// 20s: serverless egress to Algolia/Arbeitnow often needs longer than a local fetch.
+// A timed-out attempt is retried — egress from the functions region is flaky, not the
+// sources themselves, and one retry turns most of those failures into successes.
 async function getJson(url: string, timeout = 20_000, headers: Record<string, string> = UA): Promise<any> {
-  const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeout) });
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-  return res.json();
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeout) });
+      if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+      return await res.json();
+    } catch (e) {
+      lastErr = e;
+      if (attempt === 0) await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+  throw lastErr;
 }
 
 const stripTags = (s: string): string => (s ?? "").replace(/<[^>]+>/g, " ").replace(/&nbsp;?/gi, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();

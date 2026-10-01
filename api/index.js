@@ -42272,9 +42272,18 @@ var init_social = __esm({
 
 // src/ingestion/sources.ts
 async function getJson(url, timeout = 2e4, headers = UA2) {
-  const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeout) });
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-  return res.json();
+  let lastErr;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeout) });
+      if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+      return await res.json();
+    } catch (e) {
+      lastErr = e;
+      if (attempt === 0) await new Promise((r) => setTimeout(r, 1e3));
+    }
+  }
+  throw lastErr;
 }
 async function whoIsHiringStoryIds() {
   const data = await getJson(
