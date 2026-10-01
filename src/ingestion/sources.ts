@@ -93,23 +93,25 @@ const remoteok: JobSource = {
 
 /* --------------- Hacker News “Who is hiring” thread (free, emails in text) ------ */
 /** Latest monthly “Ask HN: Who is hiring?” thread, else the freshest hiring thread. */
-async function whoIsHiringStoryId(): Promise<string | null> {
+async function whoIsHiringStoryIds(): Promise<string[]> {
   const data = await getJson(
     "https://hn.algolia.com/api/v1/search_by_date?query=%22Ask%20HN%3A%20Who%20is%20hiring%3F%22&tags=story&hitsPerPage=20"
   );
-  const hits = (data.hits ?? []).filter((h: any) => /^Ask HN:\s*Who is hiring/i.test(h.title ?? ""));
-  const fresh = hits.find((h: any) => Date.now() - Date.parse(h.created_at) < 60 * 86_400_000) ?? hits[0];
-  return fresh ? String(fresh.objectID) : null;
+  const hits = (data.hits ?? []).filter((h: any) => /^Ask HN:\s*Who is hiring/i.test(h.title ?? "") && !/freelance/i.test(h.title ?? ""));
+  // early in the month the new thread has a handful of comments while the previous
+  // one still carries most of the listings — take both
+  return hits.filter((h: any) => Date.now() - Date.parse(h.created_at) < 75 * 86_400_000).slice(0, 2).map((h: any) => String(h.objectID));
 }
 
 const hnComments: JobSource = {
   name: "hn",
   fetch: async () => {
-    const storyId = await whoIsHiringStoryId();
-    if (!storyId) throw new Error("hn: no hiring thread found");
+    const storyIds = await whoIsHiringStoryIds();
+    if (!storyIds.length) throw new Error("hn: no hiring thread found");
     const out: RawPosting[] = [];
     // comment blocks are `Company | Role | Location | …`; many publish an inbox
-    for (let page = 0; page < 3; page++) {
+    for (const storyId of storyIds) {
+      for (let page = 0; page < 3; page++) {
       const data = await getJson(`https://hn.algolia.com/api/v1/search?tags=comment,story_${storyId}&hitsPerPage=100&page=${page}`);
       const hits = data.hits ?? [];
       for (const h of hits) {
@@ -136,6 +138,7 @@ const hnComments: JobSource = {
       }
       if (hits.length < 100) break;
       await new Promise((r) => setTimeout(r, 350));
+      }
     }
     if (!out.length) throw new Error("hn: thread had no parseable comments");
     return out;
