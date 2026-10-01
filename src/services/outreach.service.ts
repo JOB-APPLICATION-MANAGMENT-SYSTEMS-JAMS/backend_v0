@@ -166,12 +166,17 @@ export async function sendOutreach(userId: string, id: string, opts: { via?: "gm
       secure: smtp.port === 465,
       auth: { user: smtp.user, pass: smtp.pass },
     });
-    await transport.sendMail({
-      from: smtp.from,
-      to,
-      subject: mergeTemplate(r.subject, ctx),
-      text: mergeTemplate(r.body, ctx),
-    });
+    try {
+      await transport.sendMail({
+        from: smtp.from,
+        to,
+        subject: mergeTemplate(r.subject, ctx),
+        text: mergeTemplate(r.body, ctx),
+      });
+    } catch (e) {
+      // never surface the raw SMTP transcript (§9.4), map it to a next step
+      throw smtpSendError(e);
+    }
     state = "sent";
     await run("UPDATE outreach_messages SET state = 'sent', sent_at = ?, updated_at = ? WHERE id = ?", nowIso(), nowIso(), id);
   } else {
@@ -228,6 +233,25 @@ async function smtpForUser(userId: string): Promise<{ host: string; port: number
   const port = Number(cfg.smtp_port ?? 465);
   const user = cfg.smtp_user ?? mb.address;
   return { host, port, user, pass, from: user };
+}
+
+/**
+ * Translate an SMTP failure into something a human can act on. The most common case is
+ * Google's `534-5.7.9 Application-specific password required`: the user saved their normal
+ * account password instead of a 16-char app password, so tell them exactly where to fix it.
+ */
+export function smtpSendError(e: any): AppError {
+  const raw = String(e?.message ?? e ?? "");
+  const text = `${raw} ${String(e?.response ?? "")} ${String(e?.responseCode ?? "")}`;
+  if (/534|535|530\.|EAUTH|application-specific password|invalid login|authentication (?:failed|unsuccessful)/i.test(text)) {
+    return new AppError(
+      "SMTP_AUTH_FAILED",
+      400,
+      "The mailbox rejected the saved password",
+      "Gmail will not accept a normal account password, it needs a 16-character app password. Go to Outreach → Inbox & Sync → Edit credentials, paste the app password from my.google.com/apppasswords (Google Account → 2-Step Verification → App passwords), then send again."
+    );
+  }
+  return new AppError("SMTP_SEND_FAILED", 502, "The mailbox could not send this message", raw.slice(0, 300) || "Unknown SMTP error, try again in a moment");
 }
 
 /** Whether auto-apply will send directly instead of handing off to Gmail. */

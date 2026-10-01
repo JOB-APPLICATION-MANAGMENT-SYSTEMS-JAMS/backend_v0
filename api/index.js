@@ -55667,12 +55667,16 @@ async function sendOutreach(userId, id, opts) {
       secure: smtp.port === 465,
       auth: { user: smtp.user, pass: smtp.pass }
     });
-    await transport.sendMail({
-      from: smtp.from,
-      to,
-      subject: mergeTemplate(r.subject, ctx),
-      text: mergeTemplate(r.body, ctx)
-    });
+    try {
+      await transport.sendMail({
+        from: smtp.from,
+        to,
+        subject: mergeTemplate(r.subject, ctx),
+        text: mergeTemplate(r.body, ctx)
+      });
+    } catch (e) {
+      throw smtpSendError(e);
+    }
     state = "sent";
     await run("UPDATE outreach_messages SET state = 'sent', sent_at = ?, updated_at = ? WHERE id = ?", nowIso(), nowIso(), id);
   } else {
@@ -55704,6 +55708,19 @@ async function smtpForUser(userId) {
   const port = Number(cfg.smtp_port ?? 465);
   const user = cfg.smtp_user ?? mb.address;
   return { host, port, user, pass, from: user };
+}
+function smtpSendError(e) {
+  const raw = String(e?.message ?? e ?? "");
+  const text = `${raw} ${String(e?.response ?? "")} ${String(e?.responseCode ?? "")}`;
+  if (/534|535|530\.|EAUTH|application-specific password|invalid login|authentication (?:failed|unsuccessful)/i.test(text)) {
+    return new AppError(
+      "SMTP_AUTH_FAILED",
+      400,
+      "The mailbox rejected the saved password",
+      "Gmail will not accept a normal account password, it needs a 16-character app password. Go to Outreach \u2192 Inbox & Sync \u2192 Edit credentials, paste the app password from my.google.com/apppasswords (Google Account \u2192 2-Step Verification \u2192 App passwords), then send again."
+    );
+  }
+  return new AppError("SMTP_SEND_FAILED", 502, "The mailbox could not send this message", raw.slice(0, 300) || "Unknown SMTP error, try again in a moment");
 }
 async function smtpReadyFor(userId) {
   return !!await smtpForUser(userId);
