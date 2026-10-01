@@ -39995,9 +39995,18 @@ async function ensureProfile(userId) {
 }
 async function getProfile(userId) {
   const p = await ensureProfile(userId);
+  const u = await get("SELECT email FROM users WHERE id = ?", userId);
+  const identity = parseJson(p.identity, {});
+  if (u?.email && !identity.email) identity.email = u.email;
+  if (!identity.name) {
+    const full = [identity.first_name, identity.last_name].filter(Boolean).join(" ");
+    if (full) identity.name = full;
+  }
+  if (identity.name && !identity.first_name) identity.first_name = identity.name.split(" ")[0];
+  if (identity.name && !identity.last_name) identity.last_name = identity.name.split(" ").slice(1).join(" ");
   return {
     id: p.id,
-    identity: parseJson(p.identity, {}),
+    identity,
     prefs: parseJson(p.prefs, {}),
     aliases: parseJson(p.aliases, {}),
     version: p.version,
@@ -40594,7 +40603,8 @@ async function deleteTemplate(userId, id) {
   return { deleted: true };
 }
 function mergeTemplate(body, vars) {
-  return body.replace(/\{\{\s*([\w.]+)(?:\s*\|\s*default:\s*"?([^"}]*)"?)?\s*\}\}/g, (_m, path5, dflt) => {
+  const normalised = body.replace(/\{\{\s*([A-Za-z][\w]*)\.\s*([A-Za-z_][\w]*)\s*\}\}/g, (_m, a, b) => `{{${a.toLowerCase()}.${b.toLowerCase()}}}`);
+  return normalised.replace(/\{\{\s*([\w.]+)(?:\s*\|\s*default:\s*"?([^"}]*)"?)?\s*\}\}/g, (_m, path5, dflt) => {
     const v = path5.split(".").reduce((acc, k) => acc == null ? acc : acc[k], vars);
     if (v == null || v === "") return dflt ?? "";
     return String(v);
@@ -41744,7 +41754,7 @@ var init_core = __esm({
       identity: external_exports.record(external_exports.any()).optional(),
       prefs: external_exports.record(external_exports.any()).optional(),
       aliases: external_exports.record(external_exports.any()).optional(),
-      skills: external_exports.array(external_exports.object({ name: external_exports.string().min(1), level: external_exports.string().nullish(), years: external_exports.number().nullish(), is_top5: external_exports.boolean().optional() })).optional(),
+      skills: external_exports.array(external_exports.object({ name: external_exports.string().min(1), level: external_exports.string().nullish(), years: external_exports.number().nullish(), is_top5: external_exports.union([external_exports.boolean(), external_exports.number()]).optional() })).optional(),
       experiences: external_exports.array(
         external_exports.object({
           company: external_exports.string().min(1),
@@ -42391,7 +42401,7 @@ var init_sources = __esm({
               out.push({
                 source: "hn",
                 external_id: String(h.objectID),
-                title: (parts[1] ? `${parts[1]} \u2014 ${company}` : line.slice(0, 120)).slice(0, 140),
+                title: (parts[1] ? `${parts[1]}: ${company}` : line.slice(0, 120)).slice(0, 140),
                 company,
                 location,
                 remote: /remote/i.test(location ?? "") || /remote/i.test(text.slice(0, 300)),
@@ -55464,7 +55474,7 @@ var init_pitch_rewrite = __esm({
       "If this is useful, I am happy to send a short proposal for one concrete improvement you could make this month.",
       "If it fits, reply here and I will send a one-page plan for the first piece of work.",
       "Either way, I would be glad to hear what is already on your roadmap for this year.",
-      "Open to a short call this week if that is easier \u2014 I can show a working example rather than a deck.",
+      "Open to a short call this week if that is easier; I can show a working example rather than a deck.",
       "If someone else owns this, a pointer in their direction is just as helpful. Thank you."
     ];
     APPLICATION_CTAS = [
@@ -55475,11 +55485,11 @@ var init_pitch_rewrite = __esm({
     SUBJECT_PITCH = [
       "{{company}} x {{focus}}",
       "A concrete build idea for {{company}}",
-      "{{company}} \u2014 software help, one month in",
+      "{{company}}: software help, one month in",
       "Quick idea for {{company}}'s {{word}} operations",
       "{{company}} and a small piece of software I would take on"
     ];
-    SUBJECT_APPLICATION = ["Application: {{role}}", "{{role}} \u2014 {{company}}", "Interest in the {{role}} position"];
+    SUBJECT_APPLICATION = ["Application: {{role}}", "{{role}}: {{company}}", "Interest in the {{role}} position"];
     fill = (template, vars) => template.replace(/\{\{(\w+)\}\}/g, (_m, key) => vars[key] ?? "");
   }
 });
@@ -55557,12 +55567,22 @@ async function getOutreach(userId, id) {
 }
 async function mergeContext(userId, appId, contactId) {
   const p = await get("SELECT * FROM profiles WHERE user_id = ?", userId);
+  const u = await get("SELECT email FROM users WHERE id = ?", userId);
   const identity = p ? parseJson(p.identity, {}) : {};
+  const firstName = identity.first_name || identity.name?.split(" ")[0] || "";
+  const lastName = identity.last_name || (identity.name ? identity.name.split(" ").slice(1).join(" ") : "");
+  const profile = {
+    ...identity,
+    first_name: firstName,
+    last_name: lastName,
+    name: identity.name || [firstName, lastName].filter(Boolean).join(" "),
+    email: identity.email || u?.email || ""
+  };
   const app = appId ? await get("SELECT * FROM applications WHERE id = ? AND user_id = ?", appId, userId) : null;
   const contact = contactId ? await get("SELECT * FROM contacts WHERE id = ? AND user_id = ?", contactId, userId) : null;
   const company = app?.company_id ? await get("SELECT * FROM companies WHERE id = ?", app.company_id) : null;
   return {
-    profile: identity,
+    profile,
     contact: contact ? { ...contact, first_name: (contact.name ?? "").split(" ")[0] } : {},
     company: company ?? { name: app?.company_name ?? "" },
     posting: app ? { role: app.role_title, url: app.url } : {},
@@ -55671,7 +55691,7 @@ async function smtpForUser(userId) {
   if (smtpReady()) {
     return { host: config.smtp.host, port: config.smtp.port, user: config.smtp.user, pass: config.smtp.pass, from: config.smtp.from || config.smtp.user };
   }
-  const mb = await get("SELECT * FROM mailboxes WHERE user_id = ? ORDER BY created_at DESC LIMIT 1", userId);
+  const mb = await get("SELECT * FROM mailboxes WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1", userId);
   if (!mb) return null;
   const cfg = parseJson(mb.config, {});
   const pass = cfg.app_password ?? cfg.smtp_pass ?? null;
@@ -56781,7 +56801,7 @@ async function saveCvAttachment(userId, cvId) {
       const inner = exps.map((e) => {
         const dates = e.start_date ? `<span class="meta">${esc(e.start_date)}${e.end_date ? ` \u2013 ${esc(e.end_date)}` : ""}</span>` : "";
         const bullets = e.bullets ? `<ul>${parseJson(e.bullets, []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "";
-        return `<div class="item"><strong>${esc(e.title ?? "")}</strong>${e.company ? ` \u2014 ${esc(e.company)}` : ""}${dates}${bullets}</div>`;
+        return `<div class="item"><strong>${esc(e.title ?? "")}</strong>${e.company ? `, ${esc(e.company)}` : ""}${dates}${bullets}</div>`;
       }).join("");
       parts.push(section("Experience", inner));
     } else if (b.type === "skills") {
@@ -56789,7 +56809,7 @@ async function saveCvAttachment(userId, cvId) {
       parts.push(section("Skills", `<p>${skills.map((s) => esc(s.name)).join(" \xB7 ")}</p>`));
     } else if (b.type === "education") {
       const edu = await childrenOf(userId, "profile_education");
-      const inner = edu.map((e) => `<div class="item"><strong>${esc(e.school ?? "")}</strong>${e.degree ? ` \u2014 ${esc(e.degree)}` : ""}${e.end_date ? `<span class="meta">${esc(e.end_date)}</span>` : ""}</div>`).join("");
+      const inner = edu.map((e) => `<div class="item"><strong>${esc(e.school ?? "")}</strong>${e.degree ? `, ${esc(e.degree)}` : ""}${e.end_date ? `<span class="meta">${esc(e.end_date)}</span>` : ""}</div>`).join("");
       parts.push(section("Education", inner));
     } else if (b.text || b.title) {
       const inner = b.bullets ? `<ul>${b.bullets.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p>${esc(b.text ?? "")}</p>`;
@@ -56797,7 +56817,7 @@ async function saveCvAttachment(userId, cvId) {
     }
   }
   const html = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>${esc(name2)} \u2014 CV</title>
+<html lang="en"><head><meta charset="utf-8"><title>${esc(name2)}: CV</title>
 <style>
   body{font-family:Georgia,'Times New Roman',serif;color:#14181f;max-width:760px;margin:40px auto;padding:0 24px;line-height:1.55}
   h1{font-size:26px;margin:0 0 4px}h2{font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#5b6472;margin:26px 0 8px;border-bottom:1px solid #e3e7ee;padding-bottom:4px}
@@ -57290,8 +57310,10 @@ var init_outreach = __esm({
     mailboxRouter.use(requireAuth);
     mailboxRouter.get("/", async (req, res, next) => {
       try {
-        const rows = await get(`SELECT id, kind, address, open_tracking, last_synced_at FROM mailboxes WHERE user_id = ?`, req.userId);
-        ok(res, "Mailboxes", { items: rows ? [rows] : [], connected: !!rows });
+        const row = await get(`SELECT id, kind, address, config, open_tracking, last_synced_at FROM mailboxes WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1`, req.userId);
+        const items = row ? [{ ...row, config: void 0 }] : [];
+        const smtp_ready = await smtpReadyFor(req.userId);
+        ok(res, "Mailboxes", { items, connected: !!row, smtp_ready });
       } catch (e) {
         next(e);
       }
@@ -57299,6 +57321,14 @@ var init_outreach = __esm({
     mailboxRouter.post("/", async (req, res, next) => {
       try {
         const body = external_exports.object({ kind: external_exports.enum(["imap", "gmail"]).default("imap"), address: external_exports.string().email(), config: external_exports.record(external_exports.any()).default({}), open_tracking: external_exports.boolean().default(false) }).parse(req.body);
+        const existing = await get(`SELECT id, config FROM mailboxes WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1`, req.userId);
+        if (existing) {
+          const prev = JSON.parse(existing.config || "{}");
+          const merged = { ...prev, ...body.config };
+          await run(`UPDATE mailboxes SET kind = ?, address = ?, config = ?, open_tracking = ?, last_synced_at = last_synced_at WHERE id = ?`, body.kind, body.address, JSON.stringify(merged), body.open_tracking ? 1 : 0, existing.id);
+          ok(res, "Mailbox updated: app password stored, sends go out automatically", { id: existing.id, ...body, last_synced_at: null });
+          return;
+        }
         const id = newId();
         await run(
           `INSERT INTO mailboxes (id, user_id, kind, address, config, open_tracking, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,

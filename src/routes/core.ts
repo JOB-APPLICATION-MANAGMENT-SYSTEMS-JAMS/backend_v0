@@ -23,7 +23,7 @@ const profileSchema = z.object({
   identity: z.record(z.any()).optional(),
   prefs: z.record(z.any()).optional(),
   aliases: z.record(z.any()).optional(),
-  skills: z.array(z.object({ name: z.string().min(1), level: z.string().nullish(), years: z.number().nullish(), is_top5: z.boolean().optional() })).optional(),
+  skills: z.array(z.object({ name: z.string().min(1), level: z.string().nullish(), years: z.number().nullish(), is_top5: z.union([z.boolean(), z.number()]).optional() })).optional(),
   experiences: z
     .array(
       z.object({

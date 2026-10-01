@@ -6,7 +6,8 @@ export interface SkillInput {
   name: string;
   level?: string | null;
   years?: number | null;
-  is_top5?: boolean;
+  // SQLite hands back 0/1, the form posts booleans; accept both
+  is_top5?: boolean | number;
 }
 export interface ExperienceInput {
   company: string;
@@ -36,9 +37,22 @@ async function ensureProfile(userId: string) {
 
 export async function getProfile(userId: string) {
   const p = await ensureProfile(userId);
+  // The users row always knows the account email/name; identity blocks written
+  // before the profile form was ever saved are `{}`, which left the profile page
+  // blank and `{{profile.first_name}}` rendering literally. Seed on read so the
+  // page (and completeness) reflect what is actually in the database.
+  const u = await get<any>("SELECT email FROM users WHERE id = ?", userId);
+  const identity: any = parseJson(p.identity, {});
+  if (u?.email && !identity.email) identity.email = u.email;
+  if (!identity.name) {
+    const full = [identity.first_name, identity.last_name].filter(Boolean).join(" ");
+    if (full) identity.name = full;
+  }
+  if (identity.name && !identity.first_name) identity.first_name = identity.name.split(" ")[0];
+  if (identity.name && !identity.last_name) identity.last_name = identity.name.split(" ").slice(1).join(" ");
   return {
     id: p.id,
-    identity: parseJson(p.identity, {}),
+    identity,
     prefs: parseJson(p.prefs, {}),
     aliases: parseJson(p.aliases, {}),
     version: p.version,

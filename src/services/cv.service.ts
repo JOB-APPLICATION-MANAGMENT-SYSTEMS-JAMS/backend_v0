@@ -283,9 +283,13 @@ export async function deleteTemplate(userId: string, id: string) {
 
 export const extractVars = (body: string) => [...new Set([...body.matchAll(/\{\{\s*([\w.]+)\s*\}\}/g)].map((m) => m[1]))];
 
-/** Merge variables (§24.2): {{a.b}} plus {{var | default: "x"}} fallbacks. */
+/** Merge variables (§24.2): {{a.b}} plus {{var | default: "x"}} fallbacks.
+ *  Drafts saved before the composer masked its tokens may hold the polished form
+ *  `{{profile. First_name}}` (space after the dot, capitalised) — normalise those
+ *  first, otherwise the merge skips them and the literal token reaches the email. */
 export function mergeTemplate(body: string, vars: Record<string, any>): string {
-  return body.replace(/\{\{\s*([\w.]+)(?:\s*\|\s*default:\s*"?([^"}]*)"?)?\s*\}\}/g, (_m, path: string, dflt?: string) => {
+  const normalised = body.replace(/\{\{\s*([A-Za-z][\w]*)\.\s*([A-Za-z_][\w]*)\s*\}\}/g, (_m, a: string, b: string) => `{{${a.toLowerCase()}.${b.toLowerCase()}}}`);
+  return normalised.replace(/\{\{\s*([\w.]+)(?:\s*\|\s*default:\s*"?([^"}]*)"?)?\s*\}\}/g, (_m, path: string, dflt?: string) => {
     const v = path.split(".").reduce((acc: any, k) => (acc == null ? acc : acc[k]), vars);
     if (v == null || v === "") return dflt ?? "";
     return String(v);

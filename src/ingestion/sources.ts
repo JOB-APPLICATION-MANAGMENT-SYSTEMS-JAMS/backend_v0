@@ -138,7 +138,7 @@ const hnComments: JobSource = {
         out.push({
           source: "hn",
           external_id: String(h.objectID),
-          title: (parts[1] ? `${parts[1]} — ${company}` : line.slice(0, 120)).slice(0, 140),
+          title: (parts[1] ? `${parts[1]}: ${company}` : line.slice(0, 120)).slice(0, 140),
           company,
           location,
           remote: /remote/i.test(location ?? "") || /remote/i.test(text.slice(0, 300)),

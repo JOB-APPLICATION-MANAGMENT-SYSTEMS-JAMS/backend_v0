@@ -638,7 +638,7 @@ const CTAS = [
   "If this is useful, I am happy to send a short proposal for one concrete improvement you could make this month.",
   "If it fits, reply here and I will send a one-page plan for the first piece of work.",
   "Either way, I would be glad to hear what is already on your roadmap for this year.",
-  "Open to a short call this week if that is easier — I can show a working example rather than a deck.",
+  "Open to a short call this week if that is easier; I can show a working example rather than a deck.",
   "If someone else owns this, a pointer in their direction is just as helpful. Thank you.",
 ];
 
@@ -651,12 +651,12 @@ const APPLICATION_CTAS = [
 const SUBJECT_PITCH = [
   "{{company}} x {{focus}}",
   "A concrete build idea for {{company}}",
-  "{{company}} — software help, one month in",
+  "{{company}}: software help, one month in",
   "Quick idea for {{company}}'s {{word}} operations",
   "{{company}} and a small piece of software I would take on",
 ];
 
-const SUBJECT_APPLICATION = ["Application: {{role}}", "{{role}} — {{company}}", "Interest in the {{role}} position"];
+const SUBJECT_APPLICATION = ["Application: {{role}}", "{{role}}: {{company}}", "Interest in the {{role}} position"];
 
 /** Replace {{token}} only when the value exists; leave nothing looking unfinished. */
 const fill = (template: string, vars: Record<string, string>): string =>

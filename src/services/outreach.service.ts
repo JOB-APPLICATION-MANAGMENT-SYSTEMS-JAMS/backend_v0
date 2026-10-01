@@ -41,15 +41,30 @@ export interface CreateOutreachInput {
   step_no?: number;
 }
 
-/** Build the merge context from profile + company + application (§24.2 variables). */
+/** Build the merge context from profile + company + application (§24.2 variables).
+ *  Identity starts empty until the profile form is saved, but the users row already
+ *  has the name and email from signup — fall back to it so `{{profile.first_name}}`
+ *  never renders blank in a sent email. */
 async function mergeContext(userId: string, appId?: string | null, contactId?: string | null) {
   const p = await get<any>("SELECT * FROM profiles WHERE user_id = ?", userId);
-  const identity = p ? parseJson(p.identity, {}) : {};
+  // users carries only email — names live in identity (seeded at register) or the
+  // profile form; select just the columns that exist.
+  const u = await get<any>("SELECT email FROM users WHERE id = ?", userId);
+  const identity: any = p ? parseJson(p.identity, {}) : {};
+  const firstName = identity.first_name || identity.name?.split(" ")[0] || "";
+  const lastName = identity.last_name || (identity.name ? identity.name.split(" ").slice(1).join(" ") : "");
+  const profile = {
+    ...identity,
+    first_name: firstName,
+    last_name: lastName,
+    name: identity.name || [firstName, lastName].filter(Boolean).join(" "),
+    email: identity.email || u?.email || "",
+  };
   const app = appId ? await get<any>("SELECT * FROM applications WHERE id = ? AND user_id = ?", appId, userId) : null;
   const contact = contactId ? await get<any>("SELECT * FROM contacts WHERE id = ? AND user_id = ?", contactId, userId) : null;
   const company = app?.company_id ? await get<any>("SELECT * FROM companies WHERE id = ?", app.company_id) : null;
   return {
-    profile: identity,
+    profile,
     contact: contact ? { ...contact, first_name: (contact.name ?? "").split(" ")[0] } : {},
     company: company ?? { name: app?.company_name ?? "" },
     posting: app ? { role: app.role_title, url: app.url } : {},
@@ -196,7 +211,7 @@ async function smtpForUser(userId: string): Promise<{ host: string; port: number
   if (smtpReady()) {
     return { host: config.smtp.host, port: config.smtp.port, user: config.smtp.user, pass: config.smtp.pass, from: config.smtp.from || config.smtp.user };
   }
-  const mb = await get<any>("SELECT * FROM mailboxes WHERE user_id = ? ORDER BY created_at DESC LIMIT 1", userId);
+  const mb = await get<any>("SELECT * FROM mailboxes WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1", userId);
   if (!mb) return null;
   const cfg = parseJson<Record<string, any>>(mb.config, {});
   const pass = cfg.app_password ?? cfg.smtp_pass ?? null;

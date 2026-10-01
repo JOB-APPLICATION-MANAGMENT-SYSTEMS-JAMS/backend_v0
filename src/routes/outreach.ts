@@ -87,8 +87,12 @@ mailboxRouter.use(requireAuth);
 
 mailboxRouter.get("/", async (req: AuthedRequest, res, next) => {
   try {
-    const rows = (await get(`SELECT id, kind, address, open_tracking, last_synced_at FROM mailboxes WHERE user_id = ?`, req.userId!)) as any;
-    ok(res, "Mailboxes", { items: rows ? [rows] : [], connected: !!rows });
+    // newest row wins: reconnecting with an app password must update, not shadow
+    const row = (await get(`SELECT id, kind, address, config, open_tracking, last_synced_at FROM mailboxes WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1`, req.userId!)) as any;
+    const items = row ? [{ ...row, config: undefined }] : [];
+    // smtp_ready is the whole game: true = sends leave this server automatically
+    const smtp_ready = await out.smtpReadyFor(req.userId!);
+    ok(res, "Mailboxes", { items, connected: !!row, smtp_ready });
   } catch (e) {
     next(e);
   }
@@ -96,6 +100,15 @@ mailboxRouter.get("/", async (req: AuthedRequest, res, next) => {
   try {
     const body = z.object({ kind: z.enum(["imap", "gmail"]).default("imap"), address: z.string().email(), config: z.record(z.any()).default({}), open_tracking: z.boolean().default(false) }).parse(req.body);
 
+    const existing = (await get(`SELECT id, config FROM mailboxes WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1`, req.userId!)) as any;
+    if (existing) {
+      // merge config so "connect" can add the app password to an already-connected mailbox
+      const prev = JSON.parse(existing.config || "{}");
+      const merged = { ...prev, ...body.config };
+      await run(`UPDATE mailboxes SET kind = ?, address = ?, config = ?, open_tracking = ?, last_synced_at = last_synced_at WHERE id = ?`, body.kind, body.address, JSON.stringify(merged), body.open_tracking ? 1 : 0, existing.id);
+      ok(res, "Mailbox updated: app password stored, sends go out automatically", { id: existing.id, ...body, last_synced_at: null });
+      return;
+    }
     const id = newId();
     await run(
       `INSERT INTO mailboxes (id, user_id, kind, address, config, open_tracking, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,

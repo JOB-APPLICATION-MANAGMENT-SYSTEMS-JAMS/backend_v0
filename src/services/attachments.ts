@@ -90,7 +90,7 @@ export async function saveCvAttachment(userId: string, cvId: string): Promise<Sa
         .map((e: any) => {
           const dates = e.start_date ? `<span class="meta">${esc(e.start_date)}${e.end_date ? ` – ${esc(e.end_date)}` : ""}</span>` : "";
           const bullets = e.bullets ? `<ul>${parseJson<string[]>(e.bullets, []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "";
-          return `<div class="item"><strong>${esc(e.title ?? "")}</strong>${e.company ? ` — ${esc(e.company)}` : ""}${dates}${bullets}</div>`;
+          return `<div class="item"><strong>${esc(e.title ?? "")}</strong>${e.company ? `, ${esc(e.company)}` : ""}${dates}${bullets}</div>`;
         })
         .join("");
       parts.push(section("Experience", inner));
@@ -100,7 +100,7 @@ export async function saveCvAttachment(userId: string, cvId: string): Promise<Sa
     } else if (b.type === "education") {
       const edu = await childrenOf(userId, "profile_education");
       const inner = edu
-        .map((e: any) => `<div class="item"><strong>${esc(e.school ?? "")}</strong>${e.degree ? ` — ${esc(e.degree)}` : ""}${e.end_date ? `<span class="meta">${esc(e.end_date)}</span>` : ""}</div>`)
+        .map((e: any) => `<div class="item"><strong>${esc(e.school ?? "")}</strong>${e.degree ? `, ${esc(e.degree)}` : ""}${e.end_date ? `<span class="meta">${esc(e.end_date)}</span>` : ""}</div>`)
         .join("");
       parts.push(section("Education", inner));
     } else if (b.text || b.title) {
@@ -112,7 +112,7 @@ export async function saveCvAttachment(userId: string, cvId: string): Promise<Sa
   }
 
   const html = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>${esc(name)} — CV</title>
+<html lang="en"><head><meta charset="utf-8"><title>${esc(name)}: CV</title>
 <style>
   body{font-family:Georgia,'Times New Roman',serif;color:#14181f;max-width:760px;margin:40px auto;padding:0 24px;line-height:1.55}
   h1{font-size:26px;margin:0 0 4px}h2{font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#5b6472;margin:26px 0 8px;border-bottom:1px solid #e3e7ee;padding-bottom:4px}
