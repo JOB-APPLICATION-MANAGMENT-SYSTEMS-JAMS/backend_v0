@@ -84,7 +84,8 @@ export async function ingestAll(userId: string, opts: { sources?: string[] } = {
         await run(
           `INSERT INTO job_postings (id, user_id, company_name, source, external_id, title, location, remote, salary_min, salary_max, currency,
              seniority, employment_type, career_category, description, jd_keywords, url, posted_at, first_seen_at, last_seen_at, score, explain, dedupe_key, status, contact_email, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)
+           ON CONFLICT (user_id, source, external_id) DO UPDATE SET last_seen_at = excluded.last_seen_at`,
           newId(),
           userId,
           n.company,
