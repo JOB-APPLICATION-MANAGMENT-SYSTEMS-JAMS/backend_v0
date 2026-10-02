@@ -22,6 +22,8 @@ interface Mapping {
   value: string;
   confidence: number;
   method: string;
+  /** position of the detected field in the request, so the extension can line results up */
+  field_index: number;
 }
 
 /** Alias dictionary: profile key → phrasings (§19.3 field aliases). */
@@ -120,7 +122,7 @@ export async function matchFields(userId: string, host: string, fields: Detected
   const mappings: Mapping[] = [];
   const skipped: string[] = [];
 
-  for (const f of fields) {
+  for (const [index, f] of fields.entries()) {
     if (isPassword(f)) {
       skipped.push(f.name ?? f.id ?? "password");
       continue; // guardrail: never fill password fields (§35.2)
@@ -166,7 +168,7 @@ export async function matchFields(userId: string, host: string, fields: Detected
       skipped.push(f.label ?? f.name ?? "unknown");
       continue;
     }
-    mappings.push({ key: best.key, value: values.get(best.key)!, confidence: Math.min(1, best.confidence), method: best.method });
+    mappings.push({ key: best.key, value: values.get(best.key)!, confidence: Math.min(1, best.confidence), method: best.method, field_index: index });
   }
 
   return { mappings, skipped };

@@ -41548,7 +41548,7 @@ async function matchFields(userId, host, fields) {
   );
   const mappings = [];
   const skipped = [];
-  for (const f of fields) {
+  for (const [index, f] of fields.entries()) {
     if (isPassword(f)) {
       skipped.push(f.name ?? f.id ?? "password");
       continue;
@@ -41585,7 +41585,7 @@ async function matchFields(userId, host, fields) {
       skipped.push(f.label ?? f.name ?? "unknown");
       continue;
     }
-    mappings.push({ key: best.key, value: values.get(best.key), confidence: Math.min(1, best.confidence), method: best.method });
+    mappings.push({ key: best.key, value: values.get(best.key), confidence: Math.min(1, best.confidence), method: best.method, field_index: index });
   }
   return { mappings, skipped };
 }
