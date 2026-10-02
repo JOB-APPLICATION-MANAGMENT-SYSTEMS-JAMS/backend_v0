@@ -35,6 +35,26 @@ async function ensureProfile(userId: string) {
   return p;
 }
 
+/**
+ * The name lives under four different keys depending on which flow wrote it:
+ * signup seeds first_name/last_name/full_name, onboarding writes full_name, the
+ * profile form writes name, autofill writes full_name again. Readers each picked
+ * one or two of them, so an account could hold its name under one key while the
+ * pitch signer, profile page and completeness check looked at another — and
+ * signed emails with a blank line after "Best,". Reconcile on read so any one
+ * key satisfies every reader.
+ */
+export function reconcileIdentity(identity: any): any {
+  const id: any = { ...identity };
+  const full = String(id.full_name ?? id.name ?? "").trim() || [id.first_name, id.last_name].filter(Boolean).join(" ").trim();
+  if (!full) return id;
+  if (!id.name) id.name = full;
+  if (!id.full_name) id.full_name = full;
+  if (!id.first_name) id.first_name = full.split(" ")[0];
+  if (!id.last_name) id.last_name = full.split(" ").slice(1).join(" ").trim();
+  return id;
+}
+
 export async function getProfile(userId: string) {
   const p = await ensureProfile(userId);
   // The users row always knows the account email/name; identity blocks written
@@ -42,14 +62,8 @@ export async function getProfile(userId: string) {
   // blank and `{{profile.first_name}}` rendering literally. Seed on read so the
   // page (and completeness) reflect what is actually in the database.
   const u = await get<any>("SELECT email FROM users WHERE id = ?", userId);
-  const identity: any = parseJson(p.identity, {});
+  const identity: any = reconcileIdentity(parseJson(p.identity, {}));
   if (u?.email && !identity.email) identity.email = u.email;
-  if (!identity.name) {
-    const full = [identity.first_name, identity.last_name].filter(Boolean).join(" ");
-    if (full) identity.name = full;
-  }
-  if (identity.name && !identity.first_name) identity.first_name = identity.name.split(" ")[0];
-  if (identity.name && !identity.last_name) identity.last_name = identity.name.split(" ").slice(1).join(" ");
   return {
     id: p.id,
     identity,
@@ -72,11 +86,14 @@ export async function updateProfile(
 ) {
   const p = await ensureProfile(userId);
   if (input.identity || input.prefs || input.aliases) {
+    // merge, never replace: the onboarding step posts {full_name, headline} and
+    // a wholesale replace silently wiped the first_name/last_name signup wrote,
+    // which is how pitches ended up signed with an empty name
     await run(
       `UPDATE profiles SET identity = ?, prefs = ?, aliases = ?, version = version + 1, updated_at = ? WHERE id = ?`,
-      JSON.stringify(input.identity ?? parseJson(p.identity, {})),
-      JSON.stringify(input.prefs ?? parseJson(p.prefs, {})),
-      JSON.stringify(input.aliases ?? parseJson(p.aliases, {})),
+      JSON.stringify({ ...parseJson(p.identity, {}), ...(input.identity ?? {}) }),
+      JSON.stringify({ ...parseJson(p.prefs, {}), ...(input.prefs ?? {}) }),
+      JSON.stringify({ ...parseJson(p.aliases, {}), ...(input.aliases ?? {}) }),
       nowIso(),
       p.id
     );

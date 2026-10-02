@@ -39993,17 +39993,21 @@ async function ensureProfile(userId) {
   }
   return p;
 }
+function reconcileIdentity(identity) {
+  const id = { ...identity };
+  const full = String(id.full_name ?? id.name ?? "").trim() || [id.first_name, id.last_name].filter(Boolean).join(" ").trim();
+  if (!full) return id;
+  if (!id.name) id.name = full;
+  if (!id.full_name) id.full_name = full;
+  if (!id.first_name) id.first_name = full.split(" ")[0];
+  if (!id.last_name) id.last_name = full.split(" ").slice(1).join(" ").trim();
+  return id;
+}
 async function getProfile(userId) {
   const p = await ensureProfile(userId);
   const u = await get("SELECT email FROM users WHERE id = ?", userId);
-  const identity = parseJson(p.identity, {});
+  const identity = reconcileIdentity(parseJson(p.identity, {}));
   if (u?.email && !identity.email) identity.email = u.email;
-  if (!identity.name) {
-    const full = [identity.first_name, identity.last_name].filter(Boolean).join(" ");
-    if (full) identity.name = full;
-  }
-  if (identity.name && !identity.first_name) identity.first_name = identity.name.split(" ")[0];
-  if (identity.name && !identity.last_name) identity.last_name = identity.name.split(" ").slice(1).join(" ");
   return {
     id: p.id,
     identity,
@@ -40024,9 +40028,9 @@ async function updateProfile(userId, input) {
   if (input.identity || input.prefs || input.aliases) {
     await run(
       `UPDATE profiles SET identity = ?, prefs = ?, aliases = ?, version = version + 1, updated_at = ? WHERE id = ?`,
-      JSON.stringify(input.identity ?? parseJson(p.identity, {})),
-      JSON.stringify(input.prefs ?? parseJson(p.prefs, {})),
-      JSON.stringify(input.aliases ?? parseJson(p.aliases, {})),
+      JSON.stringify({ ...parseJson(p.identity, {}), ...input.identity ?? {} }),
+      JSON.stringify({ ...parseJson(p.prefs, {}), ...input.prefs ?? {} }),
+      JSON.stringify({ ...parseJson(p.aliases, {}), ...input.aliases ?? {} }),
       nowIso(),
       p.id
     );
@@ -55568,9 +55572,9 @@ async function getOutreach(userId, id) {
 async function mergeContext(userId, appId, contactId) {
   const p = await get("SELECT * FROM profiles WHERE user_id = ?", userId);
   const u = await get("SELECT email FROM users WHERE id = ?", userId);
-  const identity = p ? parseJson(p.identity, {}) : {};
-  const firstName = identity.first_name || identity.name?.split(" ")[0] || "";
-  const lastName = identity.last_name || (identity.name ? identity.name.split(" ").slice(1).join(" ") : "");
+  const identity = reconcileIdentity(p ? parseJson(p.identity, {}) : {});
+  const firstName = identity.first_name || "";
+  const lastName = identity.last_name || "";
   const profile = {
     ...identity,
     first_name: firstName,
@@ -55938,6 +55942,7 @@ var init_outreach_service = __esm({
     init_config();
     init_nodemailer();
     init_cv_service();
+    init_profile_service();
     init_pitch_rewrite();
     init_application_service();
     init_streak_service();
@@ -56821,9 +56826,9 @@ async function saveCvAttachment(userId, cvId) {
   const cv = await get(`SELECT * FROM cvs WHERE id = ? AND user_id = ?`, cvId, userId);
   if (!cv) throw notFound("CV");
   const profile = await get(`SELECT * FROM profiles WHERE user_id = ?`, userId);
-  const identity = profile ? parseJson(profile.identity, {}) : {};
+  const identity = reconcileIdentity(profile ? parseJson(profile.identity, {}) : {});
   const blocks = parseJson(cv.blocks, []);
-  const name2 = [identity.first_name, identity.last_name].filter(Boolean).join(" ") || cv.name;
+  const name2 = identity.name || cv.name;
   const section = (title, inner) => inner.trim() ? `<section><h2>${esc(title)}</h2>${inner}</section>` : "";
   const parts = [];
   for (const b of blocks) {
@@ -56874,6 +56879,7 @@ var init_attachments = __esm({
     init_errors2();
     init_id();
     init_config();
+    init_profile_service();
     publicBase = () => process.env.PUBLIC_API_BASE || process.env.API_BASE_URL || (process.env.VERCEL ? "https://backend-v0-3aeu-omega.vercel.app" : `http://localhost:${config.port}`);
     attachmentUrl = (id) => `${publicBase()}/api/v1/pitch-targets/attachments/${id}/download`;
     MAX_BYTES = 4 * 1024 * 1024;

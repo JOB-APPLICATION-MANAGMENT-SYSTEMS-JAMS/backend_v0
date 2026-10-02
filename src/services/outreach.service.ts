@@ -4,6 +4,7 @@ import { newId, nowIso } from "../util/id";
 import { config, smtpReady } from "../core/config";
 import nodemailer from "nodemailer";
 import { mergeTemplate } from "./cv.service";
+import { reconcileIdentity } from "./profile.service";
 import { composePitch } from "./pitch-rewrite";
 import { writeEvent, changeStatus } from "./application.service";
 import { recordEffort } from "./streak.service";
@@ -47,12 +48,13 @@ export interface CreateOutreachInput {
  *  never renders blank in a sent email. */
 async function mergeContext(userId: string, appId?: string | null, contactId?: string | null) {
   const p = await get<any>("SELECT * FROM profiles WHERE user_id = ?", userId);
-  // users carries only email — names live in identity (seeded at register) or the
-  // profile form; select just the columns that exist.
+  // users carries only email — names live in identity under whichever key the
+  // flow that wrote it used (signup first_name, onboarding full_name, form name);
+  // reconcile picks whatever exists so the signature is never blank
   const u = await get<any>("SELECT email FROM users WHERE id = ?", userId);
-  const identity: any = p ? parseJson(p.identity, {}) : {};
-  const firstName = identity.first_name || identity.name?.split(" ")[0] || "";
-  const lastName = identity.last_name || (identity.name ? identity.name.split(" ").slice(1).join(" ") : "");
+  const identity: any = reconcileIdentity(p ? parseJson(p.identity, {}) : {});
+  const firstName = identity.first_name || "";
+  const lastName = identity.last_name || "";
   const profile = {
     ...identity,
     first_name: firstName,

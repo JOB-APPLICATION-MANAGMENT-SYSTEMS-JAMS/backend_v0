@@ -10,6 +10,7 @@ import { all, get, run, parseJson } from "../core/db";
 import { notFound, validation } from "../core/errors";
 import { newId, nowIso } from "../util/id";
 import { config } from "../core/config";
+import { reconcileIdentity } from "./profile.service";
 
 /** Where a link inside an email should point: reachable by the recipient, not just us. */
 export const publicBase = (): string =>
@@ -74,9 +75,9 @@ export async function saveCvAttachment(userId: string, cvId: string): Promise<Sa
   const cv = await get<any>(`SELECT * FROM cvs WHERE id = ? AND user_id = ?`, cvId, userId);
   if (!cv) throw notFound("CV");
   const profile = await get<any>(`SELECT * FROM profiles WHERE user_id = ?`, userId);
-  const identity = profile ? parseJson<any>(profile.identity, {}) : {};
+  const identity = reconcileIdentity(profile ? parseJson<any>(profile.identity, {}) : {});
   const blocks = parseJson<any[]>(cv.blocks, []);
-  const name = [identity.first_name, identity.last_name].filter(Boolean).join(" ") || cv.name;
+  const name = identity.name || cv.name;
 
   const section = (title: string, inner: string) => (inner.trim() ? `<section><h2>${esc(title)}</h2>${inner}</section>` : "");
   const parts: string[] = [];
