@@ -46,7 +46,9 @@ async function ensureProfile(userId: string) {
  */
 export function reconcileIdentity(identity: any): any {
   const id: any = { ...identity };
-  const full = String(id.full_name ?? id.name ?? "").trim() || [id.first_name, id.last_name].filter(Boolean).join(" ").trim();
+  // `||` not `??`: signup writes first_name/last_name/full_name as "" and an
+  // empty string must fall through to whatever name key actually holds data
+  const full = String(id.full_name || id.name || "").trim() || [id.first_name, id.last_name].filter(Boolean).join(" ").trim();
   if (!full) return id;
   if (!id.name) id.name = full;
   if (!id.full_name) id.full_name = full;
@@ -91,7 +93,8 @@ export async function updateProfile(
     // which is how pitches ended up signed with an empty name
     await run(
       `UPDATE profiles SET identity = ?, prefs = ?, aliases = ?, version = version + 1, updated_at = ? WHERE id = ?`,
-      JSON.stringify({ ...parseJson(p.identity, {}), ...(input.identity ?? {}) }),
+      // reconcile on write too, so empty signup placeholders converge on real names
+      JSON.stringify(reconcileIdentity({ ...parseJson(p.identity, {}), ...(input.identity ?? {}) })),
       JSON.stringify({ ...parseJson(p.prefs, {}), ...(input.prefs ?? {}) }),
       JSON.stringify({ ...parseJson(p.aliases, {}), ...(input.aliases ?? {}) }),
       nowIso(),

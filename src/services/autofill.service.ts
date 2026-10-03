@@ -1,5 +1,6 @@
 import { all, get, run, parseJson } from "../core/db";
 import { newId, nowIso } from "../util/id";
+import { reconcileIdentity } from "./profile.service";
 
 /**
  * Autofill (§35.2), field matching with confidence tiers.
@@ -29,8 +30,9 @@ interface Mapping {
 /** Alias dictionary: profile key → phrasings (§19.3 field aliases). */
 const BASE_ALIASES: Record<string, string[]> = {
   "identity.full_name": ["full name", "name", "your name", "first and last name", "legal name", "candidate name"],
-  "identity.first_name": ["first name", "given name", "fname"],
-  "identity.last_name": ["last name", "surname", "family name", "lname"],
+  "identity.first_name": ["first name", "given name", "fname", "preferred name", "preferred first name"],
+  "identity.last_name": ["last name", "surname", "family name", "lname", "family surname"],
+  "identity.middle_name": ["middle name", "middle initial", "second name"],
   "identity.email": ["email", "email address", "e-mail", "contact email"],
   "identity.phone": ["phone", "phone number", "mobile", "telephone", "contact number"],
   "identity.location": ["location", "city", "address", "where are you based", "current location"],
@@ -42,6 +44,11 @@ const BASE_ALIASES: Record<string, string[]> = {
   "identity.sponsorship": ["sponsorship", "require sponsorship", "requires sponsorship", "visa sponsorship", "sponsor employment visa", "employment visa status", "sponsor you", "h-1b", "tn visa"],
   "identity.relocation": ["relocate", "relocation", "willing to relocate", "need to relocate", "live locally", "come in to the office", "days per week"],
   "identity.salary_expectation": ["salary expectation", "expected salary", "desired salary", "compensation"],
+  "identity.graduation_year": ["graduating", "graduation year", "anticipate graduating", "expected graduation", "grad year", "graduation date"],
+  "identity.school": ["school", "university", "college", "institution", "school name"],
+  "identity.degree": ["degree", "degree type", "degree program"],
+  "identity.field_of_study": ["discipline", "field of study", "major", "concentration"],
+  "identity.heard_about": ["how did you hear", "where did you hear", "heard about this", "how did you find"],
   "posting.url": ["job url", "posting url", "job link", "requisition url"],
   "posting.role": ["job title", "position", "role", "title of role", "what position are you applying for", "job title applied for"],
 };
@@ -63,14 +70,21 @@ const AUTOCOMPLETE_MAP: Record<string, { key: string; confidence: number }> = {
 /** What the extension can read: field keys + aliases + visibility flags (§35 GET /autofill/schema). */
 export async function autofillSchema(userId: string) {
   const p = await get<any>("SELECT * FROM profiles WHERE user_id = ?", userId);
-  const identity: any = p ? parseJson(p.identity, {}) : {};
+  // reconcile first/last/full from whichever name key holds it, and fall back to
+  // the account email — an untouched profile should still fill its email field
+  const identity: any = p ? reconcileIdentity(parseJson(p.identity, {})) : {};
+  const u = await get<any>("SELECT email FROM users WHERE id = ?", userId);
+  if (u?.email && !identity.email) identity.email = u.email;
   const aliases: any = p ? parseJson(p.aliases, {}) : {};
+  // education lives in its own table; the first row answers school/degree/discipline selects
+  const edu: any[] = p ? await all<any>("SELECT * FROM profile_education WHERE profile_id = ? ORDER BY sort_order LIMIT 1", p.id) : [];
+  const e0 = edu[0];
   const merged: Record<string, string[]> = {};
   for (const [k, v] of Object.entries(BASE_ALIASES)) merged[k] = [...v, ...(aliases[k] ?? [])];
   const values: Record<string, string> = {
-    "identity.full_name": identity.name ?? "",
-    "identity.first_name": identity.first_name ?? (identity.name ?? "").split(" ")[0] ?? "",
-    "identity.last_name": identity.last_name ?? (identity.name ?? "").split(" ").slice(1).join(" "),
+    "identity.full_name": identity.name || identity.full_name || "",
+    "identity.first_name": identity.first_name || (identity.name || "").split(" ")[0] || "",
+    "identity.last_name": identity.last_name || (identity.name || "").split(" ").slice(1).join(" ") || "",
     "identity.email": identity.email ?? "",
     "identity.phone": identity.phone ?? "",
     "identity.location": identity.location ?? "",
@@ -82,6 +96,12 @@ export async function autofillSchema(userId: string) {
     "identity.sponsorship": identity.sponsorship ?? "",
     "identity.relocation": identity.relocation ?? "",
     "identity.salary_expectation": identity.salary_expectation ? String(identity.salary_expectation) : "",
+    "identity.middle_name": identity.middle_name ?? "",
+    "identity.graduation_year": identity.graduation_year ? String(identity.graduation_year) : "",
+    "identity.school": e0?.school ?? identity.school ?? "",
+    "identity.degree": e0?.degree ?? identity.degree ?? "",
+    "identity.field_of_study": e0?.field ?? identity.field_of_study ?? "",
+    "identity.heard_about": identity.heard_about ?? "",
   };
   return {
     fields: Object.keys(merged).map((key) => ({ key, aliases: merged[key], value: values[key] ?? null, visible: identity.visibility?.[key] !== false })),
@@ -122,7 +142,7 @@ const isSelfIdentification = (label: string) =>
 const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 
 /** Server-side field matching, easily improved in one place (§35 autofill/match). */
-export async function matchFields(userId: string, host: string, fields: DetectedField[]): Promise<{ mappings: Mapping[]; skipped: string[] }> {
+export async function matchFields(userId: string, host: string, fields: DetectedField[]): Promise<{ mappings: Mapping[]; skipped: string[]; skip_reasons: { field: string; reason: string }[] }> {
   const schema = await autofillSchema(userId);
   const values = new Map(schema.fields.map((f) => [f.key, f.value ?? ""]));
   const history = new Map(
@@ -131,14 +151,19 @@ export async function matchFields(userId: string, host: string, fields: Detected
 
   const mappings: Mapping[] = [];
   const skipped: string[] = [];
+  const skip_reasons: { field: string; reason: string }[] = [];
+  const skip = (field: string, reason: string) => {
+    skipped.push(field);
+    skip_reasons.push({ field, reason });
+  };
 
   for (const [index, f] of fields.entries()) {
     if (isPassword(f)) {
-      skipped.push(f.name ?? f.id ?? "password");
+      skip(f.name ?? f.id ?? "password", "sensitive — never filled");
       continue; // guardrail: never fill password fields (§35.2)
     }
     if (f.label && isSelfIdentification(f.label)) {
-      skipped.push(f.label);
+      skip(f.label, "voluntary self-identification — your answer, not ours");
       continue; // guardrail: EEOC self-ID questions are the candidate's call, not ours
     }
     const signature = `${f.name ?? ""}|${f.autocomplete ?? ""}|${(f.label ?? "").toLowerCase().slice(0, 40)}`;
@@ -154,17 +179,27 @@ export async function matchFields(userId: string, host: string, fields: Detected
       best = { key: m.key, confidence: m.confidence, method: "autocomplete" };
     }
 
-    // 3. name/id token match
+    // 3. name/id token match — token SETS (not substrings), and the most
+    // specific alias wins so "first_name" maps to first_name, not full_name
     if (!best && (f.name || f.id)) {
-      const tokens = `${f.name ?? ""} ${f.id ?? ""}`.toLowerCase().replace(/[_-]/g, " ");
+      const tokens = new Set(
+        `${f.name ?? ""} ${f.id ?? ""}`
+          .toLowerCase()
+          .replace(/[_-]/g, " ")
+          .split(/\s+/)
+          .filter(Boolean)
+      );
+      let rank = 0;
       for (const [key, aliases] of Object.entries(BASE_ALIASES)) {
         for (const alias of aliases) {
-          if (tokens.includes(alias.split(" ")[0]) && alias.split(" ").every((w) => tokens.includes(w))) {
+          const words = alias.split(" ");
+          if (!words.every((w) => tokens.has(w))) continue;
+          const r = words.length * 100 + alias.length;
+          if (r > rank) {
+            rank = r;
             best = { key, confidence: 0.9, method: "name" };
-            break;
           }
         }
-        if (best) break;
       }
     }
 
@@ -198,14 +233,18 @@ export async function matchFields(userId: string, host: string, fields: Detected
       }
     }
 
-    if (!best || !values.get(best.key)) {
-      skipped.push(f.label ?? f.name ?? "unknown");
+    if (!best) {
+      skip(f.label ?? f.name ?? "unknown", "no confident match — left empty rather than guessed");
+      continue;
+    }
+    if (!values.get(best.key)) {
+      skip(f.label ?? f.name ?? best.key, `no profile data for ${best.key} — add it in your profile`);
       continue;
     }
     mappings.push({ key: best.key, value: values.get(best.key)!, confidence: Math.min(1, best.confidence), method: best.method, field_index: index });
   }
 
-  return { mappings, skipped };
+  return { mappings, skipped, skip_reasons };
 }
 
 /** Confirmed fill → learned mapping (§35.2 “gets smarter” loop). */

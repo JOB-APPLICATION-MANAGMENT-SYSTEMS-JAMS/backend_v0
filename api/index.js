@@ -39995,7 +39995,7 @@ async function ensureProfile(userId) {
 }
 function reconcileIdentity(identity) {
   const id = { ...identity };
-  const full = String(id.full_name ?? id.name ?? "").trim() || [id.first_name, id.last_name].filter(Boolean).join(" ").trim();
+  const full = String(id.full_name || id.name || "").trim() || [id.first_name, id.last_name].filter(Boolean).join(" ").trim();
   if (!full) return id;
   if (!id.name) id.name = full;
   if (!id.full_name) id.full_name = full;
@@ -40028,7 +40028,8 @@ async function updateProfile(userId, input) {
   if (input.identity || input.prefs || input.aliases) {
     await run(
       `UPDATE profiles SET identity = ?, prefs = ?, aliases = ?, version = version + 1, updated_at = ? WHERE id = ?`,
-      JSON.stringify({ ...parseJson(p.identity, {}), ...input.identity ?? {} }),
+      // reconcile on write too, so empty signup placeholders converge on real names
+      JSON.stringify(reconcileIdentity({ ...parseJson(p.identity, {}), ...input.identity ?? {} })),
       JSON.stringify({ ...parseJson(p.prefs, {}), ...input.prefs ?? {} }),
       JSON.stringify({ ...parseJson(p.aliases, {}), ...input.aliases ?? {} }),
       nowIso(),
@@ -41496,14 +41497,18 @@ var init_capture_service = __esm({
 // src/services/autofill.service.ts
 async function autofillSchema(userId) {
   const p = await get("SELECT * FROM profiles WHERE user_id = ?", userId);
-  const identity = p ? parseJson(p.identity, {}) : {};
+  const identity = p ? reconcileIdentity(parseJson(p.identity, {})) : {};
+  const u = await get("SELECT email FROM users WHERE id = ?", userId);
+  if (u?.email && !identity.email) identity.email = u.email;
   const aliases = p ? parseJson(p.aliases, {}) : {};
+  const edu = p ? await all("SELECT * FROM profile_education WHERE profile_id = ? ORDER BY sort_order LIMIT 1", p.id) : [];
+  const e0 = edu[0];
   const merged = {};
   for (const [k, v] of Object.entries(BASE_ALIASES)) merged[k] = [...v, ...aliases[k] ?? []];
   const values = {
-    "identity.full_name": identity.name ?? "",
-    "identity.first_name": identity.first_name ?? (identity.name ?? "").split(" ")[0] ?? "",
-    "identity.last_name": identity.last_name ?? (identity.name ?? "").split(" ").slice(1).join(" "),
+    "identity.full_name": identity.name || identity.full_name || "",
+    "identity.first_name": identity.first_name || (identity.name || "").split(" ")[0] || "",
+    "identity.last_name": identity.last_name || (identity.name || "").split(" ").slice(1).join(" ") || "",
     "identity.email": identity.email ?? "",
     "identity.phone": identity.phone ?? "",
     "identity.location": identity.location ?? "",
@@ -41514,7 +41519,13 @@ async function autofillSchema(userId) {
     "identity.work_authorization": identity.work_authorization ?? "",
     "identity.sponsorship": identity.sponsorship ?? "",
     "identity.relocation": identity.relocation ?? "",
-    "identity.salary_expectation": identity.salary_expectation ? String(identity.salary_expectation) : ""
+    "identity.salary_expectation": identity.salary_expectation ? String(identity.salary_expectation) : "",
+    "identity.middle_name": identity.middle_name ?? "",
+    "identity.graduation_year": identity.graduation_year ? String(identity.graduation_year) : "",
+    "identity.school": e0?.school ?? identity.school ?? "",
+    "identity.degree": e0?.degree ?? identity.degree ?? "",
+    "identity.field_of_study": e0?.field ?? identity.field_of_study ?? "",
+    "identity.heard_about": identity.heard_about ?? ""
   };
   return {
     fields: Object.keys(merged).map((key) => ({ key, aliases: merged[key], value: values[key] ?? null, visible: identity.visibility?.[key] !== false })),
@@ -41550,13 +41561,18 @@ async function matchFields(userId, host, fields) {
   );
   const mappings = [];
   const skipped = [];
+  const skip_reasons = [];
+  const skip = (field, reason) => {
+    skipped.push(field);
+    skip_reasons.push({ field, reason });
+  };
   for (const [index, f] of fields.entries()) {
     if (isPassword(f)) {
-      skipped.push(f.name ?? f.id ?? "password");
+      skip(f.name ?? f.id ?? "password", "sensitive \u2014 never filled");
       continue;
     }
     if (f.label && isSelfIdentification(f.label)) {
-      skipped.push(f.label);
+      skip(f.label, "voluntary self-identification \u2014 your answer, not ours");
       continue;
     }
     const signature = `${f.name ?? ""}|${f.autocomplete ?? ""}|${(f.label ?? "").toLowerCase().slice(0, 40)}`;
@@ -41568,15 +41584,20 @@ async function matchFields(userId, host, fields) {
       best = { key: m.key, confidence: m.confidence, method: "autocomplete" };
     }
     if (!best && (f.name || f.id)) {
-      const tokens = `${f.name ?? ""} ${f.id ?? ""}`.toLowerCase().replace(/[_-]/g, " ");
+      const tokens = new Set(
+        `${f.name ?? ""} ${f.id ?? ""}`.toLowerCase().replace(/[_-]/g, " ").split(/\s+/).filter(Boolean)
+      );
+      let rank = 0;
       for (const [key, aliases] of Object.entries(BASE_ALIASES)) {
         for (const alias of aliases) {
-          if (tokens.includes(alias.split(" ")[0]) && alias.split(" ").every((w) => tokens.includes(w))) {
+          const words = alias.split(" ");
+          if (!words.every((w) => tokens.has(w))) continue;
+          const r = words.length * 100 + alias.length;
+          if (r > rank) {
+            rank = r;
             best = { key, confidence: 0.9, method: "name" };
-            break;
           }
         }
-        if (best) break;
       }
     }
     if (!best && f.label) {
@@ -41602,13 +41623,17 @@ async function matchFields(userId, host, fields) {
         best = { key: hit.key, confidence, method: "label_contains" };
       }
     }
-    if (!best || !values.get(best.key)) {
-      skipped.push(f.label ?? f.name ?? "unknown");
+    if (!best) {
+      skip(f.label ?? f.name ?? "unknown", "no confident match \u2014 left empty rather than guessed");
+      continue;
+    }
+    if (!values.get(best.key)) {
+      skip(f.label ?? f.name ?? best.key, `no profile data for ${best.key} \u2014 add it in your profile`);
       continue;
     }
     mappings.push({ key: best.key, value: values.get(best.key), confidence: Math.min(1, best.confidence), method: best.method, field_index: index });
   }
-  return { mappings, skipped };
+  return { mappings, skipped, skip_reasons };
 }
 function confirmMapping(userId, host, fieldSignature, profileKey) {
   run(
@@ -41629,10 +41654,12 @@ var init_autofill_service = __esm({
     "use strict";
     init_db();
     init_id();
+    init_profile_service();
     BASE_ALIASES = {
       "identity.full_name": ["full name", "name", "your name", "first and last name", "legal name", "candidate name"],
-      "identity.first_name": ["first name", "given name", "fname"],
-      "identity.last_name": ["last name", "surname", "family name", "lname"],
+      "identity.first_name": ["first name", "given name", "fname", "preferred name", "preferred first name"],
+      "identity.last_name": ["last name", "surname", "family name", "lname", "family surname"],
+      "identity.middle_name": ["middle name", "middle initial", "second name"],
       "identity.email": ["email", "email address", "e-mail", "contact email"],
       "identity.phone": ["phone", "phone number", "mobile", "telephone", "contact number"],
       "identity.location": ["location", "city", "address", "where are you based", "current location"],
@@ -41644,6 +41671,11 @@ var init_autofill_service = __esm({
       "identity.sponsorship": ["sponsorship", "require sponsorship", "requires sponsorship", "visa sponsorship", "sponsor employment visa", "employment visa status", "sponsor you", "h-1b", "tn visa"],
       "identity.relocation": ["relocate", "relocation", "willing to relocate", "need to relocate", "live locally", "come in to the office", "days per week"],
       "identity.salary_expectation": ["salary expectation", "expected salary", "desired salary", "compensation"],
+      "identity.graduation_year": ["graduating", "graduation year", "anticipate graduating", "expected graduation", "grad year", "graduation date"],
+      "identity.school": ["school", "university", "college", "institution", "school name"],
+      "identity.degree": ["degree", "degree type", "degree program"],
+      "identity.field_of_study": ["discipline", "field of study", "major", "concentration"],
+      "identity.heard_about": ["how did you hear", "where did you hear", "heard about this", "how did you find"],
       "posting.url": ["job url", "posting url", "job link", "requisition url"],
       "posting.role": ["job title", "position", "role", "title of role", "what position are you applying for", "job title applied for"]
     };

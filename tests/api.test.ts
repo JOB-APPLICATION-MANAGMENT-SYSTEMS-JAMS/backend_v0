@@ -196,6 +196,52 @@ test("autofill match handles long exam-style radio questions and skips EEOC self
   assert.equal(map.get("identity.relocation")?.value, "Yes, I live locally");
   assert.ok(res.json.data.skipped.includes("Disability Status"), "EEOC self-ID never auto-answered");
   assert.ok(!res.json.data.mappings.some((m: any) => m.key.includes("password")));
+  const reasons = new Map<string, string>(res.json.data.skip_reasons.map((s: any) => [s.field, s.reason] as [string, string]));
+  assert.match(reasons.get("Disability Status") ?? "", /voluntary/);
+});
+
+test("autofill match fills name parts and education selects from profile data", async () => {
+  const put = await api("/profile", {
+    method: "PUT",
+    token,
+    body: {
+      identity: { middle_name: "Omokhagbo", graduation_year: 2028, heard_about: "LinkedIn" },
+      education: [{ school: "State University", degree: "B.S.", field: "Computer Science" }],
+    },
+  });
+  assert.equal(put.status, 200);
+
+  const res = await api("/autofill/match", {
+    method: "POST",
+    token,
+    body: {
+      host: "jobs.riot.example",
+      fields: [
+        { name: "first_name", label: "First Name", type: "text" },
+        { name: "last_name", label: "Last Name", type: "text" },
+        { name: "preferred_first", label: "Preferred First Name", type: "text" },
+        { name: "middle", label: "Middle Name", type: "text" },
+        { name: "school", label: "School", type: "select-one" },
+        { name: "degree", label: "Degree", type: "select-one" },
+        { name: "discipline", label: "Discipline", type: "select-one" },
+        { name: "grad_year", label: "Please select the year you anticipate graduating from your academic program.", type: "select-one" },
+        { name: "hear", label: "How did you hear about this job?", type: "select-one" },
+      ],
+    },
+  });
+  assert.equal(res.status, 200);
+  const map = new Map<string, any>(res.json.data.mappings.map((m: any) => [m.key, m]));
+  assert.equal(map.get("identity.first_name")?.value, "Test");
+  assert.equal(map.get("identity.last_name")?.value, "User");
+  assert.equal(map.get("identity.middle_name")?.value, "Omokhagbo");
+  assert.equal(map.get("identity.school")?.value, "State University");
+  assert.equal(map.get("identity.degree")?.value, "B.S.");
+  assert.equal(map.get("identity.field_of_study")?.value, "Computer Science");
+  assert.equal(map.get("identity.graduation_year")?.value, "2028");
+  assert.equal(map.get("identity.heard_about")?.value, "LinkedIn");
+  // preferred-name resolves to first_name, not full_name
+  assert.ok(!map.has("identity.full_name") || map.get("identity.full_name")?.field_index !== 2);
+  assert.equal(res.json.data.skip_reasons.length, res.json.data.skipped.length, "every skip carries a human reason");
 });
 
 test("analytics summary has kpis with value/prev/delta and funnel keys", async () => {
