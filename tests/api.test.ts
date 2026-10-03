@@ -277,6 +277,46 @@ test("custom answers and profile-authored aliases steer matching", async () => {
   assert.ok(res.json.data.skip_reasons.length === res.json.data.skipped.length);
 });
 
+test("resume upload turns a CV into reviewable profile answers", async () => {
+  const resume = [
+    "Jane Q. Doe",
+    "Software Engineer",
+    "jane.doe@example.com | (415) 555-0132 | San Francisco, CA",
+    "linkedin.com/in/janedoe · github.com/janedoe",
+    "",
+    "Education",
+    "State University, B.S. in Computer Science, Class of 2027",
+  ].join("\n");
+
+  const res = await api("/autofill/parse-resume", {
+    method: "POST",
+    token,
+    body: { filename: "resume.txt", content_base64: Buffer.from(resume, "utf8").toString("base64") },
+  });
+  assert.equal(res.status, 200);
+  const id = res.json.data.identity;
+  assert.equal(id.email, "jane.doe@example.com");
+  assert.match(id.phone, /415/);
+  assert.equal(id.location, "San Francisco, CA");
+  assert.equal(id.first_name, "Jane");
+  assert.equal(id.last_name, "Doe");
+  assert.equal(id.links?.linkedin, "https://linkedin.com/in/janedoe");
+  assert.equal(id.links?.github, "https://github.com/janedoe");
+  assert.equal(id.headline, "Software Engineer");
+  assert.equal(id.school, "State University");
+  assert.match(id.degree ?? "", /B\.S/);
+  assert.equal(id.field_of_study, "Computer Science");
+  assert.equal(id.graduation_year, "2027");
+
+  const docx = await api("/autofill/parse-resume", {
+    method: "POST",
+    token,
+    body: { filename: "resume.docx", content_base64: Buffer.from("PKzip-bytes", "utf8").toString("base64") },
+  });
+  assert.equal(docx.status, 415);
+  assert.equal(docx.json.error.code, "UNSUPPORTED_FILE");
+});
+
 test("analytics summary has kpis with value/prev/delta and funnel keys", async () => {
   const res = await api("/analytics/summary?period=week", { token });
   assert.equal(res.status, 200);

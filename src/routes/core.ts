@@ -6,6 +6,7 @@ import * as profile from "../services/profile.service";
 import * as cv from "../services/cv.service";
 import * as captureSvc from "../services/capture.service";
 import * as autofill from "../services/autofill.service";
+import * as resumeImport from "../services/resume-import.service";
 import { rateLimit } from "../core/middleware";
 
 export const profileRouter = Router();
@@ -393,6 +394,21 @@ autofillRouter.post("/confirm", (req: AuthedRequest, res, next) => {
   try {
     const body = z.object({ host: z.string(), field_signature: z.string(), profile_key: z.string() }).parse(req.body);
     ok(res, "Mapping learned", autofill.confirmMapping(req.userId!, body.host, body.field_signature, body.profile_key));
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** Resume upload → profile answers (§35): PDF/txt in, reviewed identity out. */
+autofillRouter.post("/parse-resume", async (req: AuthedRequest, res, next) => {
+  try {
+    const body = z
+      .object({
+        filename: z.string().min(1).max(200),
+        content_base64: z.string().min(1).max(6_000_000),
+      })
+      .parse(req.body);
+    ok(res, "Resume parsed", await resumeImport.parseResume(Buffer.from(body.content_base64, "base64"), body.filename));
   } catch (e) {
     next(e);
   }

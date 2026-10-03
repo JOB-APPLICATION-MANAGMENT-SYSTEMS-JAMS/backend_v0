@@ -21,6 +21,11 @@ export type ErrorCode =
   | "RATE_LIMITED"
   | "SOURCE_DOWN"
   | "PARSE_FAILED"
+  | "UNSUPPORTED_FILE"
+  | "EMPTY_UPLOAD"
+  | "FILE_TOO_LARGE"
+  | "UNREADABLE_PDF"
+  | "EMPTY_RESUME"
   | "CONFIRM_REQUIRED"
   | "INTERNAL";
 
