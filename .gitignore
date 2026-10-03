@@ -22,3 +22,16 @@ dist/
 # logs
 *.log
 npm-debug.log*
+_lc_*.html
+
+# local scratch — tokens, exports, crawl dumps (never commit)
+.tok
+prodtok
+.attid
+.extid
+.oid
+catalog.json
+export/
+prep.json
+pt.json
+rw.json
