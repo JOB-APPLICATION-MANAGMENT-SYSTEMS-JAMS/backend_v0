@@ -103,6 +103,17 @@ export async function autofillSchema(userId: string) {
     "identity.field_of_study": e0?.field ?? identity.field_of_study ?? "",
     "identity.heard_about": identity.heard_about ?? "",
   };
+  // Custom Q&A from the /autofill page: profile.autofill_answers =
+  // [{ match: "question snippet", answer: "your answer" }] — each becomes a
+  // matchable key so recurring exam questions answer themselves verbatim.
+  const answers = Array.isArray(identity.autofill_answers) ? identity.autofill_answers : [];
+  for (const [i, a] of answers.entries()) {
+    const m = String(a?.match ?? "").trim();
+    const ans = String(a?.answer ?? "").trim();
+    if (!m || !ans) continue;
+    merged[`custom.answer_${i}`] = [m];
+    values[`custom.answer_${i}`] = ans;
+  }
   return {
     fields: Object.keys(merged).map((key) => ({ key, aliases: merged[key], value: values[key] ?? null, visible: identity.visibility?.[key] !== false })),
     guardrails: { never_fill: ["password", "credit_card", "ssn", "cvv"], kill_switch: "settings.autofill_enabled" },
@@ -145,6 +156,10 @@ const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").rep
 export async function matchFields(userId: string, host: string, fields: DetectedField[]): Promise<{ mappings: Mapping[]; skipped: string[]; skip_reasons: { field: string; reason: string }[] }> {
   const schema = await autofillSchema(userId);
   const values = new Map(schema.fields.map((f) => [f.key, f.value ?? ""]));
+  // merged alias map (base + profile-edited aliases + custom answers) — the
+  // profile page's alias editor used to be decorative; matching now reads it
+  const aliasMap = new Map<string, string[]>(schema.fields.map((f) => [f.key, f.aliases ?? []]));
+  const isCustom = (key: string) => key.startsWith("custom.");
   const history = new Map(
     (await all<any>("SELECT field_signature, profile_key FROM field_history WHERE user_id = ? AND host = ?", userId, host)).map((h) => [h.field_signature, h.profile_key])
   );
@@ -190,7 +205,8 @@ export async function matchFields(userId: string, host: string, fields: Detected
           .filter(Boolean)
       );
       let rank = 0;
-      for (const [key, aliases] of Object.entries(BASE_ALIASES)) {
+      for (const [key, aliases] of aliasMap) {
+        if (isCustom(key)) continue;
         for (const alias of aliases) {
           const words = alias.split(" ");
           if (!words.every((w) => tokens.has(w))) continue;
@@ -203,9 +219,27 @@ export async function matchFields(userId: string, host: string, fields: Detected
       }
     }
 
+    // 3.5. the candidate's own pre-written answers (/autofill page) win over
+    // dictionary matching: if the question contains their snippet, use it
+    if (!best && f.label) {
+      const L = normalize(f.label);
+      for (const [key, aliases] of aliasMap) {
+        if (!isCustom(key)) continue;
+        for (const alias of aliases) {
+          const a = normalize(alias);
+          if (a.length >= 6 && L.includes(a)) {
+            best = { key, confidence: 0.9, method: "custom" };
+            break;
+          }
+        }
+        if (best) break;
+      }
+    }
+
     // 4. label similarity ≥ 0.55 (spec: rapidfuzz ≥ 85/100 on well-formed labels)
     if (!best && f.label) {
-      for (const [key, aliases] of Object.entries(BASE_ALIASES)) {
+      for (const [key, aliases] of aliasMap) {
+        if (isCustom(key)) continue;
         for (const alias of aliases) {
           const s = similarity(f.label, alias);
           if (s >= 0.55 && (!best || s > best.confidence)) best = { key, confidence: Number(s.toFixed(2)), method: "label" };
@@ -219,7 +253,8 @@ export async function matchFields(userId: string, host: string, fields: Detected
     if (!best && f.label) {
       const L = normalize(f.label);
       let hit: { key: string; aliasLen: number } | null = null;
-      for (const [key, aliases] of Object.entries(BASE_ALIASES)) {
+      for (const [key, aliases] of aliasMap) {
+        if (isCustom(key)) continue;
         for (const alias of aliases) {
           const a = normalize(alias);
           if (a.length < 5 || !L.includes(a)) continue;

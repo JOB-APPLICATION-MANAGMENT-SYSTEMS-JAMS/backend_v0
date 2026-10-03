@@ -41527,6 +41527,14 @@ async function autofillSchema(userId) {
     "identity.field_of_study": e0?.field ?? identity.field_of_study ?? "",
     "identity.heard_about": identity.heard_about ?? ""
   };
+  const answers = Array.isArray(identity.autofill_answers) ? identity.autofill_answers : [];
+  for (const [i, a] of answers.entries()) {
+    const m = String(a?.match ?? "").trim();
+    const ans = String(a?.answer ?? "").trim();
+    if (!m || !ans) continue;
+    merged[`custom.answer_${i}`] = [m];
+    values[`custom.answer_${i}`] = ans;
+  }
   return {
     fields: Object.keys(merged).map((key) => ({ key, aliases: merged[key], value: values[key] ?? null, visible: identity.visibility?.[key] !== false })),
     guardrails: { never_fill: ["password", "credit_card", "ssn", "cvv"], kill_switch: "settings.autofill_enabled" },
@@ -41556,6 +41564,8 @@ function similarity(a, b) {
 async function matchFields(userId, host, fields) {
   const schema = await autofillSchema(userId);
   const values = new Map(schema.fields.map((f) => [f.key, f.value ?? ""]));
+  const aliasMap = new Map(schema.fields.map((f) => [f.key, f.aliases ?? []]));
+  const isCustom = (key) => key.startsWith("custom.");
   const history = new Map(
     (await all("SELECT field_signature, profile_key FROM field_history WHERE user_id = ? AND host = ?", userId, host)).map((h) => [h.field_signature, h.profile_key])
   );
@@ -41588,7 +41598,8 @@ async function matchFields(userId, host, fields) {
         `${f.name ?? ""} ${f.id ?? ""}`.toLowerCase().replace(/[_-]/g, " ").split(/\s+/).filter(Boolean)
       );
       let rank = 0;
-      for (const [key, aliases] of Object.entries(BASE_ALIASES)) {
+      for (const [key, aliases] of aliasMap) {
+        if (isCustom(key)) continue;
         for (const alias of aliases) {
           const words = alias.split(" ");
           if (!words.every((w) => tokens.has(w))) continue;
@@ -41601,7 +41612,22 @@ async function matchFields(userId, host, fields) {
       }
     }
     if (!best && f.label) {
-      for (const [key, aliases] of Object.entries(BASE_ALIASES)) {
+      const L = normalize(f.label);
+      for (const [key, aliases] of aliasMap) {
+        if (!isCustom(key)) continue;
+        for (const alias of aliases) {
+          const a = normalize(alias);
+          if (a.length >= 6 && L.includes(a)) {
+            best = { key, confidence: 0.9, method: "custom" };
+            break;
+          }
+        }
+        if (best) break;
+      }
+    }
+    if (!best && f.label) {
+      for (const [key, aliases] of aliasMap) {
+        if (isCustom(key)) continue;
         for (const alias of aliases) {
           const s = similarity(f.label, alias);
           if (s >= 0.55 && (!best || s > best.confidence)) best = { key, confidence: Number(s.toFixed(2)), method: "label" };
@@ -41611,7 +41637,8 @@ async function matchFields(userId, host, fields) {
     if (!best && f.label) {
       const L = normalize(f.label);
       let hit = null;
-      for (const [key, aliases] of Object.entries(BASE_ALIASES)) {
+      for (const [key, aliases] of aliasMap) {
+        if (isCustom(key)) continue;
         for (const alias of aliases) {
           const a = normalize(alias);
           if (a.length < 5 || !L.includes(a)) continue;

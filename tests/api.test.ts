@@ -244,6 +244,39 @@ test("autofill match fills name parts and education selects from profile data", 
   assert.equal(res.json.data.skip_reasons.length, res.json.data.skipped.length, "every skip carries a human reason");
 });
 
+test("custom answers and profile-authored aliases steer matching", async () => {
+  const put = await api("/profile", {
+    method: "PUT",
+    token,
+    body: {
+      identity: { autofill_answers: [{ match: "come in to the san francisco office", answer: "Yes, I live locally" }] },
+      aliases: { "identity.email": ["reach me at"] },
+    },
+  });
+  assert.equal(put.status, 200);
+
+  const res = await api("/autofill/match", {
+    method: "POST",
+    token,
+    body: {
+      host: "jobs.custom.example",
+      fields: [
+        { name: "office_q", label: "Are you able to come in to the San Francisco office 3 days per week?", type: "radio" },
+        { name: "reach", label: "Reach me at (email)", type: "text" },
+      ],
+    },
+  });
+  assert.equal(res.status, 200);
+  const map = new Map<string, any>(res.json.data.mappings.map((m: any) => [m.key, m]));
+  // the candidate's own answer beats dictionary matching for the same question
+  assert.equal(map.get("custom.answer_0")?.value, "Yes, I live locally");
+  assert.equal(map.get("custom.answer_0")?.method, "custom");
+  assert.ok(map.get("custom.answer_0")!.confidence >= 0.85);
+  // a profile-authored alias now participates in label matching
+  assert.equal(map.get("identity.email")?.value, "t@t.t");
+  assert.ok(res.json.data.skip_reasons.length === res.json.data.skipped.length);
+});
+
 test("analytics summary has kpis with value/prev/delta and funnel keys", async () => {
   const res = await api("/analytics/summary?period=week", { token });
   assert.equal(res.status, 200);
