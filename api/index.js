@@ -15368,7 +15368,7 @@ var require_type_is = __commonJS({
     module.exports = typeofrequest;
     module.exports.is = typeis;
     module.exports.hasBody = hasbody;
-    module.exports.normalize = normalize2;
+    module.exports.normalize = normalize3;
     module.exports.match = mimeMatch;
     function typeis(value, types_) {
       if (value && typeof value === "object") {
@@ -15391,7 +15391,7 @@ var require_type_is = __commonJS({
       }
       var type;
       for (i = 0; i < types2.length; i++) {
-        if (mimeMatch(normalize2(type = types2[i]), val)) {
+        if (mimeMatch(normalize3(type = types2[i]), val)) {
           return type[0] === "+" || type.indexOf("*") !== -1 ? val : type;
         }
       }
@@ -15406,7 +15406,7 @@ var require_type_is = __commonJS({
       var value = req.headers["content-type"];
       return typeis(value, types2);
     }
-    function normalize2(type) {
+    function normalize3(type) {
       if (typeof type !== "string") {
         return false;
       }
@@ -22631,7 +22631,7 @@ var require_send = __commonJS({
     var util4 = __require("util");
     var extname = path5.extname;
     var join = path5.join;
-    var normalize2 = path5.normalize;
+    var normalize3 = path5.normalize;
     var resolve3 = path5.resolve;
     var sep = path5.sep;
     var BYTES_RANGE_REGEXP = /^ *bytes=/;
@@ -22794,7 +22794,7 @@ var require_send = __commonJS({
       var parts;
       if (root2 !== null) {
         if (path6) {
-          path6 = normalize2("." + sep + path6);
+          path6 = normalize3("." + sep + path6);
         }
         if (UP_PATH_REGEXP.test(path6)) {
           debug('malicious path "%s"', path6);
@@ -22802,14 +22802,14 @@ var require_send = __commonJS({
           return res;
         }
         parts = path6.split(sep);
-        path6 = normalize2(join(root2, path6));
+        path6 = normalize3(join(root2, path6));
       } else {
         if (UP_PATH_REGEXP.test(path6)) {
           debug('malicious path "%s"', path6);
           this.error(403);
           return res;
         }
-        parts = normalize2(path6).split(sep);
+        parts = normalize3(path6).split(sep);
         path6 = resolve3(path6);
       }
       if (containsDotFile(parts)) {
@@ -41512,6 +41512,8 @@ async function autofillSchema(userId) {
     "identity.website": identity.links?.website ?? identity.links?.portfolio ?? "",
     "identity.headline": identity.headline ?? "",
     "identity.work_authorization": identity.work_authorization ?? "",
+    "identity.sponsorship": identity.sponsorship ?? "",
+    "identity.relocation": identity.relocation ?? "",
     "identity.salary_expectation": identity.salary_expectation ? String(identity.salary_expectation) : ""
   };
   return {
@@ -41553,6 +41555,10 @@ async function matchFields(userId, host, fields) {
       skipped.push(f.name ?? f.id ?? "password");
       continue;
     }
+    if (f.label && isSelfIdentification(f.label)) {
+      skipped.push(f.label);
+      continue;
+    }
     const signature = `${f.name ?? ""}|${f.autocomplete ?? ""}|${(f.label ?? "").toLowerCase().slice(0, 40)}`;
     let best = null;
     const learned = history.get(signature);
@@ -41581,6 +41587,21 @@ async function matchFields(userId, host, fields) {
         }
       }
     }
+    if (!best && f.label) {
+      const L = normalize(f.label);
+      let hit = null;
+      for (const [key, aliases] of Object.entries(BASE_ALIASES)) {
+        for (const alias of aliases) {
+          const a = normalize(alias);
+          if (a.length < 5 || !L.includes(a)) continue;
+          if (!hit || a.length > hit.aliasLen) hit = { key, aliasLen: a.length };
+        }
+      }
+      if (hit) {
+        const confidence = hit.aliasLen >= 15 ? 0.86 : 0.78;
+        best = { key: hit.key, confidence, method: "label_contains" };
+      }
+    }
     if (!best || !values.get(best.key)) {
       skipped.push(f.label ?? f.name ?? "unknown");
       continue;
@@ -41602,7 +41623,7 @@ function confirmMapping(userId, host, fieldSignature, profileKey) {
   );
   return { learned: true };
 }
-var BASE_ALIASES, AUTOCOMPLETE_MAP, isPassword;
+var BASE_ALIASES, AUTOCOMPLETE_MAP, isPassword, isSelfIdentification, normalize;
 var init_autofill_service = __esm({
   "src/services/autofill.service.ts"() {
     "use strict";
@@ -41619,7 +41640,9 @@ var init_autofill_service = __esm({
       "identity.github": ["github", "github url", "github profile"],
       "identity.website": ["website", "portfolio", "personal site", "homepage"],
       "identity.headline": ["headline", "current position", "title", "about you", "profile summary"],
-      "identity.work_authorization": ["work authorization", "authorised to work", "authorized to work", "visa status", "right to work"],
+      "identity.work_authorization": ["work authorization", "authorised to work", "authorized to work", "visa status", "right to work", "legally authorized to work", "legally authorised to work", "work eligibility", "authorized to work in the united states"],
+      "identity.sponsorship": ["sponsorship", "require sponsorship", "requires sponsorship", "visa sponsorship", "sponsor employment visa", "employment visa status", "sponsor you", "h-1b", "tn visa"],
+      "identity.relocation": ["relocate", "relocation", "willing to relocate", "need to relocate", "live locally", "come in to the office", "days per week"],
       "identity.salary_expectation": ["salary expectation", "expected salary", "desired salary", "compensation"],
       "posting.url": ["job url", "posting url", "job link", "requisition url"],
       "posting.role": ["job title", "position", "role", "title of role", "what position are you applying for", "job title applied for"]
@@ -41638,6 +41661,8 @@ var init_autofill_service = __esm({
       "organization-title": { key: "posting.role", confidence: 0.6 }
     };
     isPassword = (f) => /password|passwd|pwd/i.test(`${f.name ?? ""} ${f.id ?? ""} ${f.autocomplete ?? ""} ${f.type ?? ""}`) || f.type === "password";
+    isSelfIdentification = (label) => /disabilit|veteran|race\b|racial|ethnic|hispanic|latino|latinx|gender|sex\b|sexual orientation|transgender|non.?binary|self.?identif/i.test(label);
+    normalize = (s) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
   }
 });
 
@@ -42576,7 +42601,7 @@ function inferSeniority(title, text = "") {
   for (const { re, s } of SENIORITY_RE) if (re.test(text.slice(0, 400))) return s;
   return null;
 }
-function normalize(raw, now = /* @__PURE__ */ new Date()) {
+function normalize2(raw, now = /* @__PURE__ */ new Date()) {
   const text = raw.description ?? "";
   const asText = (v) => v == null ? null : typeof v === "string" ? v.trim() || null : typeof v === "number" || typeof v === "boolean" ? String(v) : JSON.stringify(v);
   const asNum = (v) => {
@@ -42650,7 +42675,7 @@ async function ingestAll(userId, opts = {}) {
       const raw = await src.fetch();
       let found = 0;
       for (const item of raw) {
-        const n = normalize(item);
+        const n = normalize2(item);
         const contactEmail = findContactEmail(`${n.title ?? ""} ${n.description ?? ""}`);
         const uniq = `${src.name}:${item.external_id}`;
         if (existingKeys.has(uniq)) {

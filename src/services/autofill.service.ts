@@ -38,7 +38,9 @@ const BASE_ALIASES: Record<string, string[]> = {
   "identity.github": ["github", "github url", "github profile"],
   "identity.website": ["website", "portfolio", "personal site", "homepage"],
   "identity.headline": ["headline", "current position", "title", "about you", "profile summary"],
-  "identity.work_authorization": ["work authorization", "authorised to work", "authorized to work", "visa status", "right to work"],
+  "identity.work_authorization": ["work authorization", "authorised to work", "authorized to work", "visa status", "right to work", "legally authorized to work", "legally authorised to work", "work eligibility", "authorized to work in the united states"],
+  "identity.sponsorship": ["sponsorship", "require sponsorship", "requires sponsorship", "visa sponsorship", "sponsor employment visa", "employment visa status", "sponsor you", "h-1b", "tn visa"],
+  "identity.relocation": ["relocate", "relocation", "willing to relocate", "need to relocate", "live locally", "come in to the office", "days per week"],
   "identity.salary_expectation": ["salary expectation", "expected salary", "desired salary", "compensation"],
   "posting.url": ["job url", "posting url", "job link", "requisition url"],
   "posting.role": ["job title", "position", "role", "title of role", "what position are you applying for", "job title applied for"],
@@ -77,6 +79,8 @@ export async function autofillSchema(userId: string) {
     "identity.website": identity.links?.website ?? identity.links?.portfolio ?? "",
     "identity.headline": identity.headline ?? "",
     "identity.work_authorization": identity.work_authorization ?? "",
+    "identity.sponsorship": identity.sponsorship ?? "",
+    "identity.relocation": identity.relocation ?? "",
     "identity.salary_expectation": identity.salary_expectation ? String(identity.salary_expectation) : "",
   };
   return {
@@ -111,6 +115,12 @@ export function similarity(a: string, b: string): number {
 
 const isPassword = (f: DetectedField) => /password|passwd|pwd/i.test(`${f.name ?? ""} ${f.id ?? ""} ${f.autocomplete ?? ""} ${f.type ?? ""}`) || f.type === "password";
 
+/** EEOC / voluntary self-identification: never auto-answer (human choice, §35.2 guardrail). */
+const isSelfIdentification = (label: string) =>
+  /disabilit|veteran|race\b|racial|ethnic|hispanic|latino|latinx|gender|sex\b|sexual orientation|transgender|non.?binary|self.?identif/i.test(label);
+
+const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+
 /** Server-side field matching, easily improved in one place (§35 autofill/match). */
 export async function matchFields(userId: string, host: string, fields: DetectedField[]): Promise<{ mappings: Mapping[]; skipped: string[] }> {
   const schema = await autofillSchema(userId);
@@ -126,6 +136,10 @@ export async function matchFields(userId: string, host: string, fields: Detected
     if (isPassword(f)) {
       skipped.push(f.name ?? f.id ?? "password");
       continue; // guardrail: never fill password fields (§35.2)
+    }
+    if (f.label && isSelfIdentification(f.label)) {
+      skipped.push(f.label);
+      continue; // guardrail: EEOC self-ID questions are the candidate's call, not ours
     }
     const signature = `${f.name ?? ""}|${f.autocomplete ?? ""}|${(f.label ?? "").toLowerCase().slice(0, 40)}`;
     let best: { key: string; confidence: number; method: string } | null = null;
@@ -161,6 +175,26 @@ export async function matchFields(userId: string, host: string, fields: Detected
           const s = similarity(f.label, alias);
           if (s >= 0.55 && (!best || s > best.confidence)) best = { key, confidence: Number(s.toFixed(2)), method: "label" };
         }
+      }
+    }
+
+    // 4b. label containment: long exam-style questions ("Will you now or in the future
+    // require sponsorship for employment visa status (e.g., H-1B, TN, etc.)?") never reach
+    // 0.55 against a short alias — if the question *contains* an alias phrase, match it.
+    if (!best && f.label) {
+      const L = normalize(f.label);
+      let hit: { key: string; aliasLen: number } | null = null;
+      for (const [key, aliases] of Object.entries(BASE_ALIASES)) {
+        for (const alias of aliases) {
+          const a = normalize(alias);
+          if (a.length < 5 || !L.includes(a)) continue;
+          if (!hit || a.length > hit.aliasLen) hit = { key, aliasLen: a.length };
+        }
+      }
+      if (hit) {
+        // long, specific phrase ⇒ green; short keyword ⇒ amber (fill but flagged)
+        const confidence = hit.aliasLen >= 15 ? 0.86 : 0.78;
+        best = { key: hit.key, confidence, method: "label_contains" };
       }
     }
 

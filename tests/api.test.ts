@@ -166,6 +166,38 @@ test("autofill match fills name/email with high confidence and never passwords",
   assert.ok(res.json.data.skipped.length >= 1, "unmatched fields are skipped, not guessed");
 });
 
+test("autofill match handles long exam-style radio questions and skips EEOC self-ID", async () => {
+  const put = await api("/profile", {
+    method: "PUT",
+    token,
+    body: { identity: { sponsorship: "No", work_authorization: "Yes", relocation: "Yes, I live locally" } },
+  });
+  assert.equal(put.status, 200);
+
+  const res = await api("/autofill/match", {
+    method: "POST",
+    token,
+    body: {
+      host: "jobs.ashby.example",
+      fields: [
+        { name: "office_q", label: "Are you able to come in to the San Francisco office 3 days per week (Monday, Tuesday, Thursday)?", type: "radio" },
+        { name: "auth_q", label: "Are you legally authorized to work in the United States? (Yes/No)", type: "radio" },
+        { name: "sponsor_q", label: "Will you now or in the future require sponsorship for employment visa status (e.g., H-1B, TN, etc.)?", type: "radio" },
+        { name: "eeoc_q", label: "Disability Status", type: "radio" },
+        { name: "password", label: "Password", autocomplete: "current-password", type: "password" },
+      ],
+    },
+  });
+  assert.equal(res.status, 200);
+  const map = new Map<string, any>(res.json.data.mappings.map((m: any) => [m.key, m]));
+  assert.equal(map.get("identity.sponsorship")?.value, "No");
+  assert.ok(map.get("identity.sponsorship")!.confidence >= 0.55, "long question matched via label containment");
+  assert.equal(map.get("identity.work_authorization")?.value, "Yes");
+  assert.equal(map.get("identity.relocation")?.value, "Yes, I live locally");
+  assert.ok(res.json.data.skipped.includes("Disability Status"), "EEOC self-ID never auto-answered");
+  assert.ok(!res.json.data.mappings.some((m: any) => m.key.includes("password")));
+});
+
 test("analytics summary has kpis with value/prev/delta and funnel keys", async () => {
   const res = await api("/analytics/summary?period=week", { token });
   assert.equal(res.status, 200);
