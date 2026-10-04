@@ -41522,10 +41522,45 @@ async function autofillSchema(userId) {
     "identity.salary_expectation": identity.salary_expectation ? String(identity.salary_expectation) : "",
     "identity.middle_name": identity.middle_name ?? "",
     "identity.graduation_year": identity.graduation_year ? String(identity.graduation_year) : "",
-    "identity.school": e0?.school ?? identity.school ?? "",
-    "identity.degree": e0?.degree ?? identity.degree ?? "",
-    "identity.field_of_study": e0?.field ?? identity.field_of_study ?? "",
-    "identity.heard_about": identity.heard_about ?? ""
+    "identity.school": identity.school || e0?.school || "",
+    "identity.degree": identity.degree || e0?.degree || "",
+    "identity.field_of_study": identity.field_of_study || e0?.field || "",
+    "identity.heard_about": identity.heard_about ?? "",
+    "identity.date_of_birth": identity.date_of_birth ?? "",
+    "identity.marital_status": identity.marital_status ?? "",
+    "identity.gender": identity.gender ?? "",
+    "identity.nationality": identity.nationality ?? "",
+    "identity.religion": identity.religion ?? "",
+    "identity.hobbies": identity.hobbies ?? "",
+    // Address/City fall back to the one-line location so profiles that only
+    // filled "Location" keep answering those portal fields exactly as before
+    "identity.street": identity.street || identity.location || "",
+    "identity.city": identity.city || identity.location || "",
+    "identity.state": identity.state ?? "",
+    "identity.country": identity.country ?? "",
+    "identity.zip": identity.zip ?? "",
+    "identity.grade": identity.grade ?? "",
+    "identity.cgpa": identity.cgpa ?? "",
+    "identity.other_qualifications": identity.other_qualifications ?? "",
+    "identity.experience_years": identity.experience_years ?? "",
+    "identity.experience_months": identity.experience_months ?? "",
+    "identity.current_employer": identity.current_employer ?? "",
+    "identity.current_job_role": identity.current_job_role ?? "",
+    "identity.current_responsibilities": identity.current_responsibilities ?? "",
+    "identity.previous_employer": identity.previous_employer ?? "",
+    "identity.previous_job_role": identity.previous_job_role ?? "",
+    "identity.previous_responsibilities": identity.previous_responsibilities ?? "",
+    "identity.current_salary": identity.current_salary ?? "",
+    "identity.referee1_name": identity.referee1_name ?? "",
+    "identity.referee1_email": identity.referee1_email ?? "",
+    "identity.referee1_phone": identity.referee1_phone ?? "",
+    "identity.referee1_address": identity.referee1_address ?? "",
+    "identity.referee2_name": identity.referee2_name ?? "",
+    "identity.referee2_email": identity.referee2_email ?? "",
+    "identity.referee2_phone": identity.referee2_phone ?? "",
+    "identity.referee2_address": identity.referee2_address ?? "",
+    "identity.facebook": identity.links?.facebook ?? "",
+    "identity.twitter": identity.links?.twitter ?? ""
   };
   const answers = Array.isArray(identity.autofill_answers) ? identity.autofill_answers : [];
   for (const [i2, a2] of answers.entries()) {
@@ -41582,7 +41617,12 @@ async function matchFields(userId, host, fields) {
       continue;
     }
     if (f2.label && isSelfIdentification(f2.label)) {
-      skip(f2.label, "voluntary self-identification \u2014 your answer, not ours");
+      const explicit = sensitiveAnswer(f2.label, aliasMap, values);
+      if (explicit) {
+        mappings.push({ key: explicit.key, value: explicit.value, confidence: 0.9, method: "explicit", field_index: index });
+      } else {
+        skip(f2.label, "voluntary self-identification \u2014 your answer, not ours");
+      }
       continue;
     }
     const signature = `${f2.name ?? ""}|${f2.autocomplete ?? ""}|${(f2.label ?? "").toLowerCase().slice(0, 40)}`;
@@ -41626,6 +41666,18 @@ async function matchFields(userId, host, fields) {
       }
     }
     if (!best && f2.label) {
+      const L2 = normalize(f2.label);
+      if (L2) {
+        for (const [key, aliases] of aliasMap) {
+          if (isCustom(key)) continue;
+          if (aliases.some((a2) => normalize(a2) === L2)) {
+            best = { key, confidence: 0.92, method: "label_exact" };
+            break;
+          }
+        }
+      }
+    }
+    if (!best && f2.label) {
       for (const [key, aliases] of aliasMap) {
         if (isCustom(key)) continue;
         for (const alias of aliases) {
@@ -41634,7 +41686,7 @@ async function matchFields(userId, host, fields) {
         }
       }
     }
-    if (!best && f2.label) {
+    if (f2.label && (!best || best.method === "label")) {
       const L2 = normalize(f2.label);
       let hit = null;
       for (const [key, aliases] of aliasMap) {
@@ -41647,7 +41699,7 @@ async function matchFields(userId, host, fields) {
       }
       if (hit) {
         const confidence = hit.aliasLen >= 15 ? 0.86 : 0.78;
-        best = { key: hit.key, confidence, method: "label_contains" };
+        if (!best || confidence > best.confidence) best = { key: hit.key, confidence, method: "label_contains" };
       }
     }
     if (!best) {
@@ -41675,7 +41727,7 @@ function confirmMapping(userId, host, fieldSignature, profileKey) {
   );
   return { learned: true };
 }
-var BASE_ALIASES, AUTOCOMPLETE_MAP, isPassword, isSelfIdentification, normalize;
+var BASE_ALIASES, AUTOCOMPLETE_MAP, isPassword, isSelfIdentification, SENSITIVE_KEYS, sensitiveAnswer, normalize;
 var init_autofill_service = __esm({
   "src/services/autofill.service.ts"() {
     "use strict";
@@ -41689,7 +41741,7 @@ var init_autofill_service = __esm({
       "identity.middle_name": ["middle name", "middle initial", "second name"],
       "identity.email": ["email", "email address", "e-mail", "contact email"],
       "identity.phone": ["phone", "phone number", "mobile", "telephone", "contact number"],
-      "identity.location": ["location", "city", "address", "where are you based", "current location"],
+      "identity.location": ["location", "where are you based", "current location"],
       "identity.linkedin": ["linkedin", "linkedin url", "linkedin profile", "linkedin profile url"],
       "identity.github": ["github", "github url", "github profile"],
       "identity.website": ["website", "portfolio", "personal site", "homepage"],
@@ -41702,7 +41754,48 @@ var init_autofill_service = __esm({
       "identity.school": ["school", "university", "college", "institution", "school name"],
       "identity.degree": ["degree", "degree type", "degree program"],
       "identity.field_of_study": ["discipline", "field of study", "major", "concentration"],
-      "identity.heard_about": ["how did you hear", "where did you hear", "heard about this", "how did you find"],
+      "identity.heard_about": ["how did you hear", "where did you hear", "heard about this", "how did you find", "source"],
+      // Career-portal demographics (Qore/AppZone-style applications). gender is
+      // sensitive: it only ever fills from an explicit saved answer (see matchFields).
+      "identity.date_of_birth": ["date of birth", "dob", "birth date", "birthday"],
+      "identity.marital_status": ["marital status", "marital"],
+      "identity.gender": ["gender", "sex"],
+      "identity.nationality": ["nationality"],
+      "identity.religion": ["religion"],
+      "identity.hobbies": ["hobbies", "hobby", "interests"],
+      // granular address — "Address" routes to street (falls back to location),
+      // "City" to city (same fallback), so older profiles keep filling as before
+      "identity.street": ["street", "address line 1", "address"],
+      "identity.city": ["city", "town"],
+      "identity.state": ["state", "province", "state/province", "region"],
+      "identity.country": ["country"],
+      "identity.zip": ["zip", "zip/postal code", "postal code", "postcode"],
+      // education extras
+      "identity.grade": ["grade", "degree class", "class of degree"],
+      "identity.cgpa": ["cgpa", "gpa"],
+      "identity.other_qualifications": ["other qualifications", "other qualifications obtained"],
+      // experience & employment (the portal typo 'Currrent' is a real field label)
+      "identity.experience_years": ["experience in years", "years of experience", "experience years", "total experience"],
+      "identity.experience_months": ["experience in months", "months of experience", "experience months"],
+      "identity.current_employer": ["current employer", "present employer", "current company"],
+      "identity.current_job_role": ["current job role", "currrent job role", "current role", "current designation", "current title"],
+      "identity.current_responsibilities": ["job responsibilities (current)", "responsibilities (current)", "current responsibilities"],
+      "identity.previous_employer": ["previous employer", "prior employer", "last employer", "former employer"],
+      "identity.previous_job_role": ["previous job role", "prior job role", "last job role"],
+      "identity.previous_responsibilities": ["job responsibilities (previous)", "responsibilities (previous)", "previous responsibilities"],
+      "identity.current_salary": ["current salary", "current salary (per annum)", "present salary"],
+      // referees — numbered aliases win on numbered labels; key 1 also carries the
+      // unnumbered phrasings so a bare "Referee Name" defaults to referee 1
+      "identity.referee1_name": ["referee name 1", "referee 1 name", "referee name", "referee"],
+      "identity.referee1_email": ["referee email 1", "referee email"],
+      "identity.referee1_phone": ["referee phone 1", "referee mobile number 1", "referee phone", "referee mobile number"],
+      "identity.referee1_address": ["referee address 1", "referee address"],
+      "identity.referee2_name": ["referee name 2", "referee 2 name"],
+      "identity.referee2_email": ["referee email 2"],
+      "identity.referee2_phone": ["referee phone 2", "referee mobile number 2"],
+      "identity.referee2_address": ["referee address 2"],
+      "identity.facebook": ["facebook", "fb url"],
+      "identity.twitter": ["twitter", "x (formerly twitter)", "x profile", "x handle"],
       "posting.url": ["job url", "posting url", "job link", "requisition url"],
       "posting.role": ["job title", "position", "role", "title of role", "what position are you applying for", "job title applied for"]
     };
@@ -41721,6 +41814,20 @@ var init_autofill_service = __esm({
     };
     isPassword = (f2) => /password|passwd|pwd/i.test(`${f2.name ?? ""} ${f2.id ?? ""} ${f2.autocomplete ?? ""} ${f2.type ?? ""}`) || f2.type === "password";
     isSelfIdentification = (label) => /disabilit|veteran|race\b|racial|ethnic|hispanic|latino|latinx|gender|sex\b|sexual orientation|transgender|non.?binary|self.?identif/i.test(label);
+    SENSITIVE_KEYS = ["identity.gender"];
+    sensitiveAnswer = (label, aliasMap, values) => {
+      const L2 = normalize(label);
+      for (const key of SENSITIVE_KEYS) {
+        const v2 = values.get(key);
+        if (!v2) continue;
+        for (const a2 of aliasMap.get(key) ?? []) {
+          const n2 = normalize(a2);
+          if (!n2) continue;
+          if (L2 === n2 || new RegExp(`\\b${n2}\\b`).test(L2)) return { key, value: v2 };
+        }
+      }
+      return null;
+    };
     normalize = (s2) => s2.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
   }
 });

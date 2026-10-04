@@ -357,3 +357,137 @@ test("export returns JSON payload with applications", async () => {
   assert.ok(Array.isArray(res.json.data.applications));
   assert.ok(res.json.data.exported_at);
 });
+
+test("career-portal fields fill from saved answers; self-ID only from an explicit answer", async () => {
+  // no gender saved yet → refused with a visible, human reason (never guessed)
+  const before = await api("/autofill/match", {
+    method: "POST",
+    token,
+    body: { host: "careers.example", fields: [{ name: "gender", label: "Gender: *", type: "radio" }] },
+  });
+  assert.equal(before.status, 200);
+  assert.equal(before.json.data.mappings.length, 0);
+  const beforeReasons = new Map<string, string>(before.json.data.skip_reasons.map((s: any) => [s.field, s.reason]));
+  assert.match(beforeReasons.get("Gender: *") ?? "", /voluntary/);
+
+  const put = await api("/profile", {
+    method: "PUT",
+    token,
+    body: {
+      identity: {
+        date_of_birth: "10/16/2006",
+        marital_status: "Single",
+        gender: "Male",
+        nationality: "Nigerian",
+        religion: "Christianity",
+        hobbies: "Making the society a better place",
+        street: "Akai Itiam Mutual alliance estate plot 7",
+        city: "Uyo",
+        state: "Akwa Ibom",
+        country: "Nigeria",
+        zip: "22323",
+        grade: "Second Class Upper",
+        cgpa: "4.0",
+        experience_years: "2",
+        experience_months: "24",
+        current_employer: "People growth africa",
+        current_job_role: "Technical associate",
+        current_responsibilities: "Full stack developer",
+        previous_employer: "None",
+        current_salary: "1000000-1500000",
+        salary_expectation: "500000-1000000",
+        referee1_name: "Hannah macaluey",
+        referee1_email: "macauleyhannaheduok@gmail.com",
+        referee1_phone: "09167114560",
+        referee2_name: "Humble Rowland Chiedozie",
+        referee2_email: "dev.mecurixtech@gmail.com",
+        referee2_phone: "08177284542",
+        links: { facebook: "https://facebook.com/israel", twitter: "https://x.com/israel" },
+      },
+    },
+  });
+  assert.equal(put.status, 200);
+
+  const res = await api("/autofill/match", {
+    method: "POST",
+    token,
+    body: {
+      host: "careers.example",
+      fields: [
+        { label: "Date of Birth: *", type: "text" },
+        { label: "Marital Status: *", type: "select" },
+        { label: "Nationality: *", type: "select" },
+        { label: "Religion:", type: "select" },
+        { label: "Hobbies:", type: "textarea" },
+        { label: "Source: *", type: "select" },
+        { label: "Address: *", type: "text" },
+        { label: "City: *", type: "text" },
+        { label: "State/Province", type: "text" },
+        { label: "Country: *", type: "select" },
+        { label: "Zip/Postal Code", type: "text" },
+        { label: "Grade: *", type: "select" },
+        { label: "CGPA:", type: "text" },
+        { label: "Experience in Years: *", type: "text" },
+        { label: "Experience in Months: *", type: "text" },
+        { label: "Current Employer: *", type: "text" },
+        { label: "Currrent Job Role: *", type: "text" },
+        { label: "Job Responsibilities (Current): *", type: "textarea" },
+        { label: "Previous Employer:", type: "text" },
+        { label: "Current Salary (per annum): *", type: "text" },
+        { label: "Expected Salary (per annum): *", type: "text" },
+        { label: "Referee Name 1: *", type: "text" },
+        { label: "Referee Name 2: *", type: "text" },
+        { label: "Referee Email 1: *", type: "text" },
+        { label: "Referee Mobile Number 2: *", type: "text" },
+        { label: "Facebook", type: "text" },
+        { label: "X (formerly Twitter)", type: "text" },
+        { label: "Gender: *", type: "radio" },
+        { label: "Disability Status", type: "radio" },
+      ],
+    },
+  });
+  assert.equal(res.status, 200);
+  const got = new Map<string, any>(res.json.data.mappings.map((m: any) => [m.key, m]));
+  const expect: Record<string, string> = {
+    "identity.date_of_birth": "10/16/2006",
+    "identity.marital_status": "Single",
+    "identity.nationality": "Nigerian",
+    "identity.religion": "Christianity",
+    "identity.hobbies": "Making the society a better place",
+    "identity.heard_about": "LinkedIn",
+    "identity.street": "Akai Itiam Mutual alliance estate plot 7",
+    "identity.city": "Uyo",
+    "identity.state": "Akwa Ibom",
+    "identity.country": "Nigeria",
+    "identity.zip": "22323",
+    "identity.grade": "Second Class Upper",
+    "identity.cgpa": "4.0",
+    "identity.experience_years": "2",
+    "identity.experience_months": "24",
+    "identity.current_employer": "People growth africa",
+    "identity.current_job_role": "Technical associate", // portal typo 'Currrent' included
+    "identity.current_responsibilities": "Full stack developer",
+    "identity.previous_employer": "None",
+    "identity.current_salary": "1000000-1500000",
+    "identity.salary_expectation": "500000-1000000",
+    "identity.referee1_name": "Hannah macaluey",
+    "identity.referee2_name": "Humble Rowland Chiedozie",
+    "identity.referee1_email": "macauleyhannaheduok@gmail.com",
+    "identity.referee2_phone": "08177284542",
+    "identity.facebook": "https://facebook.com/israel",
+    "identity.twitter": "https://x.com/israel",
+  };
+  for (const [key, value] of Object.entries(expect)) {
+    assert.equal(got.get(key)?.value, value, `${key} should fill with ${JSON.stringify(value)}`);
+    assert.ok(got.get(key)!.confidence >= 0.55, `${key} should reach fill confidence`);
+  }
+  // gender: explicit saved answer, never inferred
+  assert.equal(got.get("identity.gender")?.value, "Male");
+  assert.equal(got.get("identity.gender")?.method, "explicit");
+  assert.equal(got.get("identity.gender")?.confidence, 0.9);
+  // …and unrelated self-ID questions still refuse, even with a gender saved
+  assert.ok(res.json.data.skipped.includes("Disability Status"));
+  const reasons = new Map<string, string>(res.json.data.skip_reasons.map((s: any) => [s.field, s.reason]));
+  assert.match(reasons.get("Disability Status") ?? "", /voluntary/);
+  assert.equal(res.json.data.skip_reasons.length, res.json.data.skipped.length);
+});

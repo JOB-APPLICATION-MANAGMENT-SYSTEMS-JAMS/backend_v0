@@ -35,7 +35,7 @@ const BASE_ALIASES: Record<string, string[]> = {
   "identity.middle_name": ["middle name", "middle initial", "second name"],
   "identity.email": ["email", "email address", "e-mail", "contact email"],
   "identity.phone": ["phone", "phone number", "mobile", "telephone", "contact number"],
-  "identity.location": ["location", "city", "address", "where are you based", "current location"],
+  "identity.location": ["location", "where are you based", "current location"],
   "identity.linkedin": ["linkedin", "linkedin url", "linkedin profile", "linkedin profile url"],
   "identity.github": ["github", "github url", "github profile"],
   "identity.website": ["website", "portfolio", "personal site", "homepage"],
@@ -48,7 +48,48 @@ const BASE_ALIASES: Record<string, string[]> = {
   "identity.school": ["school", "university", "college", "institution", "school name"],
   "identity.degree": ["degree", "degree type", "degree program"],
   "identity.field_of_study": ["discipline", "field of study", "major", "concentration"],
-  "identity.heard_about": ["how did you hear", "where did you hear", "heard about this", "how did you find"],
+  "identity.heard_about": ["how did you hear", "where did you hear", "heard about this", "how did you find", "source"],
+  // Career-portal demographics (Qore/AppZone-style applications). gender is
+  // sensitive: it only ever fills from an explicit saved answer (see matchFields).
+  "identity.date_of_birth": ["date of birth", "dob", "birth date", "birthday"],
+  "identity.marital_status": ["marital status", "marital"],
+  "identity.gender": ["gender", "sex"],
+  "identity.nationality": ["nationality"],
+  "identity.religion": ["religion"],
+  "identity.hobbies": ["hobbies", "hobby", "interests"],
+  // granular address — "Address" routes to street (falls back to location),
+  // "City" to city (same fallback), so older profiles keep filling as before
+  "identity.street": ["street", "address line 1", "address"],
+  "identity.city": ["city", "town"],
+  "identity.state": ["state", "province", "state/province", "region"],
+  "identity.country": ["country"],
+  "identity.zip": ["zip", "zip/postal code", "postal code", "postcode"],
+  // education extras
+  "identity.grade": ["grade", "degree class", "class of degree"],
+  "identity.cgpa": ["cgpa", "gpa"],
+  "identity.other_qualifications": ["other qualifications", "other qualifications obtained"],
+  // experience & employment (the portal typo 'Currrent' is a real field label)
+  "identity.experience_years": ["experience in years", "years of experience", "experience years", "total experience"],
+  "identity.experience_months": ["experience in months", "months of experience", "experience months"],
+  "identity.current_employer": ["current employer", "present employer", "current company"],
+  "identity.current_job_role": ["current job role", "currrent job role", "current role", "current designation", "current title"],
+  "identity.current_responsibilities": ["job responsibilities (current)", "responsibilities (current)", "current responsibilities"],
+  "identity.previous_employer": ["previous employer", "prior employer", "last employer", "former employer"],
+  "identity.previous_job_role": ["previous job role", "prior job role", "last job role"],
+  "identity.previous_responsibilities": ["job responsibilities (previous)", "responsibilities (previous)", "previous responsibilities"],
+  "identity.current_salary": ["current salary", "current salary (per annum)", "present salary"],
+  // referees — numbered aliases win on numbered labels; key 1 also carries the
+  // unnumbered phrasings so a bare "Referee Name" defaults to referee 1
+  "identity.referee1_name": ["referee name 1", "referee 1 name", "referee name", "referee"],
+  "identity.referee1_email": ["referee email 1", "referee email"],
+  "identity.referee1_phone": ["referee phone 1", "referee mobile number 1", "referee phone", "referee mobile number"],
+  "identity.referee1_address": ["referee address 1", "referee address"],
+  "identity.referee2_name": ["referee name 2", "referee 2 name"],
+  "identity.referee2_email": ["referee email 2"],
+  "identity.referee2_phone": ["referee phone 2", "referee mobile number 2"],
+  "identity.referee2_address": ["referee address 2"],
+  "identity.facebook": ["facebook", "fb url"],
+  "identity.twitter": ["twitter", "x (formerly twitter)", "x profile", "x handle"],
   "posting.url": ["job url", "posting url", "job link", "requisition url"],
   "posting.role": ["job title", "position", "role", "title of role", "what position are you applying for", "job title applied for"],
 };
@@ -76,7 +117,9 @@ export async function autofillSchema(userId: string) {
   const u = await get<any>("SELECT email FROM users WHERE id = ?", userId);
   if (u?.email && !identity.email) identity.email = u.email;
   const aliases: any = p ? parseJson(p.aliases, {}) : {};
-  // education lives in its own table; the first row answers school/degree/discipline selects
+  // education lives in its own table; the first row answers school/degree/discipline
+  // selects — but an answer edited on /autofill (saved into identity) wins, so the
+  // candidate's explicit edit is never silently overridden by the seeded row
   const edu: any[] = p ? await all<any>("SELECT * FROM profile_education WHERE profile_id = ? ORDER BY sort_order LIMIT 1", p.id) : [];
   const e0 = edu[0];
   const merged: Record<string, string[]> = {};
@@ -98,10 +141,45 @@ export async function autofillSchema(userId: string) {
     "identity.salary_expectation": identity.salary_expectation ? String(identity.salary_expectation) : "",
     "identity.middle_name": identity.middle_name ?? "",
     "identity.graduation_year": identity.graduation_year ? String(identity.graduation_year) : "",
-    "identity.school": e0?.school ?? identity.school ?? "",
-    "identity.degree": e0?.degree ?? identity.degree ?? "",
-    "identity.field_of_study": e0?.field ?? identity.field_of_study ?? "",
+    "identity.school": identity.school || e0?.school || "",
+    "identity.degree": identity.degree || e0?.degree || "",
+    "identity.field_of_study": identity.field_of_study || e0?.field || "",
     "identity.heard_about": identity.heard_about ?? "",
+    "identity.date_of_birth": identity.date_of_birth ?? "",
+    "identity.marital_status": identity.marital_status ?? "",
+    "identity.gender": identity.gender ?? "",
+    "identity.nationality": identity.nationality ?? "",
+    "identity.religion": identity.religion ?? "",
+    "identity.hobbies": identity.hobbies ?? "",
+    // Address/City fall back to the one-line location so profiles that only
+    // filled "Location" keep answering those portal fields exactly as before
+    "identity.street": identity.street || identity.location || "",
+    "identity.city": identity.city || identity.location || "",
+    "identity.state": identity.state ?? "",
+    "identity.country": identity.country ?? "",
+    "identity.zip": identity.zip ?? "",
+    "identity.grade": identity.grade ?? "",
+    "identity.cgpa": identity.cgpa ?? "",
+    "identity.other_qualifications": identity.other_qualifications ?? "",
+    "identity.experience_years": identity.experience_years ?? "",
+    "identity.experience_months": identity.experience_months ?? "",
+    "identity.current_employer": identity.current_employer ?? "",
+    "identity.current_job_role": identity.current_job_role ?? "",
+    "identity.current_responsibilities": identity.current_responsibilities ?? "",
+    "identity.previous_employer": identity.previous_employer ?? "",
+    "identity.previous_job_role": identity.previous_job_role ?? "",
+    "identity.previous_responsibilities": identity.previous_responsibilities ?? "",
+    "identity.current_salary": identity.current_salary ?? "",
+    "identity.referee1_name": identity.referee1_name ?? "",
+    "identity.referee1_email": identity.referee1_email ?? "",
+    "identity.referee1_phone": identity.referee1_phone ?? "",
+    "identity.referee1_address": identity.referee1_address ?? "",
+    "identity.referee2_name": identity.referee2_name ?? "",
+    "identity.referee2_email": identity.referee2_email ?? "",
+    "identity.referee2_phone": identity.referee2_phone ?? "",
+    "identity.referee2_address": identity.referee2_address ?? "",
+    "identity.facebook": identity.links?.facebook ?? "",
+    "identity.twitter": identity.links?.twitter ?? "",
   };
   // Custom Q&A from the /autofill page: profile.autofill_answers =
   // [{ match: "question snippet", answer: "your answer" }] — each becomes a
@@ -150,6 +228,27 @@ const isPassword = (f: DetectedField) => /password|passwd|pwd/i.test(`${f.name ?
 const isSelfIdentification = (label: string) =>
   /disabilit|veteran|race\b|racial|ethnic|hispanic|latino|latinx|gender|sex\b|sexual orientation|transgender|non.?binary|self.?identif/i.test(label);
 
+/**
+ * Sensitive self-ID keys: we never *infer* these (§35.2), but if the candidate
+ * explicitly saved an answer in their own profile we fill exactly that — it is
+ * their stated choice, same as any other answer. Word-boundary match only, so
+ * "transgender" never receives the gender value.
+ */
+const SENSITIVE_KEYS = ["identity.gender"];
+const sensitiveAnswer = (label: string, aliasMap: Map<string, string[]>, values: Map<string, string>) => {
+  const L = normalize(label);
+  for (const key of SENSITIVE_KEYS) {
+    const v = values.get(key);
+    if (!v) continue;
+    for (const a of aliasMap.get(key) ?? []) {
+      const n = normalize(a);
+      if (!n) continue;
+      if (L === n || new RegExp(`\\b${n}\\b`).test(L)) return { key, value: v };
+    }
+  }
+  return null;
+};
+
 const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 
 /** Server-side field matching, easily improved in one place (§35 autofill/match). */
@@ -178,7 +277,13 @@ export async function matchFields(userId: string, host: string, fields: Detected
       continue; // guardrail: never fill password fields (§35.2)
     }
     if (f.label && isSelfIdentification(f.label)) {
-      skip(f.label, "voluntary self-identification — your answer, not ours");
+      const explicit = sensitiveAnswer(f.label, aliasMap, values);
+      if (explicit) {
+        // the candidate saved this answer themselves — fill it, never infer one
+        mappings.push({ key: explicit.key, value: explicit.value, confidence: 0.9, method: "explicit", field_index: index });
+      } else {
+        skip(f.label, "voluntary self-identification — your answer, not ours");
+      }
       continue; // guardrail: EEOC self-ID questions are the candidate's call, not ours
     }
     const signature = `${f.name ?? ""}|${f.autocomplete ?? ""}|${(f.label ?? "").toLowerCase().slice(0, 40)}`;
@@ -236,6 +341,23 @@ export async function matchFields(userId: string, host: string, fields: Detected
       }
     }
 
+    // 3.6. exact label match — normalized label equals an alias verbatim. Must run
+    // before the fuzzy step: dice can score a *shorter* alias at 1.0 too
+    // ("Referee Name 2" bigrams contain all of "referee name"'s), and first-seen
+    // would then keep referee1 for a referee-2 field. Exact wins deterministically.
+    if (!best && f.label) {
+      const L = normalize(f.label);
+      if (L) {
+        for (const [key, aliases] of aliasMap) {
+          if (isCustom(key)) continue;
+          if (aliases.some((a) => normalize(a) === L)) {
+            best = { key, confidence: 0.92, method: "label_exact" };
+            break;
+          }
+        }
+      }
+    }
+
     // 4. label similarity ≥ 0.55 (spec: rapidfuzz ≥ 85/100 on well-formed labels)
     if (!best && f.label) {
       for (const [key, aliases] of aliasMap) {
@@ -250,7 +372,11 @@ export async function matchFields(userId: string, host: string, fields: Detected
     // 4b. label containment: long exam-style questions ("Will you now or in the future
     // require sponsorship for employment visa status (e.g., H-1B, TN, etc.)?") never reach
     // 0.55 against a short alias — if the question *contains* an alias phrase, match it.
-    if (!best && f.label) {
+    // Also runs when step 4 fired: a phrase present verbatim beats bigram similarity,
+    // correcting stem-misses ("Highest Qualification / Degree" fuzzy-matches
+    // "other qualifications" via the shared stem but truly contains "degree").
+    // Never overrides history/autocomplete/name/custom — those keep priority.
+    if (f.label && (!best || best.method === "label")) {
       const L = normalize(f.label);
       let hit: { key: string; aliasLen: number } | null = null;
       for (const [key, aliases] of aliasMap) {
@@ -264,7 +390,7 @@ export async function matchFields(userId: string, host: string, fields: Detected
       if (hit) {
         // long, specific phrase ⇒ green; short keyword ⇒ amber (fill but flagged)
         const confidence = hit.aliasLen >= 15 ? 0.86 : 0.78;
-        best = { key: hit.key, confidence, method: "label_contains" };
+        if (!best || confidence > best.confidence) best = { key: hit.key, confidence, method: "label_contains" };
       }
     }
 
