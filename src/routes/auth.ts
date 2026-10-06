@@ -3,9 +3,10 @@ import { z } from "zod";
 import { ok } from "../core/envelope";
 import { requireAuth, signAccessToken, signRefreshToken, verifyToken, type AuthedRequest } from "../core/security";
 import * as auth from "../services/auth.service";
-import { AppError, unauthenticated } from "../core/errors";
+import { AppError, notFound, unauthenticated } from "../core/errors";
 import { rateLimit } from "../core/middleware";
 import { get } from "../core/db";
+import { config } from "../core/config";
 
 export const authRouter = Router();
 const limiter = rateLimit("auth", 20, 15 * 60_000);
@@ -22,7 +23,12 @@ authRouter.post("/register", limiter, async (req, res, next) => {
   try {
     const body = registerSchema.parse(req.body);
     const result = await auth.register(body.email, body.password, body.timezone, body.first_name, body.last_name);
-    ok(res, "Account created, check your email for the verification link", { ...result, requires_verification: true }, 201);
+    ok(
+      res,
+      result.email_sent ? "Account created, check your email for the verification link" : "Account created, verify your email to continue",
+      { ...result, requires_verification: true },
+      201
+    );
   } catch (e) {
     next(e);
   }
@@ -75,9 +81,14 @@ authRouter.post("/resend-verification", limiter, async (req, res, next) => {
   }
 });
 
-/** Local-mode convenience: read the latest verification token (dev console equivalent of MailPit). */
+/**
+ * Local-mode convenience: read the latest verification token (dev console equivalent of MailPit).
+ * Gated to non-online modes — in online mode this endpoint would hand any caller the ability to
+ * verify (and therefore activate) an account they do not own, so it 404s there.
+ */
 authRouter.get("/dev-token", async (req, res, next) => {
   try {
+    if (config.mode === "online") throw notFound("Resource");
     const email = z.object({ email: z.string().email() }).parse(req.query).email;
     const user = await get("SELECT email, verification_token, verified FROM users WHERE email = ?", email.toLowerCase());
     ok(res, "dev", { email, verified: !!user?.verified, verification_token: user?.verification_token ?? null });

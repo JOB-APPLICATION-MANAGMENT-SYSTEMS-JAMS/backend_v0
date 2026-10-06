@@ -75,6 +75,3 @@ export function bucketKey(iso: string, bucket: Period, tz: string): string {
   return date.toISOString().slice(0, 10);
 }
 
-export function daysBetween(a: string, b: string): number {
-  return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86_400_000);
-}

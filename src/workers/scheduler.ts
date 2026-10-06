@@ -7,8 +7,6 @@ import { ghostSweep } from "../services/application.service";
 import { ingestAll } from "../ingestion/ingest";
 import { all, run } from "../core/db";
 import { config } from "../core/config";
-import { localDayIso } from "../util/date";
-import { newId } from "../util/id";
 
 let timer: NodeJS.Timeout | null = null;
 let tick = 0;
@@ -32,17 +30,12 @@ export function startScheduler() {
       }
       if (tick % 15 === 0) await sequenceReminders();
       if (tick % 60 === 0) await buildRollups();
-    } catch (e: any) {
-      console.error("[worker] tick failed:", e.message);
+    } catch (e) {
+      console.error("[worker] tick failed:", e instanceof Error ? e.message : e);
     }
   }, config.workerIntervalMs);
   timer.unref?.();
   console.log(`[worker] scheduler started (interval ${config.workerIntervalMs}ms)`);
-}
-
-export function stopScheduler() {
-  if (timer) clearInterval(timer);
-  timer = null;
 }
 
 /** v0: notify (chips) instead of autonomous sending (§26.4). */
@@ -84,7 +77,3 @@ async function buildRollups() {
   }
 }
 
-export const runGhostSweep = () => ghostSweep();
-export const runIngest = (userId: string) => ingestAll(userId);
-export const newRunId = () => newId();
-export const todayKey = (tz: string) => localDayIso(new Date(), tz);

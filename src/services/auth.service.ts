@@ -1,9 +1,10 @@
-import { all, get, run } from "../core/db";
+import { get, run } from "../core/db";
 import { hashPassword, signAccessToken, signRefreshToken, verifyPassword } from "../core/security";
-import { conflict, invalidCredentials, notFound, forbidden, AppError } from "../core/errors";
+import { conflict, invalidCredentials, notFound, AppError } from "../core/errors";
 import { newId, nowIso } from "../util/id";
 import { randomBytes } from "node:crypto";
-import { config } from "../core/config";
+import nodemailer from "nodemailer";
+import { config, smtpReady } from "../core/config";
 
 export interface PublicUser {
   id: string;
@@ -26,6 +27,49 @@ const publicUser = (u: any): PublicUser => ({
 export function issueTokens(userId: string) {
   const sid = newId();
   return { access_token: signAccessToken(userId, sid), refresh_token: signRefreshToken(userId, sid), token_type: "bearer" };
+}
+
+/**
+ * Deliver a verification token (§4.3).
+ *  - non-online (local/test): print the link and hand the token straight back, so the UI
+ *    can verify instantly with no SMTP — the MailPit equivalent.
+ *  - online: email the link through the deployment SMTP_* account and NEVER return the
+ *    token; echoing it would let anyone register with an address they do not own and
+ *    verify it themselves, defeating email verification entirely.
+ */
+async function deliverVerification(email: string, token: string): Promise<{ sent: boolean; verification_token?: string }> {
+  if (config.mode !== "online") {
+    console.log(`[auth] verification link for ${email}: /auth/verify-email?token=${token}`);
+    return { sent: false, verification_token: token };
+  }
+  const origin = config.webOrigin !== "*" ? config.webOrigin.replace(/\/+$/, "") : "";
+  const path = `/auth/verify?token=${token}`;
+  const link = origin ? `${origin}${path}` : null;
+  if (!smtpReady() || !link) {
+    const why = !smtpReady() ? "SMTP_* env not configured" : "WEB_ORIGIN is still the wildcard default";
+    console.warn(`[auth] verification email for ${email} NOT sent (${why}); link: ${link ?? path}`);
+    return { sent: false };
+  }
+  try {
+    const transport = nodemailer.createTransport({
+      host: config.smtp.host,
+      port: config.smtp.port,
+      secure: config.smtp.port === 465,
+      auth: { user: config.smtp.user, pass: config.smtp.pass },
+    });
+    await transport.sendMail({
+      from: config.smtp.from || config.smtp.user,
+      to: email,
+      subject: "Confirm your email for JAMS",
+      text:
+        `Confirm ${email} to finish setting up your JAMS account:\n\n${link}\n\n` +
+        `The link stops working as soon as a newer one is requested. If you did not create this account, ignore this email.`,
+    });
+    return { sent: true };
+  } catch (e) {
+    console.error("[auth] verification email failed:", e instanceof Error ? e.message : e);
+    return { sent: false };
+  }
 }
 
 export async function register(email: string, password: string, timezone?: string, firstName?: string, lastName?: string) {
@@ -52,11 +96,16 @@ export async function register(email: string, password: string, timezone?: strin
     now,
     now
   );
-  // local mode: no SMTP, the token is surfaced to the dev console + returned in dev (§31.1 MailPit equivalent)
-  console.log(`[auth] verification link for ${email}: /auth/verify-email?token=${token}`);
+  // online mode emails the link; local/test surface the token (see deliverVerification)
   await run(`INSERT INTO profiles (id, user_id, identity, prefs, aliases, version, updated_at) VALUES (?, ?, ?, '{}', '{}', 1, ?)`, newId(), id, identity, now);
+  const delivery = await deliverVerification(email, token);
   const user = (await get("SELECT * FROM users WHERE id = ?", id))!;
-  return { user: publicUser(user), verification_token: token, ...issueTokens(id) };
+  return {
+    user: publicUser(user),
+    email_sent: delivery.sent,
+    ...(delivery.verification_token ? { verification_token: delivery.verification_token } : {}),
+    ...issueTokens(id),
+  };
 }
 
 export async function login(email: string, password: string) {
@@ -86,8 +135,8 @@ export async function resendVerification(email: string) {
   if (!user) return { sent: true }; // do not leak existence
   const token = randomBytes(24).toString("hex");
   await run("UPDATE users SET verification_token = ?, updated_at = ? WHERE id = ?", token, nowIso(), user.id);
-  console.log(`[auth] verification link for ${email}: /auth/verify-email?token=${token}`);
-  return { sent: true, verification_token: token };
+  const delivery = await deliverVerification(email, token);
+  return { sent: true, ...(delivery.verification_token ? { verification_token: delivery.verification_token } : {}) };
 }
 
 export async function me(userId: string) {
@@ -105,11 +154,3 @@ export async function me(userId: string) {
   return { user: publicUser(user), profile_exists: !!profile, settings: { goal: user.goal_default, timezone: user.timezone, mode: process.env.MODE ?? "local" }, counts };
 }
 
-export function refresh(refreshToken: string) {
-  // re-issue handled in route via verifyToken
-  return { refresh_token: refreshToken };
-}
-
-export async function listUsersForDebug() {
-  return (await all("SELECT id, email, verified, created_at FROM users ORDER BY created_at DESC LIMIT 20")).map(publicUser);
-}

@@ -15,7 +15,9 @@ export function createApp() {
   app.use(
     cors({
       origin: config.webOrigin === "*" ? true : config.webOrigin.split(",").map((s) => s.trim()),
-      credentials: true,
+      // auth is a Bearer header (never a cookie) → credentialed CORS is only enabled
+      // when WEB_ORIGIN pins the callers; the wildcard dev default stays credential-free
+      credentials: config.webOrigin !== "*",
     })
   );
   // 8mb: the pitch preview uploads files/CVs as base64 JSON (§19.1 attachments)

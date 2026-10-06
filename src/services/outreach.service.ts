@@ -200,22 +200,7 @@ export async function sendOutreach(userId: string, id: string, opts: { via?: "gm
   return { id, state, compose_url: composeUrl, via: opts.via === "smtp" ? "smtp" : "gmail_open", sent_today: used + 1, daily_cap: cap };
 }
 
-/** Pitch template: CV to a company with no open role (§19.1 mode 2). Shared with pitch.service. */
-export const PITCH_SUBJECT = `{{company.name}} x software engineering`;
-export const PITCH_BODY = `Hi {{company.name}} team,
-
-I came across your work and wanted to introduce myself directly, since I did not see an open engineering role on your careers page.
-
-I am a software engineer who builds typed, well-tested product surfaces end to end: web apps, APIs and the automation that saves teams manual work. A few things I could take off your plate:
-
-- internal tools and dashboards for operations, stock or scheduling
-- a proper website / booking flow that your team controls
-- integrations (payments, email, WhatsApp) with monitoring so issues surface early
-
-If useful, my CV and a couple of sample builds are one reply away. Happy to send a short proposal for one concrete improvement you could make this month.
-
-Best regards,
-{{profile.first_name}} {{profile.last_name}}`;
+/** Pitch template: CV to a company with no open role (§19.1 mode 2). */
 
 /**
  * Direct-send credentials for this user: deployment-wide SMTP_* env first, else the
@@ -250,7 +235,7 @@ export function smtpSendError(e: any): AppError {
       "SMTP_AUTH_FAILED",
       400,
       "The mailbox rejected the saved password",
-      "Gmail will not accept a normal account password, it needs a 16-character app password. Go to Outreach → Inbox & Sync → Edit credentials, paste the app password from my.google.com/apppasswords (Google Account → 2-Step Verification → App passwords), then send again."
+      "Gmail will not accept a normal account password, it needs a 16-character app password. Go to Outreach → Inbox & Sync → Edit credentials, paste the app password from myaccount.google.com/apppasswords (open with 2-Step Verification on, then Create → copy the 16 characters), then send again."
     );
   }
   return new AppError("SMTP_SEND_FAILED", 502, "The mailbox could not send this message", raw.slice(0, 300) || "Unknown SMTP error, try again in a moment");
