@@ -138,17 +138,35 @@ cvRouter.get("/:id/suggest", async (req: AuthedRequest, res, next) => {
   }
 });
 
-/** Print-ready A4 HTML, the browser's print pipeline (Chromium) renders the PDF (§24.1). */
+/**
+ * Print-ready A4 HTML, the browser's print pipeline (Chromium) renders the PDF (§24.1).
+ *
+ * `?frame=1` wraps the document in a real 210×297mm sheet so the editor can scale it
+ * to any zoom without guessing at margins, and `?accent=` switches the document accent.
+ * Same HTML either way, so the preview cannot drift from the printed page.
+ */
 cvRouter.get("/:id/html", async (req: AuthedRequest, res, next) => {
   try {
     const c = await cv.getCV(req.userId!, String(req.params.id));
     const p = await profile.getProfile(req.userId!);
+    const q = req.query as { frame?: string; accent?: string };
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(renderCvHtml(c, p));
+    res.send(renderCvHtml(c, p, { frame: q.frame === "1", accent: CV_ACCENTS[q.accent ?? ""] ?? CV_ACCENTS.ember }));
   } catch (e) {
     next(e);
   }
 });
+
+/**
+ * Document accents. These are the darker rungs of the app's single accent hue:
+ * pure #ff9933 is a screen colour and only clears 2:1 as text on white paper, so
+ * the default document accent is the same hue one step down.
+ */
+const CV_ACCENTS: Record<string, string> = {
+  ember: "#b35f00",
+  ink: "#17130f",
+  graphite: "#5b564f",
+};
 
 /**
  * Structured like the reference FlowCV resume: uppercase name header + contact row
@@ -156,7 +174,7 @@ cvRouter.get("/:id/html", async (req: AuthedRequest, res, next) => {
  * (dates/location left, content right), skills as a multi-column grid, prose as
  * justified paragraphs. Profile-sourced blocks expand from the master profile.
  */
-function renderCvHtml(c: any, p: any): string {
+function renderCvHtml(c: any, p: any, opts: { frame: boolean; accent: string } = { frame: false, accent: CV_ACCENTS.ember }): string {
   const esc = (s: string) => String(s ?? "").replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m]!);
   const id = p?.identity ?? {};
   const links = id.links ?? {};
@@ -251,31 +269,44 @@ function renderCvHtml(c: any, p: any): string {
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(name)}</title>
 <style>
+ :root { --accent: ${esc(opts.accent)}; --ink: #17130f; --soft: #4d4842; --faint: #6f6961; --rule: #dad4cc; }
  @page { size: A4; margin: 15mm; }
  * { box-sizing: border-box; }
- body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #17130f; font-size: 10.4pt; line-height: 1.42; margin: 0; }
- header { border-bottom: 2px solid #17130f; padding-bottom: 8pt; }
- .name { font-size: 23pt; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; line-height: 1.1; margin: 0; }
- .headline { font-size: 10pt; color: #55504a; margin: 3pt 0 0; }
- .contact { display: flex; flex-wrap: wrap; gap: 2pt 16pt; font-size: 9.3pt; color: #46413b; margin-top: 6pt; }
+ html, body { margin: 0; }
+ body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: var(--ink); font-size: 10.4pt; line-height: 1.45; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+ /* the sheet: exact A4 geometry, so a parent can scale it to any zoom and the
+   printed page stays identical. Padding is dropped again for print because
+   @page margin already supplies it. */
+ .page { width: 210mm; min-height: 297mm; padding: 15mm; margin: 0 auto; background: #fff; }
+ header { padding-bottom: 9pt; border-bottom: 2px solid var(--accent); }
+ .name { font-size: 22pt; font-weight: 800; letter-spacing: .045em; text-transform: uppercase; line-height: 1.08; margin: 0; }
+ .headline { font-size: 10.2pt; font-weight: 600; color: var(--soft); margin: 3.5pt 0 0; }
+ .contact { display: flex; flex-wrap: wrap; gap: 2pt 14pt; font-size: 9.2pt; color: var(--faint); margin-top: 7pt; }
  section { margin-top: 13pt; }
- h2 { font-size: 10.6pt; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; color: #17130f; margin: 0 0 6pt; padding-bottom: 2.5pt; border-bottom: 1px solid #d8d2ca; }
- .entry { display: grid; grid-template-columns: 33mm 1fr; gap: 0 10pt; margin-bottom: 8pt; page-break-inside: avoid; }
+ section:first-of-type { margin-top: 15pt; }
+ h2 { font-size: 10.4pt; font-weight: 800; text-transform: uppercase; letter-spacing: .14em; color: var(--accent); margin: 0 0 7pt; padding-bottom: 3pt; border-bottom: 1px solid var(--rule); }
+ .entry { display: grid; grid-template-columns: 33mm 1fr; gap: 0 10pt; margin-bottom: 9pt; page-break-inside: avoid; }
  .entry:last-child { margin-bottom: 0; }
  .when { font-size: 9.2pt; }
- .when .d { font-weight: 700; color: #35302b; }
- .when .loc { color: #6b655d; font-size: 8.8pt; margin-top: 1pt; }
+ .when .d { font-weight: 700; color: var(--soft); }
+ .when .loc { color: var(--faint); font-size: 8.8pt; margin-top: 1pt; }
  .what .t { font-weight: 700; }
- .what .org { color: #55504a; font-size: 9.6pt; }
- ul { margin: 3pt 0 0; padding-left: 15pt; }
+ .what .org { color: var(--soft); font-size: 9.6pt; }
+ ul { margin: 3.5pt 0 0; padding-left: 14pt; }
  li { margin-bottom: 1.5pt; }
+ li::marker { color: var(--accent); }
  p.prose { margin: 0 0 5pt; }
  p.prose:last-child { margin-bottom: 0; }
- .skills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3pt 12pt; font-size: 10pt; }
- @media print { body { -webkit-print-color-adjust: exact; } }
+ /* one flowing line rather than a grid: skills stay a plain comma-ish list, which
+   is what a parser reads most reliably, with the accent carrying the separators */
+ .skills { font-size: 10pt; }
+ .skills span:not(:last-child)::after { content: "·"; color: var(--accent); margin: 0 7pt; }
+ @media print { .page { width: auto; min-height: 0; padding: 0; margin: 0; background: none; } }
 </style></head><body>
+${opts.frame ? `<div class="page">` : ""}
 <header><h1 class="name">${esc(name)}</h1>${id.headline ? `<p class="headline">${esc(id.headline)}</p>` : ""}${contactHtml}</header>
 ${body}
+${opts.frame ? `</div>` : ""}
 </body></html>`;
 }
 
