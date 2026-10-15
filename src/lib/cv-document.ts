@@ -5,29 +5,86 @@
  * (`IRAOYA_ISRAEL_OMOKHAGBO_FlowCV_Resume_2026-09-30.pdf`, itself a Chrome print
  * of FlowCV's HTML — same pipeline this app uses, so the two can be compared
  * number for number). The export is a tagged Skia/PDF at 1 unit = 1 CSS px on a
- * 794 × 1126 px sheet, and every value below is one of its measured positions:
+ * 794 × 1126 px sheet:
  *
  *   sheet            794 × 1126 px (210 × 297mm), white, side margin 20mm
  *   name             Amiri Bold 32.66px, centred, baseline 84
- *   contact row      Amiri Regular 14px, centred, baseline 119, 14px icons at x 171/345/486
+ *   contact row      Amiri Regular 14px, centred, baseline 119, 14px icons
  *   section heading  Amiri Bold 15.33px, baseline H, then a 2px black rule at H + 7
  *   first body line  baseline H + 30, then 18px lines (14px Amiri)
- *   next section     previous section's last baseline + 38
- *   entry columns    left starts at the 20mm margin, right at x = 223.36 (offset 147.8)
- *   entries          line 1 = date | title(bold), line 2 = location | org(italic), then prose
- *   entry gap        12px (so the next entry's first baseline lands +30)
- *   skills           3 equal columns, 32px column gap, 9.5px row gap, 4px square markers
+ *   entry columns    left at the 20mm margin, right at x = 223.36
+ *   skills           3 equal columns, 32px column gap, 9.5px row gap, 4px markers
  *
- * Two deliberate consequences of copying it exactly: the document is monochrome
- * (the reference has no accent colour anywhere — every run is rgb(0,0,0)), and
- * experience descriptions are plain prose lines rather than bulleted items,
- * which is what the reference actually contains.
+ * The document is *modelled* before it is rendered: `buildCvDoc` produces the
+ * sections and lines, `renderCvHtml` turns that model into markup and
+ * `estimateCvDoc` measures the same model with the same metrics. That is the
+ * only way the page count the ATS panel reports can be trusted to describe the
+ * page the printer produces — two independent code paths would drift, and a
+ * length check that drifts is worse than no length check.
  *
- * One geometry serves both screen and paper: `@page` supplies the vertical paper
- * margin so that *every* page of a two-page CV is inset, and the sheet supplies
- * the side margins, so the preview cannot drift from the printed page.
+ * Two deliberate consequences of copying the reference exactly: the document is
+ * monochrome (every run in the reference is rgb(0,0,0)), and experience
+ * descriptions are plain prose lines rather than bulleted items, which is what
+ * the reference actually contains.
  */
-import type { Request, Response } from "express";
+
+/* ------------------------- the sheet, in CSS px -------------------------- */
+
+const MM = 96 / 25.4;
+
+/** Paper margin, in mm. Vertical comes from `@page` so every printed page is
+ *  inset; horizontal is the sheet's own padding. */
+const PAPER_TOP_MM = 15;
+const PAPER_SIDE_MM = 20;
+
+/** Average advance of Amiri at 14px, measured across the reference's own body
+ *  lines (110 glyphs spanning 624.8px). Used only to estimate line wrapping. */
+const CHAR_W = 5.68;
+
+export const SHEET = {
+  pageW: 794,
+  pageH: 1122.67,
+  /** usable content height of one printed page: the box between the paper margins */
+  get contentH() {
+    return this.pageH - 2 * PAPER_TOP_MM * MM;
+  },
+  nameSize: 32.66,
+  nameLine: 1.2,
+  contactSize: 14,
+  contactLine: 14,
+  contactGap: 12.7,
+  headerBottom: 7.2,
+  sectionTop: 19,
+  headSize: 15.33,
+  headLine: 19,
+  headPad: 1,
+  rule: 2,
+  headGap: 9,
+  bodySize: 14,
+  bodyLine: 18,
+  colLeft: 147.8,
+  entryGap: 12,
+  entryTop: 1,
+  skillCols: 3,
+  skillColGap: 32,
+  skillRowGap: 9.5,
+  skillInset: 2.4,
+  get contentW() {
+    return this.pageW - 2 * PAPER_SIDE_MM * MM;
+  },
+  /** the right column of a dated entry */
+  get colRight() {
+    return this.contentW - this.colLeft;
+  },
+  get skillCol() {
+    return (this.contentW - 2 * this.skillColGap) / this.skillCols;
+  },
+} as const;
+
+const wrapLines = (text: string, colWidth: number): number =>
+  Math.max(1, Math.ceil(text.length / Math.floor(colWidth / CHAR_W)));
+
+/* ------------------------------ accents --------------------------------- */
 
 export const CV_ACCENTS: Record<string, string> = {
   /** the reference document: pure paper black */
@@ -41,10 +98,7 @@ const DEFAULT_ACCENT = "ink";
 
 /* ------------------------------- icons ---------------------------------- */
 
-const I = (
-  d: string,
-  cls = "ico",
-): string =>
+const I = (d: string, cls = "ico"): string =>
   `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${d}</svg>`;
 
 const ICONS: Record<string, (cls?: string) => string> = {
@@ -58,7 +112,7 @@ const ICONS: Record<string, (cls?: string) => string> = {
 
 /* ------------------------------ helpers --------------------------------- */
 
-const esc = (s: unknown): string =>
+export const esc = (s: unknown): string =>
   String(s ?? "").replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[m]!);
 
 /** strip the scheme so a link reads as `github.com/izzychils` on the page */
@@ -68,11 +122,11 @@ const href = (v: unknown): string => {
   const s = String(v ?? "").trim();
   if (!s) return "";
   if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return s;
-  return /@/.test(s) && !/^https?:/i.test(s) ? `mailto:${s}` : `https://${s}`;
+  return /@/.test(s) ? `mailto:${s}` : `https://${s}`;
 };
 
 /** one paragraph per non-empty line — the reference's prose unit */
-const lines = (t: unknown): string[] =>
+export const lines = (t: unknown): string[] =>
   String(t ?? "")
     .split("\n")
     .map((x) => x.trim())
@@ -85,7 +139,7 @@ const paras = (t: unknown): string[] =>
     .filter(Boolean);
 
 /** `2026/07 – Present`, the reference's date form */
-function range(start: unknown, end: unknown): string {
+export function range(start: unknown, end: unknown): string {
   const a = String(start ?? "").trim();
   const b = String(end ?? "").trim();
   if (!a && !b) return "";
@@ -93,116 +147,175 @@ function range(start: unknown, end: unknown): string {
   return `${a} \u2013 ${b || "Present"}`;
 }
 
-/* ---------------------------- the document ------------------------------ */
+const HEADS: Record<string, string> = {
+  summary: "Profile",
+  experience: "Professional Experience",
+  skills: "Skills",
+  education: "Education",
+  projects: "Projects",
+  awards: "Awards",
+  custom: "Section",
+};
 
-export type CvDocOptions = { frame?: boolean; accent?: string };
+/* ------------------------------ the model -------------------------------- */
 
-export function renderCvHtml(c: any, p: any, opts: CvDocOptions = {}): string {
-  const accent = CV_ACCENTS[String(opts.accent)] ?? CV_ACCENTS[DEFAULT_ACCENT];
+export type CvContact = { icon: keyof typeof ICONS; label: string; url: string };
+export type CvLine =
+  | { k: "prose"; text: string }
+  | { k: "entry"; when: string; loc: string; title?: string; org?: string; body: string[] }
+  | { k: "skills"; items: string[] };
+export type CvSection = { head: string; lines: CvLine[] };
+export type CvDoc = { name: string; contact: CvContact[]; sections: CvSection[] };
+
+/**
+ * Everything the document is, in the order it appears. Nothing here knows about
+ * HTML or about page counts; both consumers read this same shape.
+ */
+export function buildCvDoc(c: any, p: any): CvDoc {
   const id: any = p?.identity ?? {};
   const links: any = id.links ?? {};
 
-  const name = String(id.name ?? "").trim() || String(c?.name ?? "");
-  const contact: { icon: string; label: string; url: string }[] = [
-    id.email ? { icon: "mail", label: String(id.email), url: href(id.email) } : null,
-    id.phone ? { icon: "phone", label: String(id.phone), url: href(id.phone) } : null,
-    links.linkedin ? { icon: "linkedin", label: bare(links.linkedin), url: href(links.linkedin) } : null,
-    links.github ? { icon: "github", label: bare(links.github), url: href(links.github) } : null,
-    links.website ? { icon: "globe", label: bare(links.website), url: href(links.website) } : null,
-    id.location ? { icon: "pin", label: String(id.location), url: "" } : null,
-  ].filter(Boolean) as any;
-
-  const HEADS: Record<string, string> = {
-    summary: "Profile",
-    experience: "Professional Experience",
-    skills: "Skills",
-    education: "Education",
-    projects: "Projects",
-    awards: "Awards",
-    custom: "Section",
-  };
+  const contact: CvContact[] = [
+    id.email ? { icon: "mail" as const, label: String(id.email), url: href(id.email) } : null,
+    id.phone ? { icon: "phone" as const, label: String(id.phone), url: href(id.phone) } : null,
+    links.linkedin ? { icon: "linkedin" as const, label: bare(links.linkedin), url: href(links.linkedin) } : null,
+    links.github ? { icon: "github" as const, label: bare(links.github), url: href(links.github) } : null,
+    links.website ? { icon: "globe" as const, label: bare(links.website), url: href(links.website) } : null,
+    id.location ? { icon: "pin" as const, label: String(id.location), url: "" } : null,
+  ].filter(Boolean) as CvContact[];
 
   const profExps: any[] = p?.experiences ?? [];
   const profEdu: any[] = p?.education ?? [];
   const profSkills: any[] = p?.skills ?? [];
 
-  /** dates + location on the left, everything else on the right */
-  const entry = (when: string, loc: string, what: string): string =>
-    `<div class="entry"><div class="when">${when ? `<div>${esc(when)}</div>` : ""}${
-      loc ? `<div>${esc(loc)}</div>` : ""
-    }</div><div class="what">${what}</div></div>`;
+  const sections: CvSection[] = [];
+  for (const b of c?.blocks ?? []) {
+    const head = String(b.title || HEADS[b.type] || "Section");
+    const body: CvLine[] = [];
 
-  const prose = (arr: string[]): string => arr.map((x) => `<p>${esc(x)}</p>`).join("");
-
-  const sections = (c?.blocks ?? [])
-    .map((b: any) => {
-      const head = esc(b.title || HEADS[b.type] || "Section");
-      const wrap = (inner: string) => (inner ? `<section><h2>${head}</h2>${inner}</section>` : "");
-
-      if (b.type === "summary" || b.type === "custom") return wrap(prose(paras(b.text)));
-
-      if (b.type === "skills") {
-        // `groups` is the local override, otherwise the profile's skill list
-        const fromGroups = (b.groups ?? []).flatMap((g: string) =>
-          lines(g).flatMap((l) => l.split(",")),
-        );
-        const items = (fromGroups.length ? fromGroups : profSkills.map((s: any) => s.name))
-          .map((x: any) => String(x ?? "").trim())
-          .filter(Boolean);
-        return wrap(items.length ? `<div class="skills">${items.map((x: string) => `<span>${esc(x)}</span>`).join("")}</div>` : "");
+    if (b.type === "summary" || b.type === "custom") {
+      for (const para of paras(b.text)) body.push({ k: "prose", text: para });
+    } else if (b.type === "skills") {
+      // `groups` is the local override, otherwise the profile's skill list
+      const fromGroups = (b.groups ?? []).flatMap((g: string) => lines(g).flatMap((l) => l.split(",")));
+      const items = (fromGroups.length ? fromGroups : profSkills.map((s: any) => s.name))
+        .map((x: any) => String(x ?? "").trim())
+        .filter(Boolean);
+      if (items.length) body.push({ k: "skills", items });
+    } else if (b.type === "experience") {
+      if (b.source === "profile") {
+        for (const e of profExps)
+          body.push({
+            k: "entry",
+            when: range(e.start_date, e.end_date),
+            loc: String(e.location ?? ""),
+            title: String(e.title ?? ""),
+            org: String(e.company ?? ""),
+            body: Array.isArray(e.bullets) ? e.bullets.map(String) : [],
+          });
       }
-
-      if (b.type === "experience") {
-        const fromProfile = (b.source === "profile" ? profExps : [])
-          .map((e: any) =>
-            entry(
-              range(e.start_date, e.end_date),
-              e.location,
-              `<div class="t">${e.title ? esc(e.title) : ""}</div>` +
-                (e.company ? `<div class="org">${esc(e.company)}</div>` : "") +
-                prose(Array.isArray(e.bullets) ? e.bullets : []),
-            ),
-          )
-          .join("");
-        // a hand-written entry: no dates to show, so the whole block is prose
-        const local = lines(b.text).length
-          ? entry("", "", prose([...(b.bullets ?? []), ...lines(b.text)]))
-          : "";
-        return wrap(fromProfile + local);
+      // a hand-written entry: no dates to show, so the whole block is prose
+      const local = lines(b.text);
+      if (local.length) body.push({ k: "entry", when: "", loc: "", body: [...(b.bullets ?? []), ...local] });
+    } else if (b.type === "education") {
+      if (b.source === "profile") {
+        for (const e of profEdu) {
+          const qual = [e.degree, e.field]
+            .map((x: any) => String(x ?? "").trim())
+            .filter(Boolean)
+            .join(" \u00b7 ");
+          body.push({
+            k: "entry",
+            when: range(e.start_date, e.end_date),
+            loc: String(e.location ?? ""),
+            title: qual,
+            org: String(e.school ?? ""),
+            body: [],
+          });
+        }
       }
+      const local = lines(b.text);
+      if (local.length) body.push({ k: "entry", when: "", loc: "", title: String(b.title ?? ""), body: local });
+    } else if (b.type === "projects" || b.type === "awards") {
+      const items = lines(b.text).length ? lines(b.text) : (b.bullets ?? []);
+      if (items.length) body.push({ k: "entry", when: "", loc: "", body: items });
+    }
 
-      if (b.type === "education") {
-        const fromProfile = (b.source === "profile" ? profEdu : [])
-          .map((e: any) => {
-            const qual = [e.degree, e.field]
-              .map((x: any) => String(x ?? "").trim())
-              .filter(Boolean)
-              .join(" \u00b7 ");
-            return entry(
-              range(e.start_date, e.end_date),
-              e.location,
-              (qual ? `<div class="t">${esc(qual)}</div>` : "") +
-                (e.school ? `<div class="org">${esc(e.school)}</div>` : ""),
-            );
-          })
-          .join("");
-        const local = lines(b.text).length
-          ? entry("", "", `${b.title ? `<div class="t">${esc(b.title)}</div>` : ""}${prose(lines(b.text))}`)
-          : "";
-        return wrap(fromProfile + local);
+    if (body.length) sections.push({ head, lines: body });
+  }
+
+  return { name: String(id.name ?? "").trim() || String(c?.name ?? ""), contact, sections };
+}
+
+/* ------------------------------ the estimate ----------------------------- */
+
+/** A page count derived from the same model and metrics the CSS is generated from. */
+export function estimateCvDoc(doc: CvDoc): { pages: number; usedPx: number } {
+  let y = PAPER_TOP_MM * MM; // the sheet's own top padding on screen
+  y += SHEET.nameSize * SHEET.nameLine;
+  y += SHEET.contactGap + SHEET.contactLine;
+  y += SHEET.headerBottom;
+
+  for (const section of doc.sections) {
+    y += SHEET.sectionTop;
+    y += SHEET.headLine + SHEET.headPad + SHEET.rule + SHEET.headGap;
+    if (section.lines.some((l) => l.k === "entry")) y += SHEET.entryTop;
+
+    section.lines.forEach((line, i) => {
+      const last = i === section.lines.length - 1;
+      if (line.k === "prose") {
+        y += wrapLines(line.text, SHEET.contentW) * SHEET.bodyLine;
+      } else if (line.k === "skills") {
+        const rows = Math.ceil(line.items.length / SHEET.skillCols);
+        y += rows * SHEET.bodyLine + Math.max(0, rows - 1) * SHEET.skillRowGap;
+      } else {
+        const left = (line.when ? 1 : 0) + (line.loc ? 1 : 0);
+        const right =
+          (line.title ? 1 : 0) +
+          (line.org ? 1 : 0) +
+          line.body.reduce((n, t) => n + wrapLines(t, SHEET.colRight), 0);
+        y += Math.max(left, right) * SHEET.bodyLine;
+        if (!last) y += SHEET.entryGap;
       }
+    });
+  }
 
-      if (b.type === "projects" || b.type === "awards") {
-        const items = lines(b.text).length ? lines(b.text) : (b.bullets ?? []);
-        return wrap(items.length ? entry("", "", prose(items)) : "");
-      }
+  return { pages: Math.max(1, Math.ceil(y / SHEET.contentH)), usedPx: Math.round(y) };
+}
 
-      return "";
-    })
+export function estimateCvPages(c: any, p: any): number {
+  return estimateCvDoc(buildCvDoc(c, p)).pages;
+}
+
+/* ----------------------------- the document ------------------------------ */
+
+export type CvDocOptions = { frame?: boolean; accent?: string };
+
+export function renderCvHtml(c: any, p: any, opts: CvDocOptions = {}): string {
+  const accent = CV_ACCENTS[String(opts.accent)] ?? CV_ACCENTS[DEFAULT_ACCENT];
+  const doc = buildCvDoc(c, p);
+
+  const linesHtml = (body: CvLine[]): string =>
+    body
+      .map((line) => {
+        if (line.k === "prose") return `<p>${esc(line.text)}</p>`;
+        if (line.k === "skills")
+          return `<div class="skills">${line.items.map((x) => `<span>${esc(x)}</span>`).join("")}</div>`;
+        const left = `${line.when ? `<div>${esc(line.when)}</div>` : ""}${line.loc ? `<div>${esc(line.loc)}</div>` : ""}`;
+        const right =
+          (line.title ? `<div class="t">${esc(line.title)}</div>` : "") +
+          (line.org ? `<div class="org">${esc(line.org)}</div>` : "") +
+          line.body.map((t) => `<p>${esc(t)}</p>`).join("");
+        return `<div class="entry"><div class="when">${left}</div><div class="what">${right}</div></div>`;
+      })
+      .join("");
+
+  const sections = doc.sections
+    .map((s) => `<section><h2>${esc(s.head)}</h2>${linesHtml(s.lines)}</section>`)
     .join("");
 
-  const contactHtml = contact.length
-    ? `<div class="contact">${contact
+  const contactHtml = doc.contact.length
+    ? `<div class="contact">${doc.contact
         .map((x) =>
           x.url
             ? `<a href="${esc(x.url)}">${ICONS[x.icon]()}<span>${esc(x.label)}</span></a>`
@@ -216,7 +329,7 @@ export function renderCvHtml(c: any, p: any, opts: CvDocOptions = {}): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(name)} \u2014 CV</title>
+<title>${esc(doc.name)} \u2014 CV</title>
 <style>
 /* Amiri is the face the reference document embeds (ascent 1.124em / descent
    0.634em, upem 1000 — identical to the file the PDF carries). Bundled rather
@@ -229,13 +342,15 @@ export function renderCvHtml(c: any, p: any, opts: CvDocOptions = {}): string {
 @font-face { font-family: Amiri; font-style: italic; font-weight: 400; font-display: block;
   src: url("/fonts/amiri-italic.woff2") format("woff2"); }
 
+/* Every number below is one of the measured metrics; see SHEET in cv-document.ts,
+   which is also what the page estimate is computed from. */
 :root {
   --serif: Amiri, "Iowan Old Style", Palatino, "Palatino Linotype", "Book Antiqua", Georgia, "Times New Roman", serif;
   --rule: ${esc(accent)};
   --ink: #000;
   --mark: ${esc(accent)};
-  --side: 20mm;   /* measured: the text column starts at 75.59px == 20mm */
-  --myn: 15mm;    /* measured: the name box top sits 56.69px below the top edge */
+  --side: ${PAPER_SIDE_MM}mm;
+  --myn: ${PAPER_TOP_MM}mm;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: #fff; }
@@ -246,17 +361,20 @@ html, body { margin: 0; padding: 0; background: #fff; }
 .page {
   width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff;
   padding: var(--myn) var(--side) 0;
-  font: 400 14px/18px var(--serif);
+  font: 400 ${SHEET.bodySize}px/${SHEET.bodyLine}px var(--serif);
   color: var(--ink); -webkit-font-kerning: normal;
   -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  /* the sheet is a document, not a web page: it must not inherit the app's
+     text rendering or smoothing, or the print stops matching the preview */
+  text-rendering: geometricPrecision;
 }
 
 /* ── header ────────────────────────────────────────────────────────────── */
-.hdr { padding-bottom: 7.2px; }
-.name { font: 700 32.66px/1.2 var(--serif); text-align: center; margin: 0; letter-spacing: 0; }
+.hdr { padding-bottom: ${SHEET.headerBottom}px; }
+.name { font: 700 ${SHEET.nameSize}px/${SHEET.nameLine} var(--serif); text-align: center; margin: 0; letter-spacing: 0; }
 .contact {
   display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
-  gap: 6px 14px; margin-top: 12.7px; font-size: 14px; line-height: 14px;
+  gap: 6px 14px; margin-top: ${SHEET.contactGap}px; font-size: ${SHEET.contactSize}px; line-height: ${SHEET.contactLine}px;
 }
 .contact > a, .contact > span { display: inline-flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
 .ico {
@@ -265,58 +383,47 @@ html, body { margin: 0; padding: 0; background: #fff; }
 }
 
 /* ── sections ──────────────────────────────────────────────────────────── */
-section { margin-top: 19px; }
+section { margin-top: ${SHEET.sectionTop}px; }
 h2 {
-  font: 700 15.33px/19px var(--serif); color: var(--rule);
-  margin: 0 0 9px; padding-bottom: 1px; border-bottom: 2px solid var(--rule);
+  font: 700 ${SHEET.headSize}px/${SHEET.headLine}px var(--serif); color: var(--rule);
+  margin: 0 0 ${SHEET.headGap}px; padding-bottom: ${SHEET.headPad}px; border-bottom: ${SHEET.rule}px solid var(--rule);
 }
 p { margin: 0; }
 
 /* ── dated entries: when/location left, title/org/prose right ──────────── */
-.entry { display: grid; grid-template-columns: 147.8px 1fr; margin-bottom: 12px; }
+.entry { display: grid; grid-template-columns: ${SHEET.colLeft}px 1fr; margin-bottom: ${SHEET.entryGap}px; }
 .entry:last-child { margin-bottom: 0; }
 /* The reference starts an entry's first line 31px below its heading but prose
    lines at 30px — one pixel of its own box model, kept so every later section
    lands on the measured baseline instead of drifting. Padding, not margin:
    a margin here would collapse into the heading's own margin-bottom. */
-h2 + .entry { padding-top: 1px; }
-.when { font-size: 14px; line-height: 18px; }
+h2 + .entry { padding-top: ${SHEET.entryTop}px; }
+.when { font-size: ${SHEET.bodySize}px; line-height: ${SHEET.bodyLine}px; }
 .what .t { font-weight: 700; }
 .what .org { font-style: italic; }
-.ext-link { color: inherit; text-decoration: none; white-space: nowrap; }
-.ext {
-  width: 10px; height: 10px; margin-left: 4px; fill: none;
-  stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
-  vertical-align: -1px;
-}
 
 /* ── skills: three equal columns with a square marker, as measured ─────── */
-/* measured: the skill text sits 12.6px from the text column, i.e. the grid is
-   inset 2.4px so the 4px square starts at x = 78 and the label at x = 88.2 */
-.skills { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 32px; row-gap: 9.5px; padding-left: 2.4px; }
-.skills > span { display: flex; align-items: center; gap: 6px; font-size: 14px; line-height: 18px; break-inside: avoid; }
+.skills { display: grid; grid-template-columns: repeat(${SHEET.skillCols}, 1fr);
+  column-gap: ${SHEET.skillColGap}px; row-gap: ${SHEET.skillRowGap}px; padding-left: ${SHEET.skillInset}px; }
+.skills > span { display: flex; align-items: center; gap: 6px; font-size: ${SHEET.bodySize}px;
+  line-height: ${SHEET.bodyLine}px; break-inside: avoid; }
 .skills > span::before { content: ""; width: 4px; height: 4px; flex: 0 0 4px; background: var(--mark); }
 
 /* On screen the sheet carries the 297mm floor and the top margin itself, so the
    preview shows a real page. On paper the page box supplies the vertical margin
    — which is what gives page 2 of a long CV the same inset as page 1. */
 @media print { .page { min-height: 0; margin: 0; padding-top: 0; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body>
 <div class="page">
 <header class="hdr">
-  <h1 class="name">${esc(name)}</h1>
+  <h1 class="name">${esc(doc.name)}</h1>
   ${contactHtml}
 </header>
 ${sections}
 </div>
 </body>
 </html>`;
-}
-
-/** small helper the route uses to keep its handler to one line */
-export function sendCvHtml(res: Response, _req: Request, c: any, p: any, opts: CvDocOptions): void {
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.send(renderCvHtml(c, p, opts));
 }

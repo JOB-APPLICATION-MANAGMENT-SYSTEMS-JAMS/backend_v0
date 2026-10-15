@@ -52160,11 +52160,6 @@ async function completeness(userId) {
   const score = Math.min(100, Math.round(checks.reduce((a2, c2) => a2 + (c2.done ? c2.weight : 0), 0) * 100 / total));
   return { score, checks, suggestions: checks.filter((c2) => !c2.done && c2.hint).map((c2) => ({ label: c2.label, hint: c2.hint })) };
 }
-async function skillNames(userId) {
-  const p2 = await get("SELECT id FROM profiles WHERE user_id = ?", userId);
-  if (!p2) return [];
-  return (await all("SELECT name FROM profile_skills WHERE profile_id = ? ORDER BY is_top5 DESC", p2.id)).map((r2) => r2.name);
-}
 var init_profile_service = __esm({
   "src/services/profile.service.ts"() {
     "use strict";
@@ -52436,6 +52431,307 @@ var init_scoring_service = __esm({
   }
 });
 
+// src/lib/cv-document.ts
+function range(start, end) {
+  const a2 = String(start ?? "").trim();
+  const b2 = String(end ?? "").trim();
+  if (!a2 && !b2) return "";
+  if (!a2) return b2;
+  return `${a2} \u2013 ${b2 || "Present"}`;
+}
+function buildCvDoc(c2, p2) {
+  const id = p2?.identity ?? {};
+  const links = id.links ?? {};
+  const contact = [
+    id.email ? { icon: "mail", label: String(id.email), url: href(id.email) } : null,
+    id.phone ? { icon: "phone", label: String(id.phone), url: href(id.phone) } : null,
+    links.linkedin ? { icon: "linkedin", label: bare(links.linkedin), url: href(links.linkedin) } : null,
+    links.github ? { icon: "github", label: bare(links.github), url: href(links.github) } : null,
+    links.website ? { icon: "globe", label: bare(links.website), url: href(links.website) } : null,
+    id.location ? { icon: "pin", label: String(id.location), url: "" } : null
+  ].filter(Boolean);
+  const profExps = p2?.experiences ?? [];
+  const profEdu = p2?.education ?? [];
+  const profSkills = p2?.skills ?? [];
+  const sections = [];
+  for (const b2 of c2?.blocks ?? []) {
+    const head = String(b2.title || HEADS[b2.type] || "Section");
+    const body = [];
+    if (b2.type === "summary" || b2.type === "custom") {
+      for (const para of paras(b2.text)) body.push({ k: "prose", text: para });
+    } else if (b2.type === "skills") {
+      const fromGroups = (b2.groups ?? []).flatMap((g2) => lines(g2).flatMap((l2) => l2.split(",")));
+      const items = (fromGroups.length ? fromGroups : profSkills.map((s2) => s2.name)).map((x2) => String(x2 ?? "").trim()).filter(Boolean);
+      if (items.length) body.push({ k: "skills", items });
+    } else if (b2.type === "experience") {
+      if (b2.source === "profile") {
+        for (const e2 of profExps)
+          body.push({
+            k: "entry",
+            when: range(e2.start_date, e2.end_date),
+            loc: String(e2.location ?? ""),
+            title: String(e2.title ?? ""),
+            org: String(e2.company ?? ""),
+            body: Array.isArray(e2.bullets) ? e2.bullets.map(String) : []
+          });
+      }
+      const local = lines(b2.text);
+      if (local.length) body.push({ k: "entry", when: "", loc: "", body: [...b2.bullets ?? [], ...local] });
+    } else if (b2.type === "education") {
+      if (b2.source === "profile") {
+        for (const e2 of profEdu) {
+          const qual = [e2.degree, e2.field].map((x2) => String(x2 ?? "").trim()).filter(Boolean).join(" \xB7 ");
+          body.push({
+            k: "entry",
+            when: range(e2.start_date, e2.end_date),
+            loc: String(e2.location ?? ""),
+            title: qual,
+            org: String(e2.school ?? ""),
+            body: []
+          });
+        }
+      }
+      const local = lines(b2.text);
+      if (local.length) body.push({ k: "entry", when: "", loc: "", title: String(b2.title ?? ""), body: local });
+    } else if (b2.type === "projects" || b2.type === "awards") {
+      const items = lines(b2.text).length ? lines(b2.text) : b2.bullets ?? [];
+      if (items.length) body.push({ k: "entry", when: "", loc: "", body: items });
+    }
+    if (body.length) sections.push({ head, lines: body });
+  }
+  return { name: String(id.name ?? "").trim() || String(c2?.name ?? ""), contact, sections };
+}
+function estimateCvDoc(doc) {
+  let y2 = PAPER_TOP_MM * MM;
+  y2 += SHEET.nameSize * SHEET.nameLine;
+  y2 += SHEET.contactGap + SHEET.contactLine;
+  y2 += SHEET.headerBottom;
+  for (const section2 of doc.sections) {
+    y2 += SHEET.sectionTop;
+    y2 += SHEET.headLine + SHEET.headPad + SHEET.rule + SHEET.headGap;
+    if (section2.lines.some((l2) => l2.k === "entry")) y2 += SHEET.entryTop;
+    section2.lines.forEach((line, i2) => {
+      const last = i2 === section2.lines.length - 1;
+      if (line.k === "prose") {
+        y2 += wrapLines(line.text, SHEET.contentW) * SHEET.bodyLine;
+      } else if (line.k === "skills") {
+        const rows = Math.ceil(line.items.length / SHEET.skillCols);
+        y2 += rows * SHEET.bodyLine + Math.max(0, rows - 1) * SHEET.skillRowGap;
+      } else {
+        const left = (line.when ? 1 : 0) + (line.loc ? 1 : 0);
+        const right = (line.title ? 1 : 0) + (line.org ? 1 : 0) + line.body.reduce((n2, t2) => n2 + wrapLines(t2, SHEET.colRight), 0);
+        y2 += Math.max(left, right) * SHEET.bodyLine;
+        if (!last) y2 += SHEET.entryGap;
+      }
+    });
+  }
+  return { pages: Math.max(1, Math.ceil(y2 / SHEET.contentH)), usedPx: Math.round(y2) };
+}
+function renderCvHtml(c2, p2, opts = {}) {
+  const accent = CV_ACCENTS[String(opts.accent)] ?? CV_ACCENTS[DEFAULT_ACCENT];
+  const doc = buildCvDoc(c2, p2);
+  const linesHtml = (body) => body.map((line) => {
+    if (line.k === "prose") return `<p>${esc(line.text)}</p>`;
+    if (line.k === "skills")
+      return `<div class="skills">${line.items.map((x2) => `<span>${esc(x2)}</span>`).join("")}</div>`;
+    const left = `${line.when ? `<div>${esc(line.when)}</div>` : ""}${line.loc ? `<div>${esc(line.loc)}</div>` : ""}`;
+    const right = (line.title ? `<div class="t">${esc(line.title)}</div>` : "") + (line.org ? `<div class="org">${esc(line.org)}</div>` : "") + line.body.map((t2) => `<p>${esc(t2)}</p>`).join("");
+    return `<div class="entry"><div class="when">${left}</div><div class="what">${right}</div></div>`;
+  }).join("");
+  const sections = doc.sections.map((s2) => `<section><h2>${esc(s2.head)}</h2>${linesHtml(s2.lines)}</section>`).join("");
+  const contactHtml = doc.contact.length ? `<div class="contact">${doc.contact.map(
+    (x2) => x2.url ? `<a href="${esc(x2.url)}">${ICONS[x2.icon]()}<span>${esc(x2.label)}</span></a>` : `<span>${ICONS[x2.icon]()}<span>${esc(x2.label)}</span></span>`
+  ).join("")}</div>` : "";
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(doc.name)} \u2014 CV</title>
+<style>
+/* Amiri is the face the reference document embeds (ascent 1.124em / descent
+   0.634em, upem 1000 \u2014 identical to the file the PDF carries). Bundled rather
+   than fetched so a CV prints the same on every machine, and \`block\` so nothing
+   is laid out in a fallback face and re-flowed once the real one arrives. */
+@font-face { font-family: Amiri; font-style: normal; font-weight: 400; font-display: block;
+  src: url("/fonts/amiri-regular.woff2") format("woff2"); }
+@font-face { font-family: Amiri; font-style: normal; font-weight: 700; font-display: block;
+  src: url("/fonts/amiri-bold.woff2") format("woff2"); }
+@font-face { font-family: Amiri; font-style: italic; font-weight: 400; font-display: block;
+  src: url("/fonts/amiri-italic.woff2") format("woff2"); }
+
+/* Every number below is one of the measured metrics; see SHEET in cv-document.ts,
+   which is also what the page estimate is computed from. */
+:root {
+  --serif: Amiri, "Iowan Old Style", Palatino, "Palatino Linotype", "Book Antiqua", Georgia, "Times New Roman", serif;
+  --rule: ${esc(accent)};
+  --ink: #000;
+  --mark: ${esc(accent)};
+  --side: ${PAPER_SIDE_MM}mm;
+  --myn: ${PAPER_TOP_MM}mm;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #fff; }
+/* vertical paper margin comes from the page box, so page 2 of a long CV is
+   inset exactly like page 1; the sheet then only supplies the side margins. */
+@page { size: A4; margin: var(--myn) 0; }
+
+.page {
+  width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff;
+  padding: var(--myn) var(--side) 0;
+  font: 400 ${SHEET.bodySize}px/${SHEET.bodyLine}px var(--serif);
+  color: var(--ink); -webkit-font-kerning: normal;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  /* the sheet is a document, not a web page: it must not inherit the app's
+     text rendering or smoothing, or the print stops matching the preview */
+  text-rendering: geometricPrecision;
+}
+
+/* \u2500\u2500 header \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.hdr { padding-bottom: ${SHEET.headerBottom}px; }
+.name { font: 700 ${SHEET.nameSize}px/${SHEET.nameLine} var(--serif); text-align: center; margin: 0; letter-spacing: 0; }
+.contact {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 6px 14px; margin-top: ${SHEET.contactGap}px; font-size: ${SHEET.contactSize}px; line-height: ${SHEET.contactLine}px;
+}
+.contact > a, .contact > span { display: inline-flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
+.ico {
+  width: 14px; height: 14px; flex: 0 0 14px; fill: none;
+  stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* \u2500\u2500 sections \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+section { margin-top: ${SHEET.sectionTop}px; }
+h2 {
+  font: 700 ${SHEET.headSize}px/${SHEET.headLine}px var(--serif); color: var(--rule);
+  margin: 0 0 ${SHEET.headGap}px; padding-bottom: ${SHEET.headPad}px; border-bottom: ${SHEET.rule}px solid var(--rule);
+}
+p { margin: 0; }
+
+/* \u2500\u2500 dated entries: when/location left, title/org/prose right \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.entry { display: grid; grid-template-columns: ${SHEET.colLeft}px 1fr; margin-bottom: ${SHEET.entryGap}px; }
+.entry:last-child { margin-bottom: 0; }
+/* The reference starts an entry's first line 31px below its heading but prose
+   lines at 30px \u2014 one pixel of its own box model, kept so every later section
+   lands on the measured baseline instead of drifting. Padding, not margin:
+   a margin here would collapse into the heading's own margin-bottom. */
+h2 + .entry { padding-top: ${SHEET.entryTop}px; }
+.when { font-size: ${SHEET.bodySize}px; line-height: ${SHEET.bodyLine}px; }
+.what .t { font-weight: 700; }
+.what .org { font-style: italic; }
+
+/* \u2500\u2500 skills: three equal columns with a square marker, as measured \u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.skills { display: grid; grid-template-columns: repeat(${SHEET.skillCols}, 1fr);
+  column-gap: ${SHEET.skillColGap}px; row-gap: ${SHEET.skillRowGap}px; padding-left: ${SHEET.skillInset}px; }
+.skills > span { display: flex; align-items: center; gap: 6px; font-size: ${SHEET.bodySize}px;
+  line-height: ${SHEET.bodyLine}px; break-inside: avoid; }
+.skills > span::before { content: ""; width: 4px; height: 4px; flex: 0 0 4px; background: var(--mark); }
+
+/* On screen the sheet carries the 297mm floor and the top margin itself, so the
+   preview shows a real page. On paper the page box supplies the vertical margin
+   \u2014 which is what gives page 2 of a long CV the same inset as page 1. */
+@media print { .page { min-height: 0; margin: 0; padding-top: 0; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+<header class="hdr">
+  <h1 class="name">${esc(doc.name)}</h1>
+  ${contactHtml}
+</header>
+${sections}
+</div>
+</body>
+</html>`;
+}
+var MM, PAPER_TOP_MM, PAPER_SIDE_MM, CHAR_W, SHEET, wrapLines, CV_ACCENTS, DEFAULT_ACCENT, I, ICONS, esc, bare, href, lines, paras, HEADS;
+var init_cv_document = __esm({
+  "src/lib/cv-document.ts"() {
+    "use strict";
+    MM = 96 / 25.4;
+    PAPER_TOP_MM = 15;
+    PAPER_SIDE_MM = 20;
+    CHAR_W = 5.68;
+    SHEET = {
+      pageW: 794,
+      pageH: 1122.67,
+      /** usable content height of one printed page: the box between the paper margins */
+      get contentH() {
+        return this.pageH - 2 * PAPER_TOP_MM * MM;
+      },
+      nameSize: 32.66,
+      nameLine: 1.2,
+      contactSize: 14,
+      contactLine: 14,
+      contactGap: 12.7,
+      headerBottom: 7.2,
+      sectionTop: 19,
+      headSize: 15.33,
+      headLine: 19,
+      headPad: 1,
+      rule: 2,
+      headGap: 9,
+      bodySize: 14,
+      bodyLine: 18,
+      colLeft: 147.8,
+      entryGap: 12,
+      entryTop: 1,
+      skillCols: 3,
+      skillColGap: 32,
+      skillRowGap: 9.5,
+      skillInset: 2.4,
+      get contentW() {
+        return this.pageW - 2 * PAPER_SIDE_MM * MM;
+      },
+      /** the right column of a dated entry */
+      get colRight() {
+        return this.contentW - this.colLeft;
+      },
+      get skillCol() {
+        return (this.contentW - 2 * this.skillColGap) / this.skillCols;
+      }
+    };
+    wrapLines = (text, colWidth) => Math.max(1, Math.ceil(text.length / Math.floor(colWidth / CHAR_W)));
+    CV_ACCENTS = {
+      /** the reference document: pure paper black */
+      ink: "#000000",
+      /** the app's brand hue, one step down — #ff9933 only clears 2:1 as text on paper */
+      ember: "#b35f00",
+      graphite: "#5b564f"
+    };
+    DEFAULT_ACCENT = "ink";
+    I = (d2, cls = "ico") => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${d2}</svg>`;
+    ICONS = {
+      mail: (c2) => I('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/>', c2),
+      phone: (c2) => I('<path d="M5 3h3l2 5-2.5 1.5a12 12 0 0 0 6 6L15 13l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 5a2 2 0 0 1 2-2Z"/>', c2),
+      github: (c2) => I('<path d="M9 19c-4 1.5-4-2-6-2.5m12 5v-3.9a3.4 3.4 0 0 0-.9-2.6c3-.3 4.9-1.7 4.9-5.9a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C5.8 2.4 4.8 2.7 4.8 2.7a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 3.4 9.1c0 4.2 1.9 5.6 4.9 5.9a3.4 3.4 0 0 0-.9 2.6V21" transform="translate(1.4 .5) scale(.92)"/>', c2),
+      linkedin: (c2) => I('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 10.5V17M8 7.2v.01M12.5 17v-3.6a2.2 2.2 0 0 1 4.4 0V17M12.5 10.5V17"/>', c2),
+      globe: (c2) => I('<circle cx="12" cy="12" r="9"/><path d="M3.2 9.5h17.6M3.2 14.5h17.6M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18Z"/>', c2),
+      pin: (c2) => I('<path d="M12 21.5s7-6.3 7-11.5a7 7 0 1 0-14 0c0 5.2 7 11.5 7 11.5Z"/><circle cx="12" cy="10" r="2.6"/>', c2)
+    };
+    esc = (s2) => String(s2 ?? "").replace(/[&<>"]/g, (m2) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[m2]);
+    bare = (v2) => String(v2 ?? "").trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+    href = (v2) => {
+      const s2 = String(v2 ?? "").trim();
+      if (!s2) return "";
+      if (/^[a-z][a-z0-9+.-]*:/i.test(s2)) return s2;
+      return /@/.test(s2) ? `mailto:${s2}` : `https://${s2}`;
+    };
+    lines = (t2) => String(t2 ?? "").split("\n").map((x2) => x2.trim()).filter(Boolean);
+    paras = (t2) => String(t2 ?? "").split(/\n\s*\n/).map((p2) => p2.replace(/\s*\n\s*/g, " ").trim()).filter(Boolean);
+    HEADS = {
+      summary: "Profile",
+      experience: "Professional Experience",
+      skills: "Skills",
+      education: "Education",
+      projects: "Projects",
+      awards: "Awards",
+      custom: "Section"
+    };
+  }
+});
+
 // src/services/cv.service.ts
 async function listCVs(userId, filter = {}) {
   const where = ["user_id = ?"];
@@ -52550,46 +52846,166 @@ async function duplicateCV(userId, id, name2) {
 }
 async function matchCV(userId, cvId, postingId) {
   const cv = await getCV(userId, cvId);
-  const skills = await skillNames(userId);
+  const profile = await getProfile(userId);
   const posting = postingId ? await get("SELECT * FROM job_postings WHERE id = ? AND user_id = ?", postingId, userId) : null;
   const jdKeywords = posting ? parseJson(posting.jd_keywords, []) : [];
-  const cvText = [cv.blocks.map((b2) => `${b2.text ?? ""} ${(b2.bullets ?? []).join(" ")} ${(b2.groups ?? []).join(" ")}`).join(" "), ...skills, cv.name].join(" ").toLowerCase();
+  const doc = buildCvDoc(cv, profile);
+  const { pages } = estimateCvDoc(doc);
+  const id = profile.identity ?? {};
+  const blocks = Array.isArray(cv.blocks) ? cv.blocks : [];
+  const types2 = new Set(blocks.map((b2) => b2.type));
+  const bodyLines = doc.sections.flatMap(
+    (sec) => sec.lines.flatMap((l2) => l2.k === "entry" ? l2.body : l2.k === "prose" ? [l2.text] : [])
+  );
+  const quantified = bodyLines.filter((l2) => QUANTIFIED.test(l2)).length;
+  const words = doc.sections.map((sec) => [
+    sec.head,
+    ...sec.lines.map(
+      (l2) => l2.k === "entry" ? [l2.title, l2.org, ...l2.body].filter(Boolean).join(" ") : l2.k === "prose" ? l2.text : l2.items.join(" ")
+    )
+  ].join(" ")).join(" ");
+  const cvText = [words, (profile.skills ?? []).map((s2) => s2.name).join(" "), doc.name].join(" ").toLowerCase();
   const matched = [];
   const missing = [];
-  if (jdKeywords.length) {
-    for (const kw of jdKeywords) {
-      const family = expand(kw);
-      (family.some((f2) => cvText.includes(f2)) ? matched : missing).push(kw);
-    }
+  for (const kw of jdKeywords) {
+    const family = expand(kw);
+    (family.some((f2) => cvText.includes(f2)) ? matched : missing).push(kw);
   }
-  const sectionTypes = new Set(cv.blocks.map((b2) => b2.type));
-  const atsChecks = [
-    { key: "has_summary", label: "Summary / profile section", ok: sectionTypes.has("summary") || sectionTypes.has("custom"), fix: "Add a 3-line tailored summary" },
-    { key: "has_experience", label: "Experience section", ok: sectionTypes.has("experience"), fix: "Add at least one experience block" },
-    { key: "has_skills", label: "Skills section (keyword-friendly)", ok: sectionTypes.has("skills"), fix: "Add a skills group, ATS parsers look for it" },
-    { key: "length", label: "Length \u2264 2 pages worth of text", ok: cvText.length < 6e3, fix: "Trim older roles or bullets" },
-    { key: "contact", label: "Contact block present", ok: skills.length >= 0 && !!await profileHasContact(userId), fix: "Add email/phone to your profile" }
-  ];
   const coverage = jdKeywords.length ? Math.round(matched.length / jdKeywords.length * 100) : null;
+  const expCount = (profile.experiences ?? []).length;
+  const eduCount = (profile.education ?? []).length;
+  const datedTotal = expCount + eduCount;
+  const undated = (profile.experiences ?? []).filter((e2) => !String(e2.start_date ?? "").trim()).length + (profile.education ?? []).filter((e2) => !String(e2.start_date ?? "").trim()).length;
+  const pinned = Array.isArray(cv.targeting?.keywords) ? String(cv.targeting.keywords.join(" ")).trim() : "";
+  const target = String(posting?.title ?? "").trim() || pinned || String(id.headline ?? "").trim();
+  const targetWords = target.toLowerCase().split(/[^a-z0-9+#.]+/).filter((w2) => w2.length > 2);
+  const targetHit = targetWords.length ? targetWords.filter((w2) => cvText.includes(w2)).length / targetWords.length : 1;
+  const has = (t2) => types2.has(t2);
+  const inHeader = (icon) => doc.contact.find((c2) => c2.icon === icon);
+  const mail = inHeader("mail");
+  const phone = inHeader("phone");
+  const headerLinks = ["linkedin", "github", "globe"].map(inHeader).filter(Boolean);
+  const checks = [
+    {
+      key: "email",
+      label: "Email address in the contact row",
+      severity: "critical",
+      ok: !!mail,
+      evidence: mail ? `${mail.label} prints in the header` : "the header has no email address",
+      fix: "Add your email on the Profile page \u2014 every parser looks for it first"
+    },
+    {
+      key: "phone",
+      label: "Phone number in the contact row",
+      severity: "important",
+      ok: !!phone,
+      evidence: phone ? `${phone.label} prints in the header` : "the header has no phone number",
+      fix: "Add a phone number on the Profile page"
+    },
+    {
+      key: "link",
+      label: "At least one profile link",
+      severity: "polish",
+      ok: headerLinks.length > 0,
+      evidence: headerLinks.length ? headerLinks.map((l2) => l2.label).join(", ") : "no GitHub, LinkedIn or site in the header",
+      fix: "Add a GitHub or LinkedIn link on the Profile page"
+    },
+    {
+      key: "experience",
+      label: "Experience section",
+      severity: "important",
+      ok: has("experience"),
+      evidence: has("experience") ? `${expCount} dated role${expCount === 1 ? "" : "s"}` : "no experience block in this CV",
+      fix: "Add an experience block \u2014 parsers segment sections by their headings"
+    },
+    {
+      key: "education",
+      label: "Education section",
+      severity: "important",
+      ok: has("education"),
+      evidence: has("education") ? `${eduCount} entr${eduCount === 1 ? "y" : "ies"}` : "no education block in this CV",
+      fix: "Add an education block"
+    },
+    {
+      key: "skills",
+      label: "Skills section (keyword-friendly)",
+      severity: "important",
+      ok: has("skills"),
+      evidence: has("skills") ? `${(profile.skills ?? []).length} skills listed` : "no skills block in this CV",
+      fix: "Add a skills block \u2014 it is the cheapest place to match a job description"
+    },
+    {
+      key: "summary",
+      label: "Summary / profile section",
+      severity: "polish",
+      ok: has("summary") || has("custom"),
+      evidence: has("summary") || has("custom") ? "present" : "no summary block in this CV",
+      fix: "Add a three-line summary aimed at the role you want"
+    },
+    {
+      key: "dates",
+      label: "Every role and school has a start date",
+      severity: "important",
+      ok: datedTotal === 0 || undated === 0,
+      evidence: datedTotal === 0 ? "nothing dated yet" : undated ? `${undated} of ${datedTotal} entries lack a start date` : `all ${datedTotal} dated`,
+      fix: "Add start dates \u2014 tenure maths and gap detection both need them"
+    },
+    {
+      key: "length",
+      label: "Length \u2264 2 pages as printed",
+      severity: "important",
+      ok: pages <= 2,
+      evidence: `renders as ${pages} page${pages === 1 ? "" : "s"}`,
+      fix: "Trim older roles or drop the least relevant lines"
+    },
+    {
+      key: "quantified",
+      label: "Some lines quantify an outcome",
+      severity: "polish",
+      ok: bodyLines.length > 0 && quantified / bodyLines.length >= 0.25,
+      evidence: `${quantified} of ${bodyLines.length} lines carry a figure`,
+      fix: "Put a figure in a quarter of your lines: users, %, time or money saved"
+    }
+  ];
+  if (targetWords.length) {
+    checks.push({
+      key: "target",
+      label: `Names the target role`,
+      severity: "important",
+      ok: targetHit >= 0.5,
+      evidence: `covers ${Math.round(targetHit * 100)}% of \u201C${target}\u201D`,
+      fix: `Work \u201C${target}\u201D into the summary or a role title`
+    });
+  }
+  if (jdKeywords.length) {
+    checks.push({
+      key: "keywords",
+      label: "Covers the job description keywords",
+      severity: "critical",
+      ok: (coverage ?? 0) >= 60,
+      evidence: `${matched.length} of ${jdKeywords.length} keywords (${coverage}%)`,
+      fix: "Add the keywords that are genuinely true of your experience"
+    });
+  }
+  const weightTotal = checks.reduce((n2, c2) => n2 + WEIGHT[c2.severity], 0);
+  const weightEarned = checks.reduce((n2, c2) => n2 + (c2.ok ? WEIGHT[c2.severity] : 0), 0);
+  const score = Math.round(weightEarned / weightTotal * 100);
+  const blockers = checks.filter((c2) => !c2.ok && c2.severity === "critical").length;
+  const band = score >= 85 ? "strong" : score >= 65 ? "decent" : "weak";
+  const summary2 = blockers ? `${blockers} thing${blockers > 1 ? "s" : ""} a parser or a recruiter will hit before anything else.` : band === "strong" ? "Nothing structural is in the way: this is ready to send." : "No blockers, the rest is polish.";
   const signals = await profileSignals(userId);
   const jdScore = posting ? scorePosting(signals, { title: posting.title, description: posting.description, companyName: posting.company_name, seniority: posting.seniority, remote: !!posting.remote, location: posting.location, salaryMin: posting.salary_min, salaryMax: posting.salary_max, postedAt: posting.posted_at }) : null;
   return {
     cv_id: cvId,
     posting_id: postingId ?? null,
-    ats: { score: Math.round(atsChecks.filter((c2) => c2.ok).length / atsChecks.length * 100), checks: atsChecks },
+    ats: { score, checks, pages, band, blockers, summary: summary2, weight_total: weightTotal, weight_earned: weightEarned },
     keywords: { matched, missing, coverage_pct: coverage, jd_total: jdKeywords.length },
     jd_match: jdScore ? { score: jdScore.score, explain: jdScore.explain } : null,
     suggestions: [
       ...missing.slice(0, 6).map((k2) => `Keyword from the JD not in your CV: \u201C${k2}\u201D (only add if true)`),
-      ...atsChecks.filter((c2) => !c2.ok).map((c2) => c2.fix)
+      ...checks.filter((c2) => !c2.ok).sort((a2, b2) => WEIGHT[b2.severity] - WEIGHT[a2.severity]).map((c2) => c2.fix)
     ]
   };
-}
-async function profileHasContact(userId) {
-  const p2 = await get("SELECT identity FROM profiles WHERE user_id = ?", userId);
-  if (!p2) return false;
-  const id = parseJson(p2.identity, {});
-  return !!id.email || !!id.phone;
 }
 async function suggestCVs(userId, postingId) {
   const cvs = await listCVs(userId);
@@ -52663,7 +53079,7 @@ function mergeTemplate(body, vars) {
     return String(v2);
   });
 }
-var shape, extractVars;
+var shape, WEIGHT, QUANTIFIED, extractVars;
 var init_cv_service = __esm({
   "src/services/cv.service.ts"() {
     "use strict";
@@ -52674,12 +53090,15 @@ var init_cv_service = __esm({
     init_synonyms();
     init_profile_signals();
     init_scoring_service();
+    init_cv_document();
     shape = (r2) => ({
       ...r2,
       targeting: parseJson(r2.targeting, {}),
       blocks: parseJson(r2.blocks, []),
       lineage: parseJson(r2.lineage, {})
     });
+    WEIGHT = { critical: 3, important: 2, polish: 1 };
+    QUANTIFIED = /(\d|%|\bper cent\b|[$€£₦])/;
     extractVars = (body) => [...new Set([...body.matchAll(/\{\{\s*([\w.]+)\s*\}\}/g)].map((m2) => m2[1]))];
   }
 });
@@ -58299,7 +58718,7 @@ function normalizeEdgeBoundary(e2, t2, n2) {
 function percentage(e2) {
   return `${(e2 * 100).toFixed(2)}%`;
 }
-var e, t, n, r, i, a, o, s, c, l, u, d, f, p, m, h, g, _, v, y, b, x, S, C, w, T, E, D, O, k, PasswordException$1, UnknownErrorException$1, InvalidPDFException$1, ResponseException$1, FormatError$1, AbortException$1, FeatureTest$1, Util$1, j, ee, makeArr$1, makeMap$1, makeObj$1, M, te, ne, re, ie, N, ae, oe, F, L, RefSet, RefSetCache, BaseStream, se, ce, le, ue, de, fe, MissingDataException, ParserEOFException, XRefEntryException, XRefParseException, pe, me2, QCMS, he, ge, _e, ve, ye, be, xe, Se, AlternateCS, PatternCS, IndexedCS, DeviceGrayCS, DeviceRgbCS, DeviceRgbaCS, DeviceCmykCS, CalGrayCS, Ce, LabCS, we, Te, Ee, StringStream, NullStream, ChunkedStream, ChunkedStreamManager, De, Oe, ke, DecodeStream, StreamsSequenceStream, ColorSpaceUtils, JpegError, DNLMarkerError, EOIMarkerError, Ae, je, Me, Ne, Pe, Fe, Ie, Le, JpegImage, Re, ze, NullOptimizer, QueueOptimizer, Be, CheckedOperatorList, Ve, Pattern, BaseShading, RadialAxialShading, He, MeshStreamReader, Ue, We, DummyShading, BinaryCMapStream, BinaryCMapReader, Ascii85Stream, AsciiHexStream, makeBrotliDecode, Ge, BrotliStream, Ke, qe, Jbig2Error, Je, CCITTFaxStream, Ye, Xe, Ze, Qe, $e, FlateStream, et, tt, JpxError, nt, JpxStream, LZWStream, PredictorStream, RunLengthStream, Parser, rt, Lexer, Linearization, it, at, CMap, IdentityCMap, CMapFactory, CSS_FONT_INFO$1, SYSTEM_FONT_INFO$1, FONT_INFO$1, PATTERN_INFO$1, ot, st, ct, lt, ut, dt, ft, pt, mt, ht, gt, _t, vt, yt, bt, xt, St, Ct, wt, Tt, DataBuilder, Et, Dt, Ot, kt, At, CFFParser, CFF, CFFHeader, CFFStrings, CFFIndex, CFFDict, jt, Mt, Nt, Pt, Ft, CFFCharset, CFFEncoding, CFFFDSelect, CFFOffsetTracker, It, Lt, Rt, zt, Bt, Vt, Ht, Ut, Wt, GlyfTable, Gt, Kt, Contour, qt, Jt, ToUnicodeMap, IdentityToUnicodeMap, CFFFont, Commands, Yt, TrueTypeCompiled, Type2Compiled, FontRendererFactory, Xt, Zt, Qt, $t, Type1CharString, en, Type1Parser, Type1Font, tn, nn, rn, an, fonts_Glyph, Font, ErrorFont, on, sn, cn, ln, un, dn, fn, pn, mn, hn, gn, _n, vn, yn, bn, xn, Sn, Cn, wn, Tn, En, Dn, On, kn, An, jn, Mn, Nn, Pn, Fn, In, Ln, Rn, zn, Bn, Vn, Hn, Un, Wn, Gn, Kn, R, Token, qn, Jn, z, PsNode, PsProgram, PsBlock, PsNumber, PsOperator, PsIf, PsIfElse, PsArgNode, PsConstNode, PsUnaryNode, PsBinaryNode, PsTernaryNode, Yn, Xn, V, Zn, Qn, PsJsCompiler, PSStackBasedInterpreter, H, $n, er, tr, nr, BaseLocalCache, LocalImageCache, LocalColorSpaceCache, LocalFunctionCache, LocalGStateCache, LocalTilingPatternCache, RegionalImageCache, GlobalColorSpaceCache, rr, ir, ar, PDFFunction, or, sr, cr, lr, ur, dr, fr, pr, mr, hr, gr, _r, vr, yr, MurmurHash3_64$1, br, xr, Sr, Cr, wr, Tr, TranslatedFont, StateManager, TextState, EvalState, Er, DefaultAppearanceEvaluator, AppearanceStreamEvaluator, Dr, Or, kr, NameOrNumberTree, NameTree, NumberTree, Ar, jr, Mr, SimpleDOMNode, SimpleXMLParser, MetadataParser, Nr, Pr, StructElementNode, StructElement, StructTreePage, isRef, Fr, Ir, Lr, Rr, zr, Vr, Hr, Ur, Wr, Gr, Kr, qr, U, Jr, Yr, W, Xr, Zr, Qr, $r, ei, ti, ni, ri, ii, ai, oi, si, ci, li, ui, G, di, fi, pi, mi, hi, gi, _i, vi, yi, bi, xi, Si, Ci, wi, Ti, Ei, Di, Oi, ki, Ai, ji, Mi, Ni, Pi, Fi, Ii, Ri, zi, Bi, Vi, Hi, Wi, Gi, Ki, qi, K, Ji, Yi, Xi, Zi, Qi, $i, ea, q, FontFinder, FontInfo$1, FontSelector, TextMeasure, ta, na, ra, ia, aa, oa, sa, ca, J, la, ua, da, fa, pa, ma, ha, ga, _a, va, ya, ba, xa, Sa, Ca, Y, X, XFAAttribute, wa, ContentObject, OptionObject, StringObject, IntegerObject, Option01, Option10, Ta, Z, Ea, Da, Oa, AppearanceFilter, Arc, Area, Assist, Barcode, Bind, BindItems, Bookend, BooleanElement, Border, Break, BreakAfter, BreakBefore, Button, Calculate, Caption, Certificate, Certificates, CheckButton, ChoiceList, Color, Comb, Connect, ContentArea, Corner, DateElement, DateTime, DateTimeEdit, Decimal, DefaultUi, Desc, DigestMethod, DigestMethods, Draw, Edge, Encoding, Encodings, Encrypt, EncryptData, Encryption, EncryptionMethod, EncryptionMethods, Event$1, ExData, ExObject, ExclGroup, Execute, Extras, Field, Fill, Filter, Float, template_Font, Format, Handler, Hyphenation, Image$1, ImageEdit, Integer, Issuers, Items, Keep, KeyUsage, Line, Linear, LockDocument, Manifest, Margin, Mdp, Medium, Message, NumericEdit, Occur, Oid, Oids, Overflow, PageArea, ka, Para, PasswordEdit, template_Pattern, Picture, Proto, Radial, Reason, Reasons, Rectangle, RefElement, Script, SetProperty, SignData, Signature, Signing, Solid, Speak, Stipple, Subform, SubformSet, SubjectDN, SubjectDNs, Submit, Template, Text, TextEdit, Time, TimeStamp, ToolTip, Traversal, Traverse, Ui, Validate, Value, Variables, Aa, ja, Binder, DataHandler, Q, Acrobat, Acrobat7, ADBE_JSConsole, ADBE_JSDebugger, AddSilentPrint, AddViewerPreferences, AdjustData, AdobeExtensionLevel, Agent, AlwaysEmbed, Amd, config_Area, Attributes, AutoSave, Base, BatchOutput, BehaviorOverride, Cache, Change, Common, Compress, CompressLogicalStructure, CompressObjectStream, Compression, Config, Conformance, ContentCopy, Copies, Creator, CurrentPage, Data, Debug, DefaultTypeface, Destination, DocumentAssembly, Driver, DuplexOption, DynamicRender, Embed, config_Encrypt, config_Encryption, EncryptionLevel, Enforce, Equate, EquateRange, Exclude, ExcludeNS, FlipLabel, config_FontInfo, FormFieldFilling, GroupParent, IfEmpty, IncludeXDPContent, IncrementalLoad, IncrementalMerge, Interactive, Jog, LabelPrinter, Layout, Level, Linearized, Locale, LocaleSet, Log, MapElement, MediumInfo, config_Message, Messaging, Mode, ModifyAnnots, MsgId, NameAttr, NeverEmbed, NumberOfCopies, OpenAction, Output, OutputBin, OutputXSL, Overprint, Packets, PageOffset, PageRange, Pagination, PaginationOverride, Part, Pcl, Pdf, Pdfa, Permissions, PickTrayByPDFSize, config_Picture, PlaintextMetadata, Presence, Present, Print, PrintHighQuality, PrintScaling, PrinterName, Producer, Ps, Range$1, Record, Relevant, Rename, RenderPolicy, RunScripts, config_Script, ScriptModel, Severity, SilentPrint, Staple, StartNode, StartPage, SubmitFormat, SubmitUrl, SubsetBelow, SuppressBanner, Tagged, config_Template, Threshold, To, TemplateCache, Trace, Transform9, Type, Uri, config_Validate, ValidateApprovalSignatures, ValidationMessaging, Version, VersionControl, ViewerPreferences, WebClient, Whitespace, Window, Xdc, Xdp, Xsl, Zpl, Ma, Na, ConnectionSet, EffectiveInputPolicy, EffectiveOutputPolicy, Operation, RootElement, SoapAction, SoapAddress, connection_set_Uri, WsdlAddress, WsdlConnection, XmlConnection, XsdConnection, Pa, Fa, datasets_Data, Datasets, Ia, La, CalendarSymbols, CurrencySymbol, CurrencySymbols, DatePattern, DatePatterns, DateTimeSymbols, Day, DayNames, Era, EraNames, locale_set_Locale, locale_set_LocaleSet, Meridiem, MeridiemNames, Month, MonthNames, NumberPattern, NumberPatterns, NumberSymbol, NumberSymbols, TimePattern, TimePatterns, TypeFace, TypeFaces, Ra, za, signature_Signature, Ba, Va, Stylesheet, Ha, Ua, xdp_Xdp, Wa, Ga, Ka, qa, Ja, Ya, Xa, Za, Qa, XhtmlObject, A, B, Body, Br, Html, I, Li, Ol, P, Span, Sub, Sup, Ul, $a, eo, UnknownNamespace, Root, Empty, Builder, to, no, AnnotationFactory, Annotation, AnnotationBorderStyle, MarkupAnnotation, ro, TextWidgetAnnotation, ButtonWidgetAnnotation, ChoiceWidgetAnnotation, SignatureWidgetAnnotation, TextAnnotation, LinkAnnotation, PopupAnnotation, FreeTextAnnotation, LineAnnotation, SquareAnnotation, CircleAnnotation, PolylineAnnotation, PolygonAnnotation, CaretAnnotation, InkAnnotation, HighlightAnnotation, UnderlineAnnotation, SquigglyAnnotation, StrikeOutAnnotation, StampAnnotation, FileAttachmentAnnotation, io, ao, oo, so, DatasetXMLParser, DatasetReader, SingleIntersector, Intersector, Word64, co, lo, DecryptStream, ARCFourCipher, NullCipher, AESBaseCipher, AES128Cipher, AES256Cipher, PDFBase, PDF17, PDF20, CipherTransform, uo, XRef, fo, Page, po, mo, ho, PDFDocument, BasePdfManager, LocalPdfManager, NetworkPdfManager, go, _o, MessageHandler$1, PageData, DocumentData, XRefWrapper, PDFEditor, BasePDFStream$1, BasePDFStreamReader$1, BasePDFStreamRangeReader$1, PDFWorkerStream, PDFWorkerStreamReader, PDFWorkerStreamRangeReader, WorkerTask, WorkerMessageHandler, vo, yo, bo, xo, So, Co, wo, Eo, Do, Oo, $, ko, Ao, jo, Mo, No, Po, Fo, Io, Lo, Ro, zo, Bo, PasswordException, UnknownErrorException, InvalidPDFException, ResponseException, FormatError, AbortException, FeatureTest, Util, Vo, Ho, makeArr, makeMap, makeObj, Uo, Wo, XfaLayer, PixelsPerInch, RenderingCancelledException, StatTimer, PDFDateString, Go, Ko, ColorScheme, CSSConstants, qo, Jo, FloatingToolbar, Yo, Xo, IdManager, Zo, CommandManager, Qo, $o, es, ts, Comment, ns, rs, FakeEditor, is, as, os3, MurmurHash3_64, ss, AnnotationStorage, PrintAnnotationStorage, cs, ls, us, ds, BBoxReader, ensureDebugMetadata, CanvasBBoxTracker, CanvasDependencyTracker, fs5, ps, ms, FontLoader, FontFaceObject, CSS_FONT_INFO, SYSTEM_FONT_INFO, FONT_INFO, PATTERN_INFO, CssFontInfo, SystemFontInfo, FontInfo, PatternInfo, FontPathInfo, isRefProxy, isNameProxy, hs, LoopbackPort, gs, _s, MessageHandler, BaseBinaryDataFactory, DOMBinaryDataFactory, BaseCanvasFactory, DOMCanvasFactory, BaseFilterFactory, DOMFilterFactory, NodeFilterFactory, NodeCanvasFactory, NodeBinaryDataFactory, WebGPU, vs, ys, BaseShadingPattern, RadialAxialShadingPattern, MeshShadingPattern, DummyShadingPattern, bs, xs, Ss, Cs, CanvasExtraState, ws, Ts, Es, Ds, Os, BasePDFStream, BasePDFStreamReader, BasePDFStreamRangeReader, PDFFetchStream, PDFFetchStreamReader, PDFFetchStreamRangeReader, PDFDataTransportStream, PDFDataTransportStreamReader, PDFDataTransportStreamRangeReader, PDFNetworkStream, PDFNetworkStreamReader, PDFNetworkStreamRangeReader, PDFNodeStream, PDFNodeStreamReader, PDFNodeStreamRangeReader, GlobalWorkerOptions, Metadata, ks, OptionalContentGroup, As, PagesMapper, js, dataObj, PDFObjects, Ms, Ns, PDFDataRangeTransport, PDFDocumentProxy, Fs, Is, WorkerTransport, RenderTask, Ls, Rs, zs, Bs, Vs, ColorConverters, BaseSVGFactory, DOMSVGFactory, Hs, Us, AnnotationElementFactory, Ws, EditorAnnotationElement, LinkAnnotationElement, TextAnnotationElement, WidgetAnnotationElement, TextWidgetAnnotationElement, SignatureWidgetAnnotationElement, CheckboxWidgetAnnotationElement, RadioButtonWidgetAnnotationElement, PushButtonWidgetAnnotationElement, ChoiceWidgetAnnotationElement, PopupAnnotationElement, PopupElement, FreeTextAnnotationElement, LineAnnotationElement, SquareAnnotationElement, CircleAnnotationElement, PolylineAnnotationElement, PolygonAnnotationElement, CaretAnnotationElement, InkAnnotationElement, HighlightAnnotationElement, UnderlineAnnotationElement, SquigglyAnnotationElement, StrikeOutAnnotationElement, StampAnnotationElement, FileAttachmentAnnotationElement, MediaAnnotationElement, Gs, Ks, qs, Outline, Js, FreeDrawOutline, HighlightOutliner, HighlightOutline, FreeHighlightOutliner, FreeHighlightOutline, Ys, DrawingOptions, Xs, InkDrawOutliner, InkDrawOutline, Zs, Qs, ContourDrawOutline, SignatureExtractor, $s, ec, tc, StampEditor, nc, rc, ic;
+var e, t, n, r, i, a, o, s, c, l, u, d, f, p, m, h, g, _, v, y, b, x, S, C, w, T, E, D, O, k, PasswordException$1, UnknownErrorException$1, InvalidPDFException$1, ResponseException$1, FormatError$1, AbortException$1, FeatureTest$1, Util$1, j, ee, makeArr$1, makeMap$1, makeObj$1, M, te, ne, re, ie, N, ae, oe, F, L, RefSet, RefSetCache, BaseStream, se, ce, le, ue, de, fe, MissingDataException, ParserEOFException, XRefEntryException, XRefParseException, pe, me2, QCMS, he, ge, _e, ve, ye, be, xe, Se, AlternateCS, PatternCS, IndexedCS, DeviceGrayCS, DeviceRgbCS, DeviceRgbaCS, DeviceCmykCS, CalGrayCS, Ce, LabCS, we, Te, Ee, StringStream, NullStream, ChunkedStream, ChunkedStreamManager, De, Oe, ke, DecodeStream, StreamsSequenceStream, ColorSpaceUtils, JpegError, DNLMarkerError, EOIMarkerError, Ae, je, Me, Ne, Pe, Fe, Ie, Le, JpegImage, Re, ze, NullOptimizer, QueueOptimizer, Be, CheckedOperatorList, Ve, Pattern, BaseShading, RadialAxialShading, He, MeshStreamReader, Ue, We, DummyShading, BinaryCMapStream, BinaryCMapReader, Ascii85Stream, AsciiHexStream, makeBrotliDecode, Ge, BrotliStream, Ke, qe, Jbig2Error, Je, CCITTFaxStream, Ye, Xe, Ze, Qe, $e, FlateStream, et, tt, JpxError, nt, JpxStream, LZWStream, PredictorStream, RunLengthStream, Parser, rt, Lexer, Linearization, it, at, CMap, IdentityCMap, CMapFactory, CSS_FONT_INFO$1, SYSTEM_FONT_INFO$1, FONT_INFO$1, PATTERN_INFO$1, ot, st, ct, lt, ut, dt, ft, pt, mt, ht, gt, _t, vt, yt, bt, xt, St, Ct, wt, Tt, DataBuilder, Et, Dt, Ot, kt, At, CFFParser, CFF, CFFHeader, CFFStrings, CFFIndex, CFFDict, jt, Mt, Nt, Pt, Ft, CFFCharset, CFFEncoding, CFFFDSelect, CFFOffsetTracker, It, Lt, Rt, zt, Bt, Vt, Ht, Ut, Wt, GlyfTable, Gt, Kt, Contour, qt, Jt, ToUnicodeMap, IdentityToUnicodeMap, CFFFont, Commands, Yt, TrueTypeCompiled, Type2Compiled, FontRendererFactory, Xt, Zt, Qt, $t, Type1CharString, en, Type1Parser, Type1Font, tn, nn, rn, an, fonts_Glyph, Font, ErrorFont, on, sn, cn, ln, un, dn, fn, pn, mn, hn, gn, _n, vn, yn, bn, xn, Sn, Cn, wn, Tn, En, Dn, On, kn, An, jn, Mn, Nn, Pn, Fn, In, Ln, Rn, zn, Bn, Vn, Hn, Un, Wn, Gn, Kn, R, Token, qn, Jn, z, PsNode, PsProgram, PsBlock, PsNumber, PsOperator, PsIf, PsIfElse, PsArgNode, PsConstNode, PsUnaryNode, PsBinaryNode, PsTernaryNode, Yn, Xn, V, Zn, Qn, PsJsCompiler, PSStackBasedInterpreter, H, $n, er, tr, nr, BaseLocalCache, LocalImageCache, LocalColorSpaceCache, LocalFunctionCache, LocalGStateCache, LocalTilingPatternCache, RegionalImageCache, GlobalColorSpaceCache, rr, ir, ar, PDFFunction, or, sr, cr, lr, ur, dr, fr, pr, mr, hr, gr, _r, vr, yr, MurmurHash3_64$1, br, xr, Sr, Cr, wr, Tr, TranslatedFont, StateManager, TextState, EvalState, Er, DefaultAppearanceEvaluator, AppearanceStreamEvaluator, Dr, Or, kr, NameOrNumberTree, NameTree, NumberTree, Ar, jr, Mr, SimpleDOMNode, SimpleXMLParser, MetadataParser, Nr, Pr, StructElementNode, StructElement, StructTreePage, isRef, Fr, Ir, Lr, Rr, zr, Vr, Hr, Ur, Wr, Gr, Kr, qr, U, Jr, Yr, W, Xr, Zr, Qr, $r, ei, ti, ni, ri, ii, ai, oi, si, ci, li, ui, G, di, fi, pi, mi, hi, gi, _i, vi, yi, bi, xi, Si, Ci, wi, Ti, Ei, Di, Oi, ki, Ai, ji, Mi, Ni, Pi, Fi, Ii, Ri, zi, Bi, Vi, Hi, Wi, Gi, Ki, qi, K, Ji, Yi, Xi, Zi, Qi, $i, ea, q, FontFinder, FontInfo$1, FontSelector, TextMeasure, ta, na, ra, ia, aa, oa, sa, ca, J, la, ua, da, fa, pa, ma, ha, ga, _a, va, ya, ba, xa, Sa, Ca, Y, X, XFAAttribute, wa, ContentObject, OptionObject, StringObject, IntegerObject, Option01, Option10, Ta, Z, Ea, Da, Oa, AppearanceFilter, Arc, Area, Assist, Barcode, Bind, BindItems, Bookend, BooleanElement, Border, Break, BreakAfter, BreakBefore, Button, Calculate, Caption, Certificate, Certificates, CheckButton, ChoiceList, Color, Comb, Connect, ContentArea, Corner, DateElement, DateTime, DateTimeEdit, Decimal, DefaultUi, Desc, DigestMethod, DigestMethods, Draw, Edge, Encoding, Encodings, Encrypt, EncryptData, Encryption, EncryptionMethod, EncryptionMethods, Event$1, ExData, ExObject, ExclGroup, Execute, Extras, Field, Fill, Filter, Float, template_Font, Format, Handler, Hyphenation, Image$1, ImageEdit, Integer, Issuers, Items, Keep, KeyUsage, Line, Linear, LockDocument, Manifest, Margin, Mdp, Medium, Message, NumericEdit, Occur, Oid, Oids, Overflow, PageArea, ka, Para, PasswordEdit, template_Pattern, Picture, Proto, Radial, Reason, Reasons, Rectangle, RefElement, Script, SetProperty, SignData, Signature, Signing, Solid, Speak, Stipple, Subform, SubformSet, SubjectDN, SubjectDNs, Submit, Template, Text, TextEdit, Time, TimeStamp, ToolTip, Traversal, Traverse, Ui, Validate, Value, Variables, Aa, ja, Binder, DataHandler, Q, Acrobat, Acrobat7, ADBE_JSConsole, ADBE_JSDebugger, AddSilentPrint, AddViewerPreferences, AdjustData, AdobeExtensionLevel, Agent, AlwaysEmbed, Amd, config_Area, Attributes, AutoSave, Base, BatchOutput, BehaviorOverride, Cache, Change, Common, Compress, CompressLogicalStructure, CompressObjectStream, Compression, Config, Conformance, ContentCopy, Copies, Creator, CurrentPage, Data, Debug, DefaultTypeface, Destination, DocumentAssembly, Driver, DuplexOption, DynamicRender, Embed, config_Encrypt, config_Encryption, EncryptionLevel, Enforce, Equate, EquateRange, Exclude, ExcludeNS, FlipLabel, config_FontInfo, FormFieldFilling, GroupParent, IfEmpty, IncludeXDPContent, IncrementalLoad, IncrementalMerge, Interactive, Jog, LabelPrinter, Layout, Level, Linearized, Locale, LocaleSet, Log, MapElement, MediumInfo, config_Message, Messaging, Mode, ModifyAnnots, MsgId, NameAttr, NeverEmbed, NumberOfCopies, OpenAction, Output, OutputBin, OutputXSL, Overprint, Packets, PageOffset, PageRange, Pagination, PaginationOverride, Part, Pcl, Pdf, Pdfa, Permissions, PickTrayByPDFSize, config_Picture, PlaintextMetadata, Presence, Present, Print, PrintHighQuality, PrintScaling, PrinterName, Producer, Ps, Range$1, Record, Relevant, Rename, RenderPolicy, RunScripts, config_Script, ScriptModel, Severity, SilentPrint, Staple, StartNode, StartPage, SubmitFormat, SubmitUrl, SubsetBelow, SuppressBanner, Tagged, config_Template, Threshold, To, TemplateCache, Trace, Transform9, Type, Uri, config_Validate, ValidateApprovalSignatures, ValidationMessaging, Version, VersionControl, ViewerPreferences, WebClient, Whitespace, Window, Xdc, Xdp, Xsl, Zpl, Ma, Na, ConnectionSet, EffectiveInputPolicy, EffectiveOutputPolicy, Operation, RootElement, SoapAction, SoapAddress, connection_set_Uri, WsdlAddress, WsdlConnection, XmlConnection, XsdConnection, Pa, Fa, datasets_Data, Datasets, Ia, La, CalendarSymbols, CurrencySymbol, CurrencySymbols, DatePattern, DatePatterns, DateTimeSymbols, Day, DayNames, Era, EraNames, locale_set_Locale, locale_set_LocaleSet, Meridiem, MeridiemNames, Month, MonthNames, NumberPattern, NumberPatterns, NumberSymbol, NumberSymbols, TimePattern, TimePatterns, TypeFace, TypeFaces, Ra, za, signature_Signature, Ba, Va, Stylesheet, Ha, Ua, xdp_Xdp, Wa, Ga, Ka, qa, Ja, Ya, Xa, Za, Qa, XhtmlObject, A, B, Body, Br, Html, I2, Li, Ol, P, Span, Sub, Sup, Ul, $a, eo, UnknownNamespace, Root, Empty, Builder, to, no, AnnotationFactory, Annotation, AnnotationBorderStyle, MarkupAnnotation, ro, TextWidgetAnnotation, ButtonWidgetAnnotation, ChoiceWidgetAnnotation, SignatureWidgetAnnotation, TextAnnotation, LinkAnnotation, PopupAnnotation, FreeTextAnnotation, LineAnnotation, SquareAnnotation, CircleAnnotation, PolylineAnnotation, PolygonAnnotation, CaretAnnotation, InkAnnotation, HighlightAnnotation, UnderlineAnnotation, SquigglyAnnotation, StrikeOutAnnotation, StampAnnotation, FileAttachmentAnnotation, io, ao, oo, so, DatasetXMLParser, DatasetReader, SingleIntersector, Intersector, Word64, co, lo, DecryptStream, ARCFourCipher, NullCipher, AESBaseCipher, AES128Cipher, AES256Cipher, PDFBase, PDF17, PDF20, CipherTransform, uo, XRef, fo, Page, po, mo, ho, PDFDocument, BasePdfManager, LocalPdfManager, NetworkPdfManager, go, _o, MessageHandler$1, PageData, DocumentData, XRefWrapper, PDFEditor, BasePDFStream$1, BasePDFStreamReader$1, BasePDFStreamRangeReader$1, PDFWorkerStream, PDFWorkerStreamReader, PDFWorkerStreamRangeReader, WorkerTask, WorkerMessageHandler, vo, yo, bo, xo, So, Co, wo, Eo, Do, Oo, $, ko, Ao, jo, Mo, No, Po, Fo, Io, Lo, Ro, zo, Bo, PasswordException, UnknownErrorException, InvalidPDFException, ResponseException, FormatError, AbortException, FeatureTest, Util, Vo, Ho, makeArr, makeMap, makeObj, Uo, Wo, XfaLayer, PixelsPerInch, RenderingCancelledException, StatTimer, PDFDateString, Go, Ko, ColorScheme, CSSConstants, qo, Jo, FloatingToolbar, Yo, Xo, IdManager, Zo, CommandManager, Qo, $o, es, ts, Comment, ns, rs, FakeEditor, is, as, os3, MurmurHash3_64, ss, AnnotationStorage, PrintAnnotationStorage, cs, ls, us, ds, BBoxReader, ensureDebugMetadata, CanvasBBoxTracker, CanvasDependencyTracker, fs5, ps, ms, FontLoader, FontFaceObject, CSS_FONT_INFO, SYSTEM_FONT_INFO, FONT_INFO, PATTERN_INFO, CssFontInfo, SystemFontInfo, FontInfo, PatternInfo, FontPathInfo, isRefProxy, isNameProxy, hs, LoopbackPort, gs, _s, MessageHandler, BaseBinaryDataFactory, DOMBinaryDataFactory, BaseCanvasFactory, DOMCanvasFactory, BaseFilterFactory, DOMFilterFactory, NodeFilterFactory, NodeCanvasFactory, NodeBinaryDataFactory, WebGPU, vs, ys, BaseShadingPattern, RadialAxialShadingPattern, MeshShadingPattern, DummyShadingPattern, bs, xs, Ss, Cs, CanvasExtraState, ws, Ts, Es, Ds, Os, BasePDFStream, BasePDFStreamReader, BasePDFStreamRangeReader, PDFFetchStream, PDFFetchStreamReader, PDFFetchStreamRangeReader, PDFDataTransportStream, PDFDataTransportStreamReader, PDFDataTransportStreamRangeReader, PDFNetworkStream, PDFNetworkStreamReader, PDFNetworkStreamRangeReader, PDFNodeStream, PDFNodeStreamReader, PDFNodeStreamRangeReader, GlobalWorkerOptions, Metadata, ks, OptionalContentGroup, As, PagesMapper, js, dataObj, PDFObjects, Ms, Ns, PDFDataRangeTransport, PDFDocumentProxy, Fs, Is, WorkerTransport, RenderTask, Ls, Rs, zs, Bs, Vs, ColorConverters, BaseSVGFactory, DOMSVGFactory, Hs, Us, AnnotationElementFactory, Ws, EditorAnnotationElement, LinkAnnotationElement, TextAnnotationElement, WidgetAnnotationElement, TextWidgetAnnotationElement, SignatureWidgetAnnotationElement, CheckboxWidgetAnnotationElement, RadioButtonWidgetAnnotationElement, PushButtonWidgetAnnotationElement, ChoiceWidgetAnnotationElement, PopupAnnotationElement, PopupElement, FreeTextAnnotationElement, LineAnnotationElement, SquareAnnotationElement, CircleAnnotationElement, PolylineAnnotationElement, PolygonAnnotationElement, CaretAnnotationElement, InkAnnotationElement, HighlightAnnotationElement, UnderlineAnnotationElement, SquigglyAnnotationElement, StrikeOutAnnotationElement, StampAnnotationElement, FileAttachmentAnnotationElement, MediaAnnotationElement, Gs, Ks, qs, Outline, Js, FreeDrawOutline, HighlightOutliner, HighlightOutline, FreeHighlightOutliner, FreeHighlightOutline, Ys, DrawingOptions, Xs, InkDrawOutliner, InkDrawOutline, Zs, Qs, ContourDrawOutline, SignatureExtractor, $s, ec, tc, StampEditor, nc, rc, ic;
 var init_pdfjs = __esm({
   "node_modules/.pnpm/unpdf@1.8.1/node_modules/unpdf/dist/pdfjs.mjs"() {
     if (polyfillDOMMatrix(), globalThis.FinalizationRegistry === void 0 && (globalThis.FinalizationRegistry = class FinalizationRegistry2 {
@@ -75927,7 +76346,7 @@ var init_pdfjs = __esm({
         return q.success({ name: `div`, attributes: { class: [`xfaRich`], style: {} }, children: t2 });
       }
     };
-    I = class extends XhtmlObject {
+    I2 = class extends XhtmlObject {
       constructor(e2) {
         super(e2, `i`);
       }
@@ -75998,7 +76417,7 @@ var init_pdfjs = __esm({
         return new Html(e2);
       }
       static i(e2) {
-        return new I(e2);
+        return new I2(e2);
       }
       static li(e2) {
         return new Li(e2);
@@ -93858,221 +94277,6 @@ var init_resume_import_service = __esm({
     init_errors2();
     SUPPORTED = [".pdf", ".txt", ".md", ".rtf"];
     MAX_BYTES = 4 * 1024 * 1024;
-  }
-});
-
-// src/lib/cv-document.ts
-function range(start, end) {
-  const a2 = String(start ?? "").trim();
-  const b2 = String(end ?? "").trim();
-  if (!a2 && !b2) return "";
-  if (!a2) return b2;
-  return `${a2} \u2013 ${b2 || "Present"}`;
-}
-function renderCvHtml(c2, p2, opts = {}) {
-  const accent = CV_ACCENTS[String(opts.accent)] ?? CV_ACCENTS[DEFAULT_ACCENT];
-  const id = p2?.identity ?? {};
-  const links = id.links ?? {};
-  const name2 = String(id.name ?? "").trim() || String(c2?.name ?? "");
-  const contact = [
-    id.email ? { icon: "mail", label: String(id.email), url: href(id.email) } : null,
-    id.phone ? { icon: "phone", label: String(id.phone), url: href(id.phone) } : null,
-    links.linkedin ? { icon: "linkedin", label: bare(links.linkedin), url: href(links.linkedin) } : null,
-    links.github ? { icon: "github", label: bare(links.github), url: href(links.github) } : null,
-    links.website ? { icon: "globe", label: bare(links.website), url: href(links.website) } : null,
-    id.location ? { icon: "pin", label: String(id.location), url: "" } : null
-  ].filter(Boolean);
-  const HEADS = {
-    summary: "Profile",
-    experience: "Professional Experience",
-    skills: "Skills",
-    education: "Education",
-    projects: "Projects",
-    awards: "Awards",
-    custom: "Section"
-  };
-  const profExps = p2?.experiences ?? [];
-  const profEdu = p2?.education ?? [];
-  const profSkills = p2?.skills ?? [];
-  const entry = (when, loc, what) => `<div class="entry"><div class="when">${when ? `<div>${esc(when)}</div>` : ""}${loc ? `<div>${esc(loc)}</div>` : ""}</div><div class="what">${what}</div></div>`;
-  const prose = (arr) => arr.map((x2) => `<p>${esc(x2)}</p>`).join("");
-  const sections = (c2?.blocks ?? []).map((b2) => {
-    const head = esc(b2.title || HEADS[b2.type] || "Section");
-    const wrap3 = (inner) => inner ? `<section><h2>${head}</h2>${inner}</section>` : "";
-    if (b2.type === "summary" || b2.type === "custom") return wrap3(prose(paras(b2.text)));
-    if (b2.type === "skills") {
-      const fromGroups = (b2.groups ?? []).flatMap(
-        (g2) => lines(g2).flatMap((l2) => l2.split(","))
-      );
-      const items = (fromGroups.length ? fromGroups : profSkills.map((s2) => s2.name)).map((x2) => String(x2 ?? "").trim()).filter(Boolean);
-      return wrap3(items.length ? `<div class="skills">${items.map((x2) => `<span>${esc(x2)}</span>`).join("")}</div>` : "");
-    }
-    if (b2.type === "experience") {
-      const fromProfile = (b2.source === "profile" ? profExps : []).map(
-        (e2) => entry(
-          range(e2.start_date, e2.end_date),
-          e2.location,
-          `<div class="t">${e2.title ? esc(e2.title) : ""}</div>` + (e2.company ? `<div class="org">${esc(e2.company)}</div>` : "") + prose(Array.isArray(e2.bullets) ? e2.bullets : [])
-        )
-      ).join("");
-      const local = lines(b2.text).length ? entry("", "", prose([...b2.bullets ?? [], ...lines(b2.text)])) : "";
-      return wrap3(fromProfile + local);
-    }
-    if (b2.type === "education") {
-      const fromProfile = (b2.source === "profile" ? profEdu : []).map((e2) => {
-        const qual = [e2.degree, e2.field].map((x2) => String(x2 ?? "").trim()).filter(Boolean).join(" \xB7 ");
-        return entry(
-          range(e2.start_date, e2.end_date),
-          e2.location,
-          (qual ? `<div class="t">${esc(qual)}</div>` : "") + (e2.school ? `<div class="org">${esc(e2.school)}</div>` : "")
-        );
-      }).join("");
-      const local = lines(b2.text).length ? entry("", "", `${b2.title ? `<div class="t">${esc(b2.title)}</div>` : ""}${prose(lines(b2.text))}`) : "";
-      return wrap3(fromProfile + local);
-    }
-    if (b2.type === "projects" || b2.type === "awards") {
-      const items = lines(b2.text).length ? lines(b2.text) : b2.bullets ?? [];
-      return wrap3(items.length ? entry("", "", prose(items)) : "");
-    }
-    return "";
-  }).join("");
-  const contactHtml = contact.length ? `<div class="contact">${contact.map(
-    (x2) => x2.url ? `<a href="${esc(x2.url)}">${ICONS[x2.icon]()}<span>${esc(x2.label)}</span></a>` : `<span>${ICONS[x2.icon]()}<span>${esc(x2.label)}</span></span>`
-  ).join("")}</div>` : "";
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(name2)} \u2014 CV</title>
-<style>
-/* Amiri is the face the reference document embeds (ascent 1.124em / descent
-   0.634em, upem 1000 \u2014 identical to the file the PDF carries). Bundled rather
-   than fetched so a CV prints the same on every machine, and \`block\` so nothing
-   is laid out in a fallback face and re-flowed once the real one arrives. */
-@font-face { font-family: Amiri; font-style: normal; font-weight: 400; font-display: block;
-  src: url("/fonts/amiri-regular.woff2") format("woff2"); }
-@font-face { font-family: Amiri; font-style: normal; font-weight: 700; font-display: block;
-  src: url("/fonts/amiri-bold.woff2") format("woff2"); }
-@font-face { font-family: Amiri; font-style: italic; font-weight: 400; font-display: block;
-  src: url("/fonts/amiri-italic.woff2") format("woff2"); }
-
-:root {
-  --serif: Amiri, "Iowan Old Style", Palatino, "Palatino Linotype", "Book Antiqua", Georgia, "Times New Roman", serif;
-  --rule: ${esc(accent)};
-  --ink: #000;
-  --mark: ${esc(accent)};
-  --side: 20mm;   /* measured: the text column starts at 75.59px == 20mm */
-  --myn: 15mm;    /* measured: the name box top sits 56.69px below the top edge */
-}
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: #fff; }
-/* vertical paper margin comes from the page box, so page 2 of a long CV is
-   inset exactly like page 1; the sheet then only supplies the side margins. */
-@page { size: A4; margin: var(--myn) 0; }
-
-.page {
-  width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff;
-  padding: var(--myn) var(--side) 0;
-  font: 400 14px/18px var(--serif);
-  color: var(--ink); -webkit-font-kerning: normal;
-  -webkit-print-color-adjust: exact; print-color-adjust: exact;
-}
-
-/* \u2500\u2500 header \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
-.hdr { padding-bottom: 7.2px; }
-.name { font: 700 32.66px/1.2 var(--serif); text-align: center; margin: 0; letter-spacing: 0; }
-.contact {
-  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
-  gap: 6px 14px; margin-top: 12.7px; font-size: 14px; line-height: 14px;
-}
-.contact > a, .contact > span { display: inline-flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
-.ico {
-  width: 14px; height: 14px; flex: 0 0 14px; fill: none;
-  stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
-}
-
-/* \u2500\u2500 sections \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
-section { margin-top: 19px; }
-h2 {
-  font: 700 15.33px/19px var(--serif); color: var(--rule);
-  margin: 0 0 9px; padding-bottom: 1px; border-bottom: 2px solid var(--rule);
-}
-p { margin: 0; }
-
-/* \u2500\u2500 dated entries: when/location left, title/org/prose right \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
-.entry { display: grid; grid-template-columns: 147.8px 1fr; margin-bottom: 12px; }
-.entry:last-child { margin-bottom: 0; }
-/* The reference starts an entry's first line 31px below its heading but prose
-   lines at 30px \u2014 one pixel of its own box model, kept so every later section
-   lands on the measured baseline instead of drifting. Padding, not margin:
-   a margin here would collapse into the heading's own margin-bottom. */
-h2 + .entry { padding-top: 1px; }
-.when { font-size: 14px; line-height: 18px; }
-.what .t { font-weight: 700; }
-.what .org { font-style: italic; }
-.ext-link { color: inherit; text-decoration: none; white-space: nowrap; }
-.ext {
-  width: 10px; height: 10px; margin-left: 4px; fill: none;
-  stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
-  vertical-align: -1px;
-}
-
-/* \u2500\u2500 skills: three equal columns with a square marker, as measured \u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
-/* measured: the skill text sits 12.6px from the text column, i.e. the grid is
-   inset 2.4px so the 4px square starts at x = 78 and the label at x = 88.2 */
-.skills { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 32px; row-gap: 9.5px; padding-left: 2.4px; }
-.skills > span { display: flex; align-items: center; gap: 6px; font-size: 14px; line-height: 18px; break-inside: avoid; }
-.skills > span::before { content: ""; width: 4px; height: 4px; flex: 0 0 4px; background: var(--mark); }
-
-/* On screen the sheet carries the 297mm floor and the top margin itself, so the
-   preview shows a real page. On paper the page box supplies the vertical margin
-   \u2014 which is what gives page 2 of a long CV the same inset as page 1. */
-@media print { .page { min-height: 0; margin: 0; padding-top: 0; } }
-</style>
-</head>
-<body>
-<div class="page">
-<header class="hdr">
-  <h1 class="name">${esc(name2)}</h1>
-  ${contactHtml}
-</header>
-${sections}
-</div>
-</body>
-</html>`;
-}
-var CV_ACCENTS, DEFAULT_ACCENT, I2, ICONS, esc, bare, href, lines, paras;
-var init_cv_document = __esm({
-  "src/lib/cv-document.ts"() {
-    "use strict";
-    CV_ACCENTS = {
-      /** the reference document: pure paper black */
-      ink: "#000000",
-      /** the app's brand hue, one step down — #ff9933 only clears 2:1 as text on paper */
-      ember: "#b35f00",
-      graphite: "#5b564f"
-    };
-    DEFAULT_ACCENT = "ink";
-    I2 = (d2, cls = "ico") => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${d2}</svg>`;
-    ICONS = {
-      mail: (c2) => I2('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/>', c2),
-      phone: (c2) => I2('<path d="M5 3h3l2 5-2.5 1.5a12 12 0 0 0 6 6L15 13l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 5a2 2 0 0 1 2-2Z"/>', c2),
-      github: (c2) => I2('<path d="M9 19c-4 1.5-4-2-6-2.5m12 5v-3.9a3.4 3.4 0 0 0-.9-2.6c3-.3 4.9-1.7 4.9-5.9a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C5.8 2.4 4.8 2.7 4.8 2.7a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 3.4 9.1c0 4.2 1.9 5.6 4.9 5.9a3.4 3.4 0 0 0-.9 2.6V21" transform="translate(1.4 .5) scale(.92)"/>', c2),
-      linkedin: (c2) => I2('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 10.5V17M8 7.2v.01M12.5 17v-3.6a2.2 2.2 0 0 1 4.4 0V17M12.5 10.5V17"/>', c2),
-      globe: (c2) => I2('<circle cx="12" cy="12" r="9"/><path d="M3.2 9.5h17.6M3.2 14.5h17.6M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18Z"/>', c2),
-      pin: (c2) => I2('<path d="M12 21.5s7-6.3 7-11.5a7 7 0 1 0-14 0c0 5.2 7 11.5 7 11.5Z"/><circle cx="12" cy="10" r="2.6"/>', c2)
-    };
-    esc = (s2) => String(s2 ?? "").replace(/[&<>"]/g, (m2) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[m2]);
-    bare = (v2) => String(v2 ?? "").trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
-    href = (v2) => {
-      const s2 = String(v2 ?? "").trim();
-      if (!s2) return "";
-      if (/^[a-z][a-z0-9+.-]*:/i.test(s2)) return s2;
-      return /@/.test(s2) && !/^https?:/i.test(s2) ? `mailto:${s2}` : `https://${s2}`;
-    };
-    lines = (t2) => String(t2 ?? "").split("\n").map((x2) => x2.trim()).filter(Boolean);
-    paras = (t2) => String(t2 ?? "").split(/\n\s*\n/).map((p2) => p2.replace(/\s*\n\s*/g, " ").trim()).filter(Boolean);
   }
 });
 
