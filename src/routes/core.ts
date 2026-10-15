@@ -8,6 +8,7 @@ import * as captureSvc from "../services/capture.service";
 import * as autofill from "../services/autofill.service";
 import * as resumeImport from "../services/resume-import.service";
 import { rateLimit } from "../core/middleware";
+import { renderCvHtml } from "../lib/cv-document";
 
 export const profileRouter = Router();
 profileRouter.use(requireAuth);
@@ -139,11 +140,13 @@ cvRouter.get("/:id/suggest", async (req: AuthedRequest, res, next) => {
 });
 
 /**
- * Print-ready A4 HTML, the browser's print pipeline (Chromium) renders the PDF (§24.1).
+ * Print-ready A4 HTML. Chromium's own print pipeline turns it into the PDF, so the
+ * editor's preview and the printed page are the same document, at the same
+ * geometry — see `../lib/cv-document` for the measured layout it implements.
  *
- * `?frame=1` wraps the document in a real 210×297mm sheet so the editor can scale it
- * to any zoom without guessing at margins, and `?accent=` switches the document accent.
- * Same HTML either way, so the preview cannot drift from the printed page.
+ * `?frame=1` is kept for the editor's URL contract; the document is always a real
+ * 210×297mm sheet now, so the flag no longer changes the output. `?accent=` picks
+ * the document's rule/marker colour (default: the reference's paper black).
  */
 cvRouter.get("/:id/html", async (req: AuthedRequest, res, next) => {
   try {
@@ -151,164 +154,11 @@ cvRouter.get("/:id/html", async (req: AuthedRequest, res, next) => {
     const p = await profile.getProfile(req.userId!);
     const q = req.query as { frame?: string; accent?: string };
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(renderCvHtml(c, p, { frame: q.frame === "1", accent: CV_ACCENTS[q.accent ?? ""] ?? CV_ACCENTS.ember }));
+    res.send(renderCvHtml(c, p, { frame: q.frame === "1", accent: q.accent }));
   } catch (e) {
     next(e);
   }
 });
-
-/**
- * Document accents. These are the darker rungs of the app's single accent hue:
- * pure #ff9933 is a screen colour and only clears 2:1 as text on white paper, so
- * the default document accent is the same hue one step down.
- */
-const CV_ACCENTS: Record<string, string> = {
-  ember: "#b35f00",
-  ink: "#17130f",
-  graphite: "#5b564f",
-};
-
-/**
- * Structured like the reference FlowCV resume: uppercase name header + contact row
- * under a rule, uppercase section headings, dated entries as a two-column grid
- * (dates/location left, content right), skills as a multi-column grid, prose as
- * justified paragraphs. Profile-sourced blocks expand from the master profile.
- */
-function renderCvHtml(c: any, p: any, opts: { frame: boolean; accent: string } = { frame: false, accent: CV_ACCENTS.ember }): string {
-  const esc = (s: string) => String(s ?? "").replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m]!);
-  const id = p?.identity ?? {};
-  const links = id.links ?? {};
-  const clean = (v: any) => String(v ?? "").replace(/^https?:\/\//, "").replace(/\/$/, "").trim();
-
-  const name = String(id.name ?? "").trim() || c.name;
-  const contact = [id.email, id.phone, id.location, clean(links.linkedin)].map((x) => String(x ?? "").trim()).filter(Boolean);
-
-  const fmtRange = (s: any, e: any) => {
-    const a = String(s ?? "").trim();
-    const b = String(e ?? "").trim();
-    if (!a && !b) return "";
-    if (!a) return esc(b);
-    return `${esc(a)} – ${esc(b || "Present")}`;
-  };
-  const lines = (t: any) => String(t ?? "").split(/\n/).map((x) => x.trim()).filter(Boolean);
-  const paras = (t: any) => String(t ?? "")
-    .split(/\n\s*\n/)
-    .map((para) => esc(para.replace(/\s*\n\s*/g, " ")).trim())
-    .filter(Boolean);
-  const bulletList = (arr: string[]) =>
-    arr.length ? `<ul>${arr.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "";
-  const entry = (when: string, loc: string, what: string) =>
-    `<div class="entry"><div class="when">${when ? `<div class="d">${when}</div>` : ""}${loc ? `<div class="loc">${esc(loc)}</div>` : ""}</div><div class="what">${what}</div></div>`;
-
-  const HEADS: Record<string, string> = {
-    summary: "Profile",
-    experience: "Experience",
-    skills: "Skills",
-    education: "Education",
-    projects: "Projects",
-    awards: "Awards",
-    custom: "Section",
-  };
-
-  const profExps: any[] = p?.experiences ?? [];
-  const profEdu: any[] = p?.education ?? [];
-  const profSkills: any[] = p?.skills ?? [];
-
-  const body = c.blocks
-    .map((b: any) => {
-      const head = esc(b.title || HEADS[b.type] || "Section");
-      const section = (inner: string) => (inner ? `<section><h2>${head}</h2>${inner}</section>` : "");
-
-      if (b.type === "summary") return section(paras(b.text).map((x) => `<p class="prose">${x}</p>`).join(""));
-      if (b.type === "custom") return section(paras(b.text).map((x) => `<p class="prose">${x}</p>`).join(""));
-
-      if (b.type === "skills") {
-        const fromGroups = (b.groups ?? []).flatMap((g: string) => lines(g).flatMap((l) => l.split(",")));
-        const items = (fromGroups.length ? fromGroups : profSkills.map((s: any) => s.name))
-          .map((x: any) => String(x ?? "").trim())
-          .filter(Boolean);
-        return section(items.length ? `<div class="skills">${items.map((x: string) => `<span>${esc(x)}</span>`).join("")}</div>` : "");
-      }
-
-      if (b.type === "experience") {
-        const fromProfile = (b.source === "profile" ? profExps : [])
-          .map((e: any) => entry(fmtRange(e.start_date, e.end_date), e.location, `<div class="t">${esc(e.title)}</div>${e.company ? `<div class="org">${esc(e.company)}</div>` : ""}${bulletList(e.bullets ?? [])}`))
-          .join("");
-        const local = lines(b.text).length
-          ? entry("", "", `${b.title ? `<div class="t">${esc(b.title)}</div>` : ""}${bulletList(lines(b.text))}`)
-          : "";
-        return section(fromProfile + local);
-      }
-
-      if (b.type === "education") {
-        const fromProfile = (b.source === "profile" ? profEdu : [])
-          .map((e: any) => {
-            const qual = [e.degree, e.field].map((x: any) => String(x ?? "").trim()).filter(Boolean).join(" · ");
-            const what = `${qual ? `<div class="t">${esc(qual)}</div>` : ""}${e.school ? `<div class="org">${esc(e.school)}</div>` : ""}`;
-            return entry(fmtRange(e.start_date, e.end_date), "", what);
-          })
-          .join("");
-        const local = lines(b.text).length
-          ? entry("", "", `${b.title ? `<div class="t">${esc(b.title)}</div>` : ""}${bulletList(lines(b.text))}`)
-          : "";
-        return section(fromProfile + local);
-      }
-
-      if (b.type === "projects" || b.type === "awards") {
-        const items = lines(b.text).length ? lines(b.text) : (b.bullets ?? []);
-        return section(items.length ? bulletList(items) : "");
-      }
-
-      return "";
-    })
-    .join("");
-
-  const contactHtml = contact.length
-    ? `<div class="contact">${contact.map((x) => `<span>${esc(x)}</span>`).join("")}</div>`
-    : "";
-
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(name)}</title>
-<style>
- :root { --accent: ${esc(opts.accent)}; --ink: #17130f; --soft: #4d4842; --faint: #6f6961; --rule: #dad4cc; }
- @page { size: A4; margin: 15mm; }
- * { box-sizing: border-box; }
- html, body { margin: 0; }
- body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: var(--ink); font-size: 10.4pt; line-height: 1.45; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
- /* the sheet: exact A4 geometry, so a parent can scale it to any zoom and the
-   printed page stays identical. Padding is dropped again for print because
-   @page margin already supplies it. */
- .page { width: 210mm; min-height: 297mm; padding: 15mm; margin: 0 auto; background: #fff; }
- header { padding-bottom: 9pt; border-bottom: 2px solid var(--accent); }
- .name { font-size: 22pt; font-weight: 800; letter-spacing: .045em; text-transform: uppercase; line-height: 1.08; margin: 0; }
- .headline { font-size: 10.2pt; font-weight: 600; color: var(--soft); margin: 3.5pt 0 0; }
- .contact { display: flex; flex-wrap: wrap; gap: 2pt 14pt; font-size: 9.2pt; color: var(--faint); margin-top: 7pt; }
- section { margin-top: 13pt; }
- section:first-of-type { margin-top: 15pt; }
- h2 { font-size: 10.4pt; font-weight: 800; text-transform: uppercase; letter-spacing: .14em; color: var(--accent); margin: 0 0 7pt; padding-bottom: 3pt; border-bottom: 1px solid var(--rule); }
- .entry { display: grid; grid-template-columns: 33mm 1fr; gap: 0 10pt; margin-bottom: 9pt; page-break-inside: avoid; }
- .entry:last-child { margin-bottom: 0; }
- .when { font-size: 9.2pt; }
- .when .d { font-weight: 700; color: var(--soft); }
- .when .loc { color: var(--faint); font-size: 8.8pt; margin-top: 1pt; }
- .what .t { font-weight: 700; }
- .what .org { color: var(--soft); font-size: 9.6pt; }
- ul { margin: 3.5pt 0 0; padding-left: 14pt; }
- li { margin-bottom: 1.5pt; }
- li::marker { color: var(--accent); }
- p.prose { margin: 0 0 5pt; }
- p.prose:last-child { margin-bottom: 0; }
- /* one flowing line rather than a grid: skills stay a plain comma-ish list, which
-   is what a parser reads most reliably, with the accent carrying the separators */
- .skills { font-size: 10pt; }
- .skills span:not(:last-child)::after { content: "·"; color: var(--accent); margin: 0 7pt; }
- @media print { .page { width: auto; min-height: 0; padding: 0; margin: 0; background: none; } }
-</style></head><body>
-${opts.frame ? `<div class="page">` : ""}
-<header><h1 class="name">${esc(name)}</h1>${id.headline ? `<p class="headline">${esc(id.headline)}</p>` : ""}${contactHtml}</header>
-${body}
-${opts.frame ? `</div>` : ""}
-</body></html>`;
-}
 
 export const templateRouter = Router();
 templateRouter.use(requireAuth);
