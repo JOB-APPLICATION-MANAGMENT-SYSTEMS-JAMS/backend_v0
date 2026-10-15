@@ -19777,20 +19777,20 @@ var require_proxy_addr = __commonJS({
         ip = ip.toIPv4Address();
       }
       var max = ip.kind() === "ipv6" ? 128 : 32;
-      var range = pos !== -1 ? note.substring(pos + 1, note.length) : null;
-      if (range === null) {
-        range = max;
-      } else if (DIGIT_REGEXP.test(range)) {
-        range = parseInt(range, 10);
-      } else if (ip.kind() === "ipv4" && isip(range)) {
-        range = parseNetmask(range);
+      var range2 = pos !== -1 ? note.substring(pos + 1, note.length) : null;
+      if (range2 === null) {
+        range2 = max;
+      } else if (DIGIT_REGEXP.test(range2)) {
+        range2 = parseInt(range2, 10);
+      } else if (ip.kind() === "ipv4" && isip(range2)) {
+        range2 = parseNetmask(range2);
       } else {
-        range = null;
+        range2 = null;
       }
-      if (range <= 0 || range > max) {
+      if (range2 <= 0 || range2 > max) {
         throw new TypeError("invalid range on address: " + note);
       }
-      return [ip, range];
+      return [ip, range2];
     }
     function parseNetmask(netmask) {
       var ip = parseip(netmask);
@@ -22033,13 +22033,13 @@ var require_range_parser = __commonJS({
     function combineRanges(ranges) {
       var ordered = ranges.map(mapWithIndex).sort(sortByRangeStart);
       for (var j2 = 0, i2 = 1; i2 < ordered.length; i2++) {
-        var range = ordered[i2];
+        var range2 = ordered[i2];
         var current = ordered[j2];
-        if (range.start > current.end + 1) {
-          ordered[++j2] = range;
-        } else if (range.end > current.end) {
-          current.end = range.end;
-          current.index = Math.min(current.index, range.index);
+        if (range2.start > current.end + 1) {
+          ordered[++j2] = range2;
+        } else if (range2.end > current.end) {
+          current.end = range2.end;
+          current.index = Math.min(current.index, range2.index);
         }
       }
       ordered.length = j2 + 1;
@@ -22047,17 +22047,17 @@ var require_range_parser = __commonJS({
       combined.type = ranges.type;
       return combined;
     }
-    function mapWithIndex(range, index) {
+    function mapWithIndex(range2, index) {
       return {
-        start: range.start,
-        end: range.end,
+        start: range2.start,
+        end: range2.end,
         index
       };
     }
-    function mapWithoutIndex(range) {
+    function mapWithoutIndex(range2) {
       return {
-        start: range.start,
-        end: range.end
+        start: range2.start,
+        end: range2.end
       };
     }
     function sortByRangeIndex(a2, b2) {
@@ -22114,10 +22114,10 @@ var require_request = __commonJS({
     req.acceptsLanguages = function(...languages) {
       return accepts(this).languages(...languages);
     };
-    req.range = function range(size, options) {
-      var range2 = this.get("Range");
-      if (!range2) return;
-      return parseRange(size, range2, options);
+    req.range = function range2(size, options) {
+      var range3 = this.get("Range");
+      if (!range3) return;
+      return parseRange(size, range3, options);
     };
     defineGetter(req, "query", function query() {
       var queryparse = this.app.get("query parser fn");
@@ -23020,8 +23020,8 @@ var require_send = __commonJS({
       }
       return false;
     }
-    function contentRange(type, size, range) {
-      return type + " " + (range ? range.start + "-" + range.end : "*") + "/" + size;
+    function contentRange(type, size, range2) {
+      return type + " " + (range2 ? range2.start + "-" + range2.end : "*") + "/" + size;
     }
     function createHtmlDocument(title, body) {
       return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<title>' + title + "</title>\n</head>\n<body>\n<pre>" + body + "</pre>\n</body>\n</html>\n";
@@ -29986,25 +29986,25 @@ var require_range2 = __commonJS({
     "use strict";
     var SPACE_CHARACTERS = /\s+/g;
     var Range2 = class _Range {
-      constructor(range, options) {
+      constructor(range2, options) {
         options = parseOptions(options);
-        if (range instanceof _Range) {
-          if (range.loose === !!options.loose && range.includePrerelease === !!options.includePrerelease) {
-            return range;
+        if (range2 instanceof _Range) {
+          if (range2.loose === !!options.loose && range2.includePrerelease === !!options.includePrerelease) {
+            return range2;
           } else {
-            return new _Range(range.raw, options);
+            return new _Range(range2.raw, options);
           }
         }
-        if (range instanceof Comparator) {
-          this.raw = range.value;
-          this.set = [[range]];
+        if (range2 instanceof Comparator) {
+          this.raw = range2.value;
+          this.set = [[range2]];
           this.formatted = void 0;
           return this;
         }
         this.options = options;
         this.loose = !!options.loose;
         this.includePrerelease = !!options.includePrerelease;
-        this.raw = range.trim().replace(SPACE_CHARACTERS, " ");
+        this.raw = range2.trim().replace(SPACE_CHARACTERS, " ");
         this.set = this.raw.split("||").map((r2) => this.parseRange(r2.trim())).filter((c2) => c2.length);
         if (!this.set.length) {
           throw new TypeError(`Invalid SemVer Range: ${this.raw}`);
@@ -30049,25 +30049,25 @@ var require_range2 = __commonJS({
       toString() {
         return this.range;
       }
-      parseRange(range) {
-        range = range.replace(BUILDSTRIPRE, "");
+      parseRange(range2) {
+        range2 = range2.replace(BUILDSTRIPRE, "");
         const memoOpts = (this.options.includePrerelease && FLAG_INCLUDE_PRERELEASE) | (this.options.loose && FLAG_LOOSE);
-        const memoKey = memoOpts + ":" + range;
+        const memoKey = memoOpts + ":" + range2;
         const cached = cache.get(memoKey);
         if (cached) {
           return cached;
         }
         const loose = this.options.loose;
         const hr2 = loose ? re2[t2.HYPHENRANGELOOSE] : re2[t2.HYPHENRANGE];
-        range = range.replace(hr2, hyphenReplace(this.options.includePrerelease));
-        debug("hyphen replace", range);
-        range = range.replace(re2[t2.COMPARATORTRIM], comparatorTrimReplace);
-        debug("comparator trim", range);
-        range = range.replace(re2[t2.TILDETRIM], tildeTrimReplace);
-        debug("tilde trim", range);
-        range = range.replace(re2[t2.CARETTRIM], caretTrimReplace);
-        debug("caret trim", range);
-        let rangeList = range.split(" ").map((comp) => parseComparator(comp, this.options)).join(" ").split(/\s+/).map((comp) => replaceGTE0(comp, this.options));
+        range2 = range2.replace(hr2, hyphenReplace(this.options.includePrerelease));
+        debug("hyphen replace", range2);
+        range2 = range2.replace(re2[t2.COMPARATORTRIM], comparatorTrimReplace);
+        debug("comparator trim", range2);
+        range2 = range2.replace(re2[t2.TILDETRIM], tildeTrimReplace);
+        debug("tilde trim", range2);
+        range2 = range2.replace(re2[t2.CARETTRIM], caretTrimReplace);
+        debug("caret trim", range2);
+        let rangeList = range2.split(" ").map((comp) => parseComparator(comp, this.options)).join(" ").split(/\s+/).map((comp) => replaceGTE0(comp, this.options));
         if (loose) {
           rangeList = rangeList.filter((comp) => {
             debug("loose invalid filter", comp, this.options);
@@ -30090,12 +30090,12 @@ var require_range2 = __commonJS({
         cache.set(memoKey, result);
         return result;
       }
-      intersects(range, options) {
-        if (!(range instanceof _Range)) {
+      intersects(range2, options) {
+        if (!(range2 instanceof _Range)) {
           throw new TypeError("a Range is required");
         }
         return this.set.some((thisComparators) => {
-          return isSatisfiable(thisComparators, options) && range.set.some((rangeComparators) => {
+          return isSatisfiable(thisComparators, options) && range2.set.some((rangeComparators) => {
             return isSatisfiable(rangeComparators, options) && thisComparators.every((thisComparator) => {
               return rangeComparators.every((rangeComparator) => {
                 return thisComparator.intersects(rangeComparator, options);
@@ -30483,13 +30483,13 @@ var require_satisfies = __commonJS({
   "node_modules/.pnpm/semver@7.8.5/node_modules/semver/functions/satisfies.js"(exports, module) {
     "use strict";
     var Range2 = require_range2();
-    var satisfies = (version2, range, options) => {
+    var satisfies = (version2, range2, options) => {
       try {
-        range = new Range2(range, options);
+        range2 = new Range2(range2, options);
       } catch (er2) {
         return false;
       }
-      return range.test(version2);
+      return range2.test(version2);
     };
     module.exports = satisfies;
   }
@@ -30500,7 +30500,7 @@ var require_to_comparators = __commonJS({
   "node_modules/.pnpm/semver@7.8.5/node_modules/semver/ranges/to-comparators.js"(exports, module) {
     "use strict";
     var Range2 = require_range2();
-    var toComparators = (range, options) => new Range2(range, options).set.map((comp) => comp.map((c2) => c2.value).join(" ").trim().split(" "));
+    var toComparators = (range2, options) => new Range2(range2, options).set.map((comp) => comp.map((c2) => c2.value).join(" ").trim().split(" "));
     module.exports = toComparators;
   }
 });
@@ -30511,12 +30511,12 @@ var require_max_satisfying = __commonJS({
     "use strict";
     var SemVer = require_semver();
     var Range2 = require_range2();
-    var maxSatisfying = (versions, range, options) => {
+    var maxSatisfying = (versions, range2, options) => {
       let max = null;
       let maxSV = null;
       let rangeObj = null;
       try {
-        rangeObj = new Range2(range, options);
+        rangeObj = new Range2(range2, options);
       } catch (er2) {
         return null;
       }
@@ -30540,12 +30540,12 @@ var require_min_satisfying = __commonJS({
     "use strict";
     var SemVer = require_semver();
     var Range2 = require_range2();
-    var minSatisfying = (versions, range, options) => {
+    var minSatisfying = (versions, range2, options) => {
       let min = null;
       let minSV = null;
       let rangeObj = null;
       try {
-        rangeObj = new Range2(range, options);
+        rangeObj = new Range2(range2, options);
       } catch (er2) {
         return null;
       }
@@ -30570,19 +30570,19 @@ var require_min_version = __commonJS({
     var SemVer = require_semver();
     var Range2 = require_range2();
     var gt2 = require_gt();
-    var minVersion = (range, loose) => {
-      range = new Range2(range, loose);
+    var minVersion = (range2, loose) => {
+      range2 = new Range2(range2, loose);
       let minver = new SemVer("0.0.0");
-      if (range.test(minver)) {
+      if (range2.test(minver)) {
         return minver;
       }
       minver = new SemVer("0.0.0-0");
-      if (range.test(minver)) {
+      if (range2.test(minver)) {
         return minver;
       }
       minver = null;
-      for (let i2 = 0; i2 < range.set.length; ++i2) {
-        const comparators = range.set[i2];
+      for (let i2 = 0; i2 < range2.set.length; ++i2) {
+        const comparators = range2.set[i2];
         let setMin = null;
         comparators.forEach((comparator) => {
           const compver = new SemVer(comparator.semver.version);
@@ -30613,7 +30613,7 @@ var require_min_version = __commonJS({
           minver = setMin;
         }
       }
-      if (minver && range.test(minver)) {
+      if (minver && range2.test(minver)) {
         return minver;
       }
       return null;
@@ -30627,9 +30627,9 @@ var require_valid2 = __commonJS({
   "node_modules/.pnpm/semver@7.8.5/node_modules/semver/ranges/valid.js"(exports, module) {
     "use strict";
     var Range2 = require_range2();
-    var validRange = (range, options) => {
+    var validRange = (range2, options) => {
       try {
-        return new Range2(range, options).range || "*";
+        return new Range2(range2, options).range || "*";
       } catch (er2) {
         return null;
       }
@@ -30651,9 +30651,9 @@ var require_outside = __commonJS({
     var lt2 = require_lt();
     var lte = require_lte();
     var gte = require_gte();
-    var outside = (version2, range, hilo, options) => {
+    var outside = (version2, range2, hilo, options) => {
       version2 = new SemVer(version2, options);
-      range = new Range2(range, options);
+      range2 = new Range2(range2, options);
       let gtfn, ltefn, ltfn, comp, ecomp;
       switch (hilo) {
         case ">":
@@ -30673,11 +30673,11 @@ var require_outside = __commonJS({
         default:
           throw new TypeError('Must provide a hilo val of "<" or ">"');
       }
-      if (satisfies(version2, range, options)) {
+      if (satisfies(version2, range2, options)) {
         return false;
       }
-      for (let i2 = 0; i2 < range.set.length; ++i2) {
-        const comparators = range.set[i2];
+      for (let i2 = 0; i2 < range2.set.length; ++i2) {
+        const comparators = range2.set[i2];
         let high = null;
         let low = null;
         comparators.forEach((comparator) => {
@@ -30712,7 +30712,7 @@ var require_gtr = __commonJS({
   "node_modules/.pnpm/semver@7.8.5/node_modules/semver/ranges/gtr.js"(exports, module) {
     "use strict";
     var outside = require_outside();
-    var gtr = (version2, range, options) => outside(version2, range, ">", options);
+    var gtr = (version2, range2, options) => outside(version2, range2, ">", options);
     module.exports = gtr;
   }
 });
@@ -30722,7 +30722,7 @@ var require_ltr = __commonJS({
   "node_modules/.pnpm/semver@7.8.5/node_modules/semver/ranges/ltr.js"(exports, module) {
     "use strict";
     var outside = require_outside();
-    var ltr = (version2, range, options) => outside(version2, range, "<", options);
+    var ltr = (version2, range2, options) => outside(version2, range2, "<", options);
     module.exports = ltr;
   }
 });
@@ -30747,13 +30747,13 @@ var require_simplify = __commonJS({
     "use strict";
     var satisfies = require_satisfies();
     var compare2 = require_compare();
-    module.exports = (versions, range, options) => {
+    module.exports = (versions, range2, options) => {
       const set = [];
       let first = null;
       let prev = null;
       const v2 = versions.sort((a2, b2) => compare2(a2, b2, options));
       for (const version2 of v2) {
-        const included = satisfies(version2, range, options);
+        const included = satisfies(version2, range2, options);
         if (included) {
           prev = version2;
           if (!first) {
@@ -30785,8 +30785,8 @@ var require_simplify = __commonJS({
         }
       }
       const simplified = ranges.join(" || ");
-      const original = typeof range.raw === "string" ? range.raw : String(range);
-      return simplified.length < original.length ? simplified : range;
+      const original = typeof range2.raw === "string" ? range2.raw : String(range2);
+      return simplified.length < original.length ? simplified : range2;
     };
   }
 });
@@ -40000,7 +40000,7 @@ function safeDecode(str) {
     return str;
   }
 }
-function normalizeHostname(raw, href) {
+function normalizeHostname(raw, href2) {
   const hostname = raw || "";
   if (!hostname) {
     return "";
@@ -40011,7 +40011,7 @@ function normalizeHostname(raw, href) {
   const decoded = safeDecode(hostname);
   const mapped = FORBIDDEN_HOST_CHARS.test(decoded) ? "" : urllib.domainToASCII(decoded);
   if (!mapped) {
-    throw invalidUrl(href);
+    throw invalidUrl(href2);
   }
   return mapped;
 }
@@ -43453,14 +43453,14 @@ function wrap2(str, lineLength) {
 }
 function checkRanges(nr2, ranges) {
   for (let i2 = ranges.length - 1; i2 >= 0; i2--) {
-    const range = ranges[i2];
-    if (!range.length) {
+    const range2 = ranges[i2];
+    if (!range2.length) {
       continue;
     }
-    if (range.length === 1 && nr2 === range[0]) {
+    if (range2.length === 1 && nr2 === range2[0]) {
       return true;
     }
-    if (range.length === 2 && nr2 >= range[0] && nr2 <= range[1]) {
+    if (range2.length === 2 && nr2 >= range2[0] && nr2 <= range2[1]) {
       return true;
     }
   }
@@ -43879,7 +43879,7 @@ function foldLines(str, lineLength, afterSpace) {
   return result;
 }
 function splitMimeEncodedString(str, maxlen) {
-  const lines = [];
+  const lines2 = [];
   let curLine, fallbackLine, match, chr, done;
   maxlen = Math.max(maxlen || 0, 12);
   while (str.length) {
@@ -43902,10 +43902,10 @@ function splitMimeEncodedString(str, maxlen) {
     if (!curLine.length) {
       curLine = fallbackLine;
     }
-    lines.push(curLine);
+    lines2.push(curLine);
     str = str.substr(curLine.length);
   }
-  return lines;
+  return lines2;
 }
 function encodeURICharComponent(chr) {
   let res = "";
@@ -46234,15 +46234,15 @@ var init_message_parser = __esm({
       }
       parseHeaders() {
         const rawLines = (this.rawHeaders || Buffer.alloc(0)).toString("binary").split(/\r?\n/);
-        const lines = [];
+        const lines2 = [];
         for (const rawLine of rawLines) {
-          if (lines.length && /^[ \t]/.test(rawLine)) {
-            lines[lines.length - 1] += "\n" + rawLine;
+          if (lines2.length && /^[ \t]/.test(rawLine)) {
+            lines2[lines2.length - 1] += "\n" + rawLine;
           } else {
-            lines.push(rawLine);
+            lines2.push(rawLine);
           }
         }
-        return lines.filter((line) => /[^ \t\r]/.test(line)).map((line) => ({
+        return lines2.filter((line) => /[^ \t\r]/.test(line)).map((line) => ({
           key: line.substr(0, line.indexOf(":")).replace(/^[ \t]+|[ \t]+$/g, "").toLowerCase(),
           line
         }));
@@ -48116,15 +48116,15 @@ var init_smtp_connection = __esm({
           }
           return;
         }
-        const lines = (this._remainder + data).split(/\r?\n/);
-        this._remainder = lines.pop();
-        for (let i2 = 0, len = lines.length; i2 < len; i2++) {
+        const lines2 = (this._remainder + data).split(/\r?\n/);
+        this._remainder = lines2.pop();
+        for (let i2 = 0, len = lines2.length; i2 < len; i2++) {
           if (this._responsePartial) {
-            this._responseQueue[this._responseQueue.length - 1] += "\n" + lines[i2];
+            this._responseQueue[this._responseQueue.length - 1] += "\n" + lines2[i2];
           } else {
-            this._responseQueue.push(lines[i2]);
+            this._responseQueue.push(lines2[i2]);
           }
-          this._responsePartial = isPartialLine(lines[i2]);
+          this._responsePartial = isPartialLine(lines2[i2]);
           if (this._responsePartial && this._responseQueue[this._responseQueue.length - 1].length > maxResponseSize) {
             return this._onResponseTooLarge();
           }
@@ -93798,7 +93798,7 @@ async function parseResume(buf, filename) {
 }
 function extractIdentity(raw) {
   const text = raw.replace(/\r/g, "");
-  const lines = text.split("\n").map((l2) => l2.trim()).filter(Boolean);
+  const lines2 = text.split("\n").map((l2) => l2.trim()).filter(Boolean);
   const id = {};
   const links = {};
   const warnings = [];
@@ -93811,7 +93811,7 @@ function extractIdentity(raw) {
   const gh = text.match(/github\.com\/[A-Za-z0-9._/-]+/i);
   if (gh) links.github = `https://${gh[0].replace(/[.,;·]+$/, "")}`;
   const TITLE_WORDS = /engineer|developer|designer|student|intern|manager|analyst|architect|specialist|consultant|lead|director|scientist|technician|nurse|teacher|candidate|resume|curriculum/i;
-  const nameLine = lines.find(
+  const nameLine = lines2.find(
     (l2) => l2.length >= 5 && l2.length <= 60 && !/[@\d|•·]/.test(l2) && /^[A-Za-z'’. -]+$/.test(l2) && /^[A-Z]/.test(l2) && !TITLE_WORDS.test(l2) && l2.split(/\s+/).length >= 2 && l2.split(/\s+/).length <= 4
   );
   if (nameLine) {
@@ -93824,17 +93824,17 @@ function extractIdentity(raw) {
     warnings.push("Couldn\u2019t spot a name \u2014 add it manually below.");
   }
   const citySt = /\b([A-Z][a-zA-Z.' -]{2,29},\s[A-Z]{2})\b/;
-  const contactLine = email ? lines.find((l2) => l2.includes(email[0])) : void 0;
+  const contactLine = email ? lines2.find((l2) => l2.includes(email[0])) : void 0;
   const loc = contactLine && citySt.exec(contactLine)?.[1] || text.match(citySt)?.[1];
   if (loc) id.location = loc.trim();
-  const headline = lines.find((l2) => l2.length <= 70 && TITLE_WORDS.test(l2) && l2 !== nameLine && !/@/.test(l2));
+  const headline = lines2.find((l2) => l2.length <= 70 && TITLE_WORDS.test(l2) && l2 !== nameLine && !/@/.test(l2));
   if (headline) id.headline = headline.replace(/^[-•\s]+/, "");
-  const schoolLine = lines.find((l2) => /(university|college|institute|polytechnic|school of)/i.test(l2) && l2.length <= 100);
+  const schoolLine = lines2.find((l2) => /(university|college|institute|polytechnic|school of)/i.test(l2) && l2.length <= 100);
   if (schoolLine) {
     const school = schoolLine.replace(/^[-•\d\s]+/, "").split(/[,·|]/)[0].trim();
     if (school.length >= 3) id.school = school;
   }
-  const degLine = lines.find((l2) => /(bachelor|master|ph\.?\s?d|b\.?s\.?c?|m\.?s\.?c?|b\.?a\.?|m\.?a\.?|b\.?tech|m\.?tech)/i.test(l2));
+  const degLine = lines2.find((l2) => /(bachelor|master|ph\.?\s?d|b\.?s\.?c?|m\.?s\.?c?|b\.?a\.?|m\.?a\.?|b\.?tech|m\.?tech)/i.test(l2));
   if (degLine) {
     const deg = degLine.match(/\b(ph\.?\s?d|bachelor(?:\s+of\s+[A-Za-z]+)?|master(?:\s+of\s+[A-Za-z]+)?|b\.?s\.?c?|m\.?s\.?c?|b\.?a\.?|m\.?a\.?|b\.?tech|m\.?tech)\b/i);
     if (deg) id.degree = deg[0].replace(/\s+/g, " ").trim();
@@ -93861,28 +93861,30 @@ var init_resume_import_service = __esm({
   }
 });
 
-// src/routes/core.ts
-function renderCvHtml(c2, p2) {
-  const esc2 = (s2) => String(s2 ?? "").replace(/[&<>]/g, (m2) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[m2]);
+// src/lib/cv-document.ts
+function range(start, end) {
+  const a2 = String(start ?? "").trim();
+  const b2 = String(end ?? "").trim();
+  if (!a2 && !b2) return "";
+  if (!a2) return b2;
+  return `${a2} \u2013 ${b2 || "Present"}`;
+}
+function renderCvHtml(c2, p2, opts = {}) {
+  const accent = CV_ACCENTS[String(opts.accent)] ?? CV_ACCENTS[DEFAULT_ACCENT];
   const id = p2?.identity ?? {};
   const links = id.links ?? {};
-  const clean = (v2) => String(v2 ?? "").replace(/^https?:\/\//, "").replace(/\/$/, "").trim();
-  const name2 = String(id.name ?? "").trim() || c2.name;
-  const contact = [id.email, id.phone, id.location, clean(links.linkedin)].map((x2) => String(x2 ?? "").trim()).filter(Boolean);
-  const fmtRange = (s2, e2) => {
-    const a2 = String(s2 ?? "").trim();
-    const b2 = String(e2 ?? "").trim();
-    if (!a2 && !b2) return "";
-    if (!a2) return esc2(b2);
-    return `${esc2(a2)} \u2013 ${esc2(b2 || "Present")}`;
-  };
-  const lines = (t2) => String(t2 ?? "").split(/\n/).map((x2) => x2.trim()).filter(Boolean);
-  const paras = (t2) => String(t2 ?? "").split(/\n\s*\n/).map((para) => esc2(para.replace(/\s*\n\s*/g, " ")).trim()).filter(Boolean);
-  const bulletList = (arr) => arr.length ? `<ul>${arr.map((x2) => `<li>${esc2(x2)}</li>`).join("")}</ul>` : "";
-  const entry = (when, loc, what) => `<div class="entry"><div class="when">${when ? `<div class="d">${when}</div>` : ""}${loc ? `<div class="loc">${esc2(loc)}</div>` : ""}</div><div class="what">${what}</div></div>`;
+  const name2 = String(id.name ?? "").trim() || String(c2?.name ?? "");
+  const contact = [
+    id.email ? { icon: "mail", label: String(id.email), url: href(id.email) } : null,
+    id.phone ? { icon: "phone", label: String(id.phone), url: href(id.phone) } : null,
+    links.linkedin ? { icon: "linkedin", label: bare(links.linkedin), url: href(links.linkedin) } : null,
+    links.github ? { icon: "github", label: bare(links.github), url: href(links.github) } : null,
+    links.website ? { icon: "globe", label: bare(links.website), url: href(links.website) } : null,
+    id.location ? { icon: "pin", label: String(id.location), url: "" } : null
+  ].filter(Boolean);
   const HEADS = {
     summary: "Profile",
-    experience: "Experience",
+    experience: "Professional Experience",
     skills: "Skills",
     education: "Education",
     projects: "Projects",
@@ -93892,66 +93894,189 @@ function renderCvHtml(c2, p2) {
   const profExps = p2?.experiences ?? [];
   const profEdu = p2?.education ?? [];
   const profSkills = p2?.skills ?? [];
-  const body = c2.blocks.map((b2) => {
-    const head = esc2(b2.title || HEADS[b2.type] || "Section");
-    const section2 = (inner) => inner ? `<section><h2>${head}</h2>${inner}</section>` : "";
-    if (b2.type === "summary") return section2(paras(b2.text).map((x2) => `<p class="prose">${x2}</p>`).join(""));
-    if (b2.type === "custom") return section2(paras(b2.text).map((x2) => `<p class="prose">${x2}</p>`).join(""));
+  const entry = (when, loc, what) => `<div class="entry"><div class="when">${when ? `<div>${esc(when)}</div>` : ""}${loc ? `<div>${esc(loc)}</div>` : ""}</div><div class="what">${what}</div></div>`;
+  const prose = (arr) => arr.map((x2) => `<p>${esc(x2)}</p>`).join("");
+  const sections = (c2?.blocks ?? []).map((b2) => {
+    const head = esc(b2.title || HEADS[b2.type] || "Section");
+    const wrap3 = (inner) => inner ? `<section><h2>${head}</h2>${inner}</section>` : "";
+    if (b2.type === "summary" || b2.type === "custom") return wrap3(prose(paras(b2.text)));
     if (b2.type === "skills") {
-      const fromGroups = (b2.groups ?? []).flatMap((g2) => lines(g2).flatMap((l2) => l2.split(",")));
+      const fromGroups = (b2.groups ?? []).flatMap(
+        (g2) => lines(g2).flatMap((l2) => l2.split(","))
+      );
       const items = (fromGroups.length ? fromGroups : profSkills.map((s2) => s2.name)).map((x2) => String(x2 ?? "").trim()).filter(Boolean);
-      return section2(items.length ? `<div class="skills">${items.map((x2) => `<span>${esc2(x2)}</span>`).join("")}</div>` : "");
+      return wrap3(items.length ? `<div class="skills">${items.map((x2) => `<span>${esc(x2)}</span>`).join("")}</div>` : "");
     }
     if (b2.type === "experience") {
-      const fromProfile = (b2.source === "profile" ? profExps : []).map((e2) => entry(fmtRange(e2.start_date, e2.end_date), e2.location, `<div class="t">${esc2(e2.title)}</div>${e2.company ? `<div class="org">${esc2(e2.company)}</div>` : ""}${bulletList(e2.bullets ?? [])}`)).join("");
-      const local = lines(b2.text).length ? entry("", "", `${b2.title ? `<div class="t">${esc2(b2.title)}</div>` : ""}${bulletList(lines(b2.text))}`) : "";
-      return section2(fromProfile + local);
+      const fromProfile = (b2.source === "profile" ? profExps : []).map(
+        (e2) => entry(
+          range(e2.start_date, e2.end_date),
+          e2.location,
+          `<div class="t">${e2.title ? esc(e2.title) : ""}</div>` + (e2.company ? `<div class="org">${esc(e2.company)}</div>` : "") + prose(Array.isArray(e2.bullets) ? e2.bullets : [])
+        )
+      ).join("");
+      const local = lines(b2.text).length ? entry("", "", prose([...b2.bullets ?? [], ...lines(b2.text)])) : "";
+      return wrap3(fromProfile + local);
     }
     if (b2.type === "education") {
       const fromProfile = (b2.source === "profile" ? profEdu : []).map((e2) => {
         const qual = [e2.degree, e2.field].map((x2) => String(x2 ?? "").trim()).filter(Boolean).join(" \xB7 ");
-        const what = `${qual ? `<div class="t">${esc2(qual)}</div>` : ""}${e2.school ? `<div class="org">${esc2(e2.school)}</div>` : ""}`;
-        return entry(fmtRange(e2.start_date, e2.end_date), "", what);
+        return entry(
+          range(e2.start_date, e2.end_date),
+          e2.location,
+          (qual ? `<div class="t">${esc(qual)}</div>` : "") + (e2.school ? `<div class="org">${esc(e2.school)}</div>` : "")
+        );
       }).join("");
-      const local = lines(b2.text).length ? entry("", "", `${b2.title ? `<div class="t">${esc2(b2.title)}</div>` : ""}${bulletList(lines(b2.text))}`) : "";
-      return section2(fromProfile + local);
+      const local = lines(b2.text).length ? entry("", "", `${b2.title ? `<div class="t">${esc(b2.title)}</div>` : ""}${prose(lines(b2.text))}`) : "";
+      return wrap3(fromProfile + local);
     }
     if (b2.type === "projects" || b2.type === "awards") {
       const items = lines(b2.text).length ? lines(b2.text) : b2.bullets ?? [];
-      return section2(items.length ? bulletList(items) : "");
+      return wrap3(items.length ? entry("", "", prose(items)) : "");
     }
     return "";
   }).join("");
-  const contactHtml = contact.length ? `<div class="contact">${contact.map((x2) => `<span>${esc2(x2)}</span>`).join("")}</div>` : "";
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc2(name2)}</title>
+  const contactHtml = contact.length ? `<div class="contact">${contact.map(
+    (x2) => x2.url ? `<a href="${esc(x2.url)}">${ICONS[x2.icon]()}<span>${esc(x2.label)}</span></a>` : `<span>${ICONS[x2.icon]()}<span>${esc(x2.label)}</span></span>`
+  ).join("")}</div>` : "";
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(name2)} \u2014 CV</title>
 <style>
- @page { size: A4; margin: 15mm; }
- * { box-sizing: border-box; }
- body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #17130f; font-size: 10.4pt; line-height: 1.42; margin: 0; }
- header { border-bottom: 2px solid #17130f; padding-bottom: 8pt; }
- .name { font-size: 23pt; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; line-height: 1.1; margin: 0; }
- .headline { font-size: 10pt; color: #55504a; margin: 3pt 0 0; }
- .contact { display: flex; flex-wrap: wrap; gap: 2pt 16pt; font-size: 9.3pt; color: #46413b; margin-top: 6pt; }
- section { margin-top: 13pt; }
- h2 { font-size: 10.6pt; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; color: #17130f; margin: 0 0 6pt; padding-bottom: 2.5pt; border-bottom: 1px solid #d8d2ca; }
- .entry { display: grid; grid-template-columns: 33mm 1fr; gap: 0 10pt; margin-bottom: 8pt; page-break-inside: avoid; }
- .entry:last-child { margin-bottom: 0; }
- .when { font-size: 9.2pt; }
- .when .d { font-weight: 700; color: #35302b; }
- .when .loc { color: #6b655d; font-size: 8.8pt; margin-top: 1pt; }
- .what .t { font-weight: 700; }
- .what .org { color: #55504a; font-size: 9.6pt; }
- ul { margin: 3pt 0 0; padding-left: 15pt; }
- li { margin-bottom: 1.5pt; }
- p.prose { margin: 0 0 5pt; }
- p.prose:last-child { margin-bottom: 0; }
- .skills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3pt 12pt; font-size: 10pt; }
- @media print { body { -webkit-print-color-adjust: exact; } }
-</style></head><body>
-<header><h1 class="name">${esc2(name2)}</h1>${id.headline ? `<p class="headline">${esc2(id.headline)}</p>` : ""}${contactHtml}</header>
-${body}
-</body></html>`;
+/* Amiri is the face the reference document embeds (ascent 1.124em / descent
+   0.634em, upem 1000 \u2014 identical to the file the PDF carries). Bundled rather
+   than fetched so a CV prints the same on every machine, and \`block\` so nothing
+   is laid out in a fallback face and re-flowed once the real one arrives. */
+@font-face { font-family: Amiri; font-style: normal; font-weight: 400; font-display: block;
+  src: url("/fonts/amiri-regular.woff2") format("woff2"); }
+@font-face { font-family: Amiri; font-style: normal; font-weight: 700; font-display: block;
+  src: url("/fonts/amiri-bold.woff2") format("woff2"); }
+@font-face { font-family: Amiri; font-style: italic; font-weight: 400; font-display: block;
+  src: url("/fonts/amiri-italic.woff2") format("woff2"); }
+
+:root {
+  --serif: Amiri, "Iowan Old Style", Palatino, "Palatino Linotype", "Book Antiqua", Georgia, "Times New Roman", serif;
+  --rule: ${esc(accent)};
+  --ink: #000;
+  --mark: ${esc(accent)};
+  --side: 20mm;   /* measured: the text column starts at 75.59px == 20mm */
+  --myn: 15mm;    /* measured: the name box top sits 56.69px below the top edge */
 }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #fff; }
+/* vertical paper margin comes from the page box, so page 2 of a long CV is
+   inset exactly like page 1; the sheet then only supplies the side margins. */
+@page { size: A4; margin: var(--myn) 0; }
+
+.page {
+  width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff;
+  padding: var(--myn) var(--side) 0;
+  font: 400 14px/18px var(--serif);
+  color: var(--ink); -webkit-font-kerning: normal;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+
+/* \u2500\u2500 header \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.hdr { padding-bottom: 7.2px; }
+.name { font: 700 32.66px/1.2 var(--serif); text-align: center; margin: 0; letter-spacing: 0; }
+.contact {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 6px 14px; margin-top: 12.7px; font-size: 14px; line-height: 14px;
+}
+.contact > a, .contact > span { display: inline-flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
+.ico {
+  width: 14px; height: 14px; flex: 0 0 14px; fill: none;
+  stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* \u2500\u2500 sections \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+section { margin-top: 19px; }
+h2 {
+  font: 700 15.33px/19px var(--serif); color: var(--rule);
+  margin: 0 0 9px; padding-bottom: 1px; border-bottom: 2px solid var(--rule);
+}
+p { margin: 0; }
+
+/* \u2500\u2500 dated entries: when/location left, title/org/prose right \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.entry { display: grid; grid-template-columns: 147.8px 1fr; margin-bottom: 12px; }
+.entry:last-child { margin-bottom: 0; }
+/* The reference starts an entry's first line 31px below its heading but prose
+   lines at 30px \u2014 one pixel of its own box model, kept so every later section
+   lands on the measured baseline instead of drifting. Padding, not margin:
+   a margin here would collapse into the heading's own margin-bottom. */
+h2 + .entry { padding-top: 1px; }
+.when { font-size: 14px; line-height: 18px; }
+.what .t { font-weight: 700; }
+.what .org { font-style: italic; }
+.ext-link { color: inherit; text-decoration: none; white-space: nowrap; }
+.ext {
+  width: 10px; height: 10px; margin-left: 4px; fill: none;
+  stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
+  vertical-align: -1px;
+}
+
+/* \u2500\u2500 skills: three equal columns with a square marker, as measured \u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+/* measured: the skill text sits 12.6px from the text column, i.e. the grid is
+   inset 2.4px so the 4px square starts at x = 78 and the label at x = 88.2 */
+.skills { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 32px; row-gap: 9.5px; padding-left: 2.4px; }
+.skills > span { display: flex; align-items: center; gap: 6px; font-size: 14px; line-height: 18px; break-inside: avoid; }
+.skills > span::before { content: ""; width: 4px; height: 4px; flex: 0 0 4px; background: var(--mark); }
+
+/* On screen the sheet carries the 297mm floor and the top margin itself, so the
+   preview shows a real page. On paper the page box supplies the vertical margin
+   \u2014 which is what gives page 2 of a long CV the same inset as page 1. */
+@media print { .page { min-height: 0; margin: 0; padding-top: 0; } }
+</style>
+</head>
+<body>
+<div class="page">
+<header class="hdr">
+  <h1 class="name">${esc(name2)}</h1>
+  ${contactHtml}
+</header>
+${sections}
+</div>
+</body>
+</html>`;
+}
+var CV_ACCENTS, DEFAULT_ACCENT, I2, ICONS, esc, bare, href, lines, paras;
+var init_cv_document = __esm({
+  "src/lib/cv-document.ts"() {
+    "use strict";
+    CV_ACCENTS = {
+      /** the reference document: pure paper black */
+      ink: "#000000",
+      /** the app's brand hue, one step down — #ff9933 only clears 2:1 as text on paper */
+      ember: "#b35f00",
+      graphite: "#5b564f"
+    };
+    DEFAULT_ACCENT = "ink";
+    I2 = (d2, cls = "ico") => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${d2}</svg>`;
+    ICONS = {
+      mail: (c2) => I2('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/>', c2),
+      phone: (c2) => I2('<path d="M5 3h3l2 5-2.5 1.5a12 12 0 0 0 6 6L15 13l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 5a2 2 0 0 1 2-2Z"/>', c2),
+      github: (c2) => I2('<path d="M9 19c-4 1.5-4-2-6-2.5m12 5v-3.9a3.4 3.4 0 0 0-.9-2.6c3-.3 4.9-1.7 4.9-5.9a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C5.8 2.4 4.8 2.7 4.8 2.7a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 3.4 9.1c0 4.2 1.9 5.6 4.9 5.9a3.4 3.4 0 0 0-.9 2.6V21" transform="translate(1.4 .5) scale(.92)"/>', c2),
+      linkedin: (c2) => I2('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 10.5V17M8 7.2v.01M12.5 17v-3.6a2.2 2.2 0 0 1 4.4 0V17M12.5 10.5V17"/>', c2),
+      globe: (c2) => I2('<circle cx="12" cy="12" r="9"/><path d="M3.2 9.5h17.6M3.2 14.5h17.6M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18Z"/>', c2),
+      pin: (c2) => I2('<path d="M12 21.5s7-6.3 7-11.5a7 7 0 1 0-14 0c0 5.2 7 11.5 7 11.5Z"/><circle cx="12" cy="10" r="2.6"/>', c2)
+    };
+    esc = (s2) => String(s2 ?? "").replace(/[&<>"]/g, (m2) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[m2]);
+    bare = (v2) => String(v2 ?? "").trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+    href = (v2) => {
+      const s2 = String(v2 ?? "").trim();
+      if (!s2) return "";
+      if (/^[a-z][a-z0-9+.-]*:/i.test(s2)) return s2;
+      return /@/.test(s2) && !/^https?:/i.test(s2) ? `mailto:${s2}` : `https://${s2}`;
+    };
+    lines = (t2) => String(t2 ?? "").split("\n").map((x2) => x2.trim()).filter(Boolean);
+    paras = (t2) => String(t2 ?? "").split(/\n\s*\n/).map((p2) => p2.replace(/\s*\n\s*/g, " ").trim()).filter(Boolean);
+  }
+});
+
+// src/routes/core.ts
 var import_express2, profileRouter, profileSchema, cvRouter, cvSchema, templateRouter, captureRouter, captureLimiter, autofillRouter, companyRouter;
 var init_core = __esm({
   "src/routes/core.ts"() {
@@ -93966,6 +94091,7 @@ var init_core = __esm({
     init_autofill_service();
     init_resume_import_service();
     init_middleware();
+    init_cv_document();
     profileRouter = (0, import_express2.Router)();
     profileRouter.use(requireAuth);
     profileRouter.get("/", async (req, res, next) => {
@@ -94079,8 +94205,9 @@ var init_core = __esm({
       try {
         const c2 = await getCV(req.userId, String(req.params.id));
         const p2 = await getProfile(req.userId);
+        const q2 = req.query;
         res.setHeader("Content-Type", "text/html; charset=utf-8");
-        res.send(renderCvHtml(c2, p2));
+        res.send(renderCvHtml(c2, p2, { frame: q2.frame === "1", accent: q2.accent }));
       } catch (e2) {
         next(e2);
       }
@@ -97062,40 +97189,40 @@ async function saveCvAttachment(userId, cvId) {
   const identity = reconcileIdentity(profile ? parseJson(profile.identity, {}) : {});
   const blocks = parseJson(cv.blocks, []);
   const name2 = identity.name || cv.name;
-  const section2 = (title, inner) => inner.trim() ? `<section><h2>${esc(title)}</h2>${inner}</section>` : "";
+  const section2 = (title, inner) => inner.trim() ? `<section><h2>${esc2(title)}</h2>${inner}</section>` : "";
   const parts = [];
   for (const b2 of blocks) {
     if (b2.type === "summary") {
-      parts.push(section2("Profile", `<p>${esc(b2.text ?? "")}</p>`));
+      parts.push(section2("Profile", `<p>${esc2(b2.text ?? "")}</p>`));
     } else if (b2.type === "experience") {
       const exps = await childrenOf(userId, "profile_experiences");
       const inner = exps.map((e2) => {
-        const dates = e2.start_date ? `<span class="meta">${esc(e2.start_date)}${e2.end_date ? ` \u2013 ${esc(e2.end_date)}` : ""}</span>` : "";
-        const bullets = e2.bullets ? `<ul>${parseJson(e2.bullets, []).map((x2) => `<li>${esc(x2)}</li>`).join("")}</ul>` : "";
-        return `<div class="item"><strong>${esc(e2.title ?? "")}</strong>${e2.company ? `, ${esc(e2.company)}` : ""}${dates}${bullets}</div>`;
+        const dates = e2.start_date ? `<span class="meta">${esc2(e2.start_date)}${e2.end_date ? ` \u2013 ${esc2(e2.end_date)}` : ""}</span>` : "";
+        const bullets = e2.bullets ? `<ul>${parseJson(e2.bullets, []).map((x2) => `<li>${esc2(x2)}</li>`).join("")}</ul>` : "";
+        return `<div class="item"><strong>${esc2(e2.title ?? "")}</strong>${e2.company ? `, ${esc2(e2.company)}` : ""}${dates}${bullets}</div>`;
       }).join("");
       parts.push(section2("Experience", inner));
     } else if (b2.type === "skills") {
       const skills = await childrenOf(userId, "profile_skills");
-      parts.push(section2("Skills", `<p>${skills.map((s2) => esc(s2.name)).join(" \xB7 ")}</p>`));
+      parts.push(section2("Skills", `<p>${skills.map((s2) => esc2(s2.name)).join(" \xB7 ")}</p>`));
     } else if (b2.type === "education") {
       const edu = await childrenOf(userId, "profile_education");
-      const inner = edu.map((e2) => `<div class="item"><strong>${esc(e2.school ?? "")}</strong>${e2.degree ? `, ${esc(e2.degree)}` : ""}${e2.end_date ? `<span class="meta">${esc(e2.end_date)}</span>` : ""}</div>`).join("");
+      const inner = edu.map((e2) => `<div class="item"><strong>${esc2(e2.school ?? "")}</strong>${e2.degree ? `, ${esc2(e2.degree)}` : ""}${e2.end_date ? `<span class="meta">${esc2(e2.end_date)}</span>` : ""}</div>`).join("");
       parts.push(section2("Education", inner));
     } else if (b2.text || b2.title) {
-      const inner = b2.bullets ? `<ul>${b2.bullets.map((x2) => `<li>${esc(x2)}</li>`).join("")}</ul>` : `<p>${esc(b2.text ?? "")}</p>`;
+      const inner = b2.bullets ? `<ul>${b2.bullets.map((x2) => `<li>${esc2(x2)}</li>`).join("")}</ul>` : `<p>${esc2(b2.text ?? "")}</p>`;
       parts.push(section2(b2.title ?? "Notes", inner));
     }
   }
   const html = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>${esc(name2)}: CV</title>
+<html lang="en"><head><meta charset="utf-8"><title>${esc2(name2)}: CV</title>
 <style>
   body{font-family:Georgia,'Times New Roman',serif;color:#14181f;max-width:760px;margin:40px auto;padding:0 24px;line-height:1.55}
   h1{font-size:26px;margin:0 0 4px}h2{font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#5b6472;margin:26px 0 8px;border-bottom:1px solid #e3e7ee;padding-bottom:4px}
   .meta{color:#5b6472;font-weight:400;margin-left:8px;font-size:14px}.item{margin-bottom:12px}ul{margin:6px 0 0 18px;padding:0}li{margin-bottom:4px}
   .head{border-bottom:2px solid #14181f;padding-bottom:12px}.contact{color:#5b6472;font-size:14px}
 </style></head><body>
-<div class="head"><h1>${esc(name2)}</h1><div class="contact">${esc(identity.headline ?? "")}${identity.email ? ` \xB7 ${esc(identity.email)}` : ""}</div></div>
+<div class="head"><h1>${esc2(name2)}</h1><div class="contact">${esc2(identity.headline ?? "")}${identity.email ? ` \xB7 ${esc2(identity.email)}` : ""}</div></div>
 ${parts.join("\n")}
 </body></html>`;
   return saveAttachment(userId, {
@@ -97104,7 +97231,7 @@ ${parts.join("\n")}
     content_b64: Buffer.from(html, "utf8").toString("base64")
   });
 }
-var publicBase, attachmentUrl, MAX_BYTES2, esc, profileOf, childrenOf;
+var publicBase, attachmentUrl, MAX_BYTES2, esc2, profileOf, childrenOf;
 var init_attachments = __esm({
   "src/services/attachments.ts"() {
     "use strict";
@@ -97116,7 +97243,7 @@ var init_attachments = __esm({
     publicBase = () => process.env.PUBLIC_API_BASE || process.env.API_BASE_URL || (process.env.VERCEL ? "https://backend-v0-3aeu-omega.vercel.app" : `http://localhost:${config.port}`);
     attachmentUrl = (id) => `${publicBase()}/api/v1/pitch-targets/attachments/${id}/download`;
     MAX_BYTES2 = 4 * 1024 * 1024;
-    esc = (s2) => String(s2 ?? "").replace(/[&<>"]/g, (c2) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c2]);
+    esc2 = (s2) => String(s2 ?? "").replace(/[&<>"]/g, (c2) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c2]);
     profileOf = (userId) => get(`SELECT id FROM profiles WHERE user_id = ?`, userId);
     childrenOf = async (userId, table) => {
       const p2 = await profileOf(userId);
@@ -97933,8 +98060,8 @@ var init_analytics = __esm({
     analyticsRouter.get("/funnel", limiter2, async (req, res, next) => {
       try {
         const { period } = periodSchema.parse(req.query);
-        const range = period === "day" ? 1 : period === "week" ? 7 : period === "month" ? 30 : 365;
-        const from = new Date(Date.now() - range * 864e5).toISOString();
+        const range2 = period === "day" ? 1 : period === "week" ? 7 : period === "month" ? 30 : 365;
+        const from = new Date(Date.now() - range2 * 864e5).toISOString();
         ok(res, "Funnel retrieved", { period, items: await funnelCounts(req.userId, from) });
       } catch (e2) {
         next(e2);
