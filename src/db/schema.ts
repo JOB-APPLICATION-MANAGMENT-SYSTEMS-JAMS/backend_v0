@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS cvs (
   career_category TEXT NOT NULL DEFAULT 'software_engineering',
   targeting       TEXT NOT NULL DEFAULT '{}',           -- JSON {seniority[], keywords[], companies[]}
   blocks          TEXT NOT NULL DEFAULT '[]',           -- JSON block array (§24.1)
+  design          TEXT NOT NULL DEFAULT '{}',           -- JSON CvDesign: the document's own settings (page, type, colour)
   template_id     TEXT,
   lineage         TEXT NOT NULL DEFAULT '{}',           -- JSON {forked_from, forked_at}
   created_at      TEXT NOT NULL,

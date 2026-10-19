@@ -32,6 +32,7 @@ let sqlitePromise: Promise<DatabaseSync> | null = null;
 const ENSURE_COLUMNS: { table: string; column: string; ddl: string }[] = [
   { table: "job_postings", column: "contact_email", ddl: "ALTER TABLE job_postings ADD COLUMN contact_email TEXT" },
   { table: "pitch_targets", column: "country", ddl: "ALTER TABLE pitch_targets ADD COLUMN country TEXT" },
+  { table: "cvs", column: "design", ddl: "ALTER TABLE cvs ADD COLUMN design TEXT NOT NULL DEFAULT '{}'" },
 ];
 
 /** Idempotent statements for databases created before they existed. */

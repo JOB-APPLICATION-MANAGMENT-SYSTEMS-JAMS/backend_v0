@@ -84,6 +84,194 @@ export const SHEET = {
 const wrapLines = (text: string, colWidth: number): number =>
   Math.max(1, Math.ceil(text.length / Math.floor(colWidth / CHAR_W)));
 
+/* ------------------------------ the design -------------------------------- */
+
+/**
+ * Document settings. A CV is not one fixed sheet: the same words are set
+ * differently for a one-page ATS read than for a two-page executive one, so the
+ * geometry is *data*, not constants.
+ *
+ * Every field is optional and an absent field means **the measured default**, so
+ * `{}` renders the reference document exactly and a CV saved before this panel
+ * existed cannot shift by a pixel. Settings that change the geometry are folded
+ * into `resolveMetrics`, which both the renderer and the page estimate read —
+ * that is what keeps the reported page count true after a setting changes.
+ */
+export type CvDesign = {
+  /** Paper: `a4` is the reference sheet, `letter` the US one. */
+  page?: "a4" | "letter";
+  /** `ink` | `ember` | `graphite`, or any CSS hex. */
+  accent?: string;
+  /** Body face. `serif` is the reference's Amiri; `sans` reads more neutral. */
+  font?: "serif" | "sans";
+  /** Body size in pt. 10.5pt is the reference's 14px. */
+  base?: number;
+  /** pt added to the name, the section headings and the entry titles. */
+  nameDelta?: number;
+  headDelta?: number;
+  entryDelta?: number;
+  /** Line height as a multiple of the body size. The reference is 1.29. */
+  lineHeight?: number;
+  /** px between sections and between entries. */
+  sectionGap?: number;
+  entryGap?: number;
+  /** Paper margins in mm. */
+  marginX?: number;
+  marginY?: number;
+  /** Skill columns, 1–4. */
+  skillCols?: number;
+  /** Section-heading case. */
+  caps?: "none" | "capitalize" | "upper";
+  /** The rule under a section heading. */
+  rule?: boolean;
+  /** Runs that carry the accent colour: the heading and its rule, or the rule only. */
+  headTone?: "accent" | "ink";
+  /** Which side the dates column sits on. */
+  datePos?: "left" | "right";
+  /** Header alignment (the name and the contact row). */
+  align?: "center" | "left";
+  /** Frame drawn around each contact icon. */
+  icons?: IconFrame;
+  /** A glyph beside each section heading: none, a bare outline, or a filled chip. */
+  headIcons?: "none" | "outline" | "filled";
+  /** Contact-link styling. */
+  links?: { underline?: boolean; colored?: boolean };
+  /** How a `YYYY-MM` / `YYYY/MM` date is written out. Anything else is left alone. */
+  dates?: "keep" | "month" | "dots" | "hide";
+};
+
+export type IconFrame = "none" | "outline" | "circle" | "rounded" | "square" | "circle-fill" | "rounded-fill" | "square-fill";
+
+export const ICON_FRAMES: IconFrame[] = ["none", "outline", "circle", "rounded", "square", "circle-fill", "rounded-fill", "square-fill"];
+
+export const CV_PAPER = { a4: { w: 210, h: 297 }, letter: { w: 215.9, h: 279.4 } } as const;
+
+/** 1pt in CSS px. Font sizes are authored in pt, the sheet is laid out in px. */
+const PT = 96 / 72;
+
+/** px → the shortest string that still round-trips, for generated CSS. */
+const px = (n: number): string => String(Math.round(n * 100) / 100);
+/** px → mm, because paper is specified in mm. */
+const mm = (n: number): string => String(Math.round((n / MM) * 1000) / 1000);
+
+const num = (v: unknown, d: number, lo: number, hi: number): number =>
+  typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d;
+
+/**
+ * Every distance the sheet uses, in CSS px, resolved from a design. The renderer
+ * generates its CSS from this and `estimateCvDoc` measures with it, so the two
+ * cannot disagree about how tall the document is.
+ */
+export type CvMetrics = {
+  page: keyof typeof CV_PAPER;
+  pageW: number;
+  pageH: number;
+  marginX: number;
+  marginY: number;
+  contentW: number;
+  contentH: number;
+  bodySize: number;
+  bodyLine: number;
+  entrySize: number;
+  nameSize: number;
+  headSize: number;
+  contactSize: number;
+  contactLine: number;
+  contactGap: number;
+  headerBottom: number;
+  sectionTop: number;
+  headLine: number;
+  headPad: number;
+  rule: number;
+  headGap: number;
+  entryTop: number;
+  entryGap: number;
+  colLeft: number;
+  skillCols: number;
+  skillColGap: number;
+  skillRowGap: number;
+  skillInset: number;
+};
+
+export function resolveMetrics(design: CvDesign = {}): CvMetrics {
+  const page = design.page === "letter" ? "letter" : "a4";
+  const paper = CV_PAPER[page];
+  const marginX = num(design.marginX, PAPER_SIDE_MM, 8, 35) * MM;
+  const marginY = num(design.marginY, PAPER_TOP_MM, 8, 35) * MM;
+  const pageW = paper.w * MM;
+  const pageH = paper.h * MM;
+  const contentW = pageW - 2 * marginX;
+
+  // one knob moves the type scale; the deltas are then absolute pt, the way a
+  // desktop word processor presents them ("Full name +14pt")
+  const grow = num(design.base, SHEET.bodySize / PT, 6, 16) / (SHEET.bodySize / PT);
+  const bodySize = SHEET.bodySize * grow;
+  const bodyLine = bodySize * num(design.lineHeight, SHEET.bodyLine / SHEET.bodySize, 1, 2.2);
+
+  return {
+    page,
+    pageW,
+    pageH,
+    marginX,
+    marginY,
+    contentW,
+    contentH: pageH - 2 * marginY,
+    bodySize,
+    bodyLine,
+    entrySize: bodySize + num(design.entryDelta, 0, -5, 14) * PT,
+    nameSize: SHEET.nameSize * grow + num(design.nameDelta, 0, -14, 30) * PT,
+    headSize: SHEET.headSize * grow + num(design.headDelta, 0, -6, 16) * PT,
+    contactSize: SHEET.contactSize * grow,
+    contactLine: SHEET.contactLine * grow,
+    contactGap: SHEET.contactGap * grow,
+    headerBottom: SHEET.headerBottom * grow,
+    sectionTop: num(design.sectionGap, SHEET.sectionTop, 6, 40) * grow,
+    headLine: SHEET.headLine * grow + num(design.headDelta, 0, -6, 16) * PT,
+    headPad: SHEET.headPad * grow,
+    rule: design.rule === false ? 0 : SHEET.rule * grow,
+    headGap: SHEET.headGap * grow,
+    entryTop: SHEET.entryTop * grow,
+    entryGap: num(design.entryGap, SHEET.entryGap, 2, 30) * grow,
+    // the entry columns keep the reference's proportion as the margins move
+    colLeft: (SHEET.colLeft / SHEET.contentW) * contentW,
+    skillCols: Math.round(num(design.skillCols, SHEET.skillCols, 1, 4)),
+    skillColGap: SHEET.skillColGap * grow,
+    skillRowGap: SHEET.skillRowGap * grow,
+    skillInset: SHEET.skillInset * grow,
+  };
+}
+
+/** `#rrggbb`, or a key of `CV_ACCENTS`. Anything else falls back to paper black. */
+export function resolveAccent(accent: unknown): string {
+  const key = typeof accent === "string" ? accent.trim() : "";
+  if (CV_ACCENTS[key]) return CV_ACCENTS[key];
+  return /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(key) ? key : CV_ACCENTS[DEFAULT_ACCENT];
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const YM = /^(\d{4})[-/](\d{1,2})$/;
+
+/**
+ * Rewrite a `YYYY-MM` / `YYYY/MM` value per the design. Free text ("Summer 2024",
+ * "2019") is passed through untouched — guessing at prose would mangle it.
+ */
+export function formatDate(value: unknown, mode: CvDesign["dates"] = "keep"): string {
+  const s = String(value ?? "").trim();
+  if (!s || s === "_") return s;
+  if (mode === "hide") return "";
+  const m = YM.exec(s);
+  if (!m || (mode !== "month" && mode !== "dots")) return s;
+  const mo = Math.min(12, Math.max(1, +m[2]));
+  return mode === "month" ? `${MONTHS[mo - 1]} ${m[1]}` : `${String(mo).padStart(2, "0")}.${m[1]}`;
+}
+
+const applyCaps = (s: string, caps: CvDesign["caps"]): string =>
+  caps === "upper"
+    ? s.toUpperCase()
+    : caps === "capitalize"
+      ? s.replace(/\S+/g, (w) => w[0].toUpperCase() + w.slice(1).toLowerCase())
+      : s;
+
 /* ------------------------------ accents --------------------------------- */
 
 export const CV_ACCENTS: Record<string, string> = {
@@ -108,6 +296,25 @@ const ICONS: Record<string, (cls?: string) => string> = {
   linkedin: (c) => I('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 10.5V17M8 7.2v.01M12.5 17v-3.6a2.2 2.2 0 0 1 4.4 0V17M12.5 10.5V17"/>', c),
   globe: (c) => I('<circle cx="12" cy="12" r="9"/><path d="M3.2 9.5h17.6M3.2 14.5h17.6M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18Z"/>', c),
   pin: (c) => I('<path d="M12 21.5s7-6.3 7-11.5a7 7 0 1 0-14 0c0 5.2 7 11.5 7 11.5Z"/><circle cx="12" cy="10" r="2.6"/>', c),
+  // section-heading glyphs, for the `headIcons` setting
+  user: (c) => I('<circle cx="12" cy="8" r="3.6"/><path d="M5.5 20c.6-3.6 3.3-5.6 6.5-5.6s5.9 2 6.5 5.6"/>', c),
+  briefcase: (c) => I('<rect x="3" y="7.5" width="18" height="12" rx="2"/><path d="M9 7.5V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.5M3 12.5h18"/>', c),
+  code: (c) => I('<path d="m9 8-5 4 5 4M15 8l5 4-5 4"/>', c),
+  book: (c) => I('<path d="M4 5.5A2 2 0 0 1 6 3.5h13v15H6a2 2 0 0 0-2 2Z"/><path d="M4 20.5A2 2 0 0 1 6 18.5h13"/>', c),
+  award: (c) => I('<circle cx="12" cy="9" r="5.5"/><path d="m8.5 14-1.5 7 5-3 5 3-1.5-7"/>', c),
+  folder: (c) => I('<path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h6a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>', c),
+  star: (c) => I('<path d="m12 3.5 2.7 5.6 6 .9-4.4 4.3 1.1 6-5.4-2.9-5.4 2.9 1.1-6L3.3 10l6-.9Z"/>', c),
+};
+
+/** The glyph a section heading carries when `headIcons` is on. */
+const SECTION_ICONS: Record<string, keyof typeof ICONS> = {
+  summary: "user",
+  experience: "briefcase",
+  skills: "code",
+  education: "book",
+  projects: "folder",
+  awards: "award",
+  custom: "star",
 };
 
 /* ------------------------------ helpers --------------------------------- */
@@ -139,9 +346,9 @@ const paras = (t: unknown): string[] =>
     .filter(Boolean);
 
 /** `2026/07 – Present`, the reference's date form */
-export function range(start: unknown, end: unknown): string {
-  const a = String(start ?? "").trim();
-  const b = String(end ?? "").trim();
+export function range(start: unknown, end: unknown, dates: CvDesign["dates"] = "keep"): string {
+  const a = formatDate(start, dates);
+  const b = formatDate(end, dates);
   if (!a && !b) return "";
   if (!a) return b;
   return `${a} \u2013 ${b || "Present"}`;
@@ -164,16 +371,18 @@ export type CvLine =
   | { k: "prose"; text: string }
   | { k: "entry"; when: string; loc: string; title?: string; org?: string; body: string[] }
   | { k: "skills"; items: string[] };
-export type CvSection = { head: string; lines: CvLine[] };
+export type CvSection = { head: string; lines: CvLine[]; /** glyph key, for the heading-icon setting */ icon?: keyof typeof ICONS };
 export type CvDoc = { name: string; contact: CvContact[]; sections: CvSection[] };
 
 /**
  * Everything the document is, in the order it appears. Nothing here knows about
  * HTML or about page counts; both consumers read this same shape.
  */
-export function buildCvDoc(c: any, p: any): CvDoc {
+export function buildCvDoc(c: any, p: any, design: CvDesign = {}): CvDoc {
   const id: any = p?.identity ?? {};
   const links: any = id.links ?? {};
+  const dates = design.dates;
+  const caps = design.caps;
 
   const contact: CvContact[] = [
     id.email ? { icon: "mail" as const, label: String(id.email), url: href(id.email) } : null,
@@ -190,7 +399,7 @@ export function buildCvDoc(c: any, p: any): CvDoc {
 
   const sections: CvSection[] = [];
   for (const b of c?.blocks ?? []) {
-    const head = String(b.title || HEADS[b.type] || "Section");
+    const head = applyCaps(String(b.title || HEADS[b.type] || "Section"), caps);
     const body: CvLine[] = [];
 
     if (b.type === "summary" || b.type === "custom") {
@@ -207,7 +416,7 @@ export function buildCvDoc(c: any, p: any): CvDoc {
         for (const e of profExps)
           body.push({
             k: "entry",
-            when: range(e.start_date, e.end_date),
+            when: range(e.start_date, e.end_date, dates),
             loc: String(e.location ?? ""),
             title: String(e.title ?? ""),
             org: String(e.company ?? ""),
@@ -226,7 +435,7 @@ export function buildCvDoc(c: any, p: any): CvDoc {
             .join(" \u00b7 ");
           body.push({
             k: "entry",
-            when: range(e.start_date, e.end_date),
+            when: range(e.start_date, e.end_date, dates),
             loc: String(e.location ?? ""),
             title: qual,
             org: String(e.school ?? ""),
@@ -241,7 +450,7 @@ export function buildCvDoc(c: any, p: any): CvDoc {
       if (items.length) body.push({ k: "entry", when: "", loc: "", body: items });
     }
 
-    if (body.length) sections.push({ head, lines: body });
+    if (body.length) sections.push({ head, icon: SECTION_ICONS[b.type] ?? "star", lines: body });
   }
 
   return { name: String(id.name ?? "").trim() || String(c?.name ?? ""), contact, sections };
@@ -249,51 +458,88 @@ export function buildCvDoc(c: any, p: any): CvDoc {
 
 /* ------------------------------ the estimate ----------------------------- */
 
-/** A page count derived from the same model and metrics the CSS is generated from. */
-export function estimateCvDoc(doc: CvDoc): { pages: number; usedPx: number } {
-  let y = PAPER_TOP_MM * MM; // the sheet's own top padding on screen
-  y += SHEET.nameSize * SHEET.nameLine;
-  y += SHEET.contactGap + SHEET.contactLine;
-  y += SHEET.headerBottom;
+/**
+ * A page count derived from the same model and metrics the CSS is generated from.
+ *
+ * The metrics arrive from `resolveMetrics`, never from `SHEET` directly, so a CV
+ * set in Letter, at 11pt, with 8mm margins is measured against the sheet it will
+ * actually print on. The contact row is the one place the estimate measures text
+ * rather than counting lines: a long list of details wraps, and `flex-wrap` is
+ * exactly what the CSS does with it.
+ */
+export function estimateCvDoc(doc: CvDoc, design: CvDesign = {}): { pages: number; usedPx: number } {
+  const m = resolveMetrics(design);
+  const charW = CHAR_W * (m.bodySize / SHEET.bodySize);
+  let y = m.marginY; // the sheet's own top padding on screen
+  y += m.nameSize * SHEET.nameLine;
+  // one detail is `icon + label`, the details are separated by a 14px column gap;
+  // a framed icon is a 20px box, not the bare 14px glyph
+  const iconW = !design.icons || design.icons === "none" ? 22 : 28;
+  const contactWidth = doc.contact.reduce((n, c) => n + c.label.length * charW + iconW + 14, 0);
+  y += m.contactGap + m.contactLine * Math.max(1, Math.ceil(contactWidth / m.contentW));
+  y += m.headerBottom;
 
   for (const section of doc.sections) {
-    y += SHEET.sectionTop;
-    y += SHEET.headLine + SHEET.headPad + SHEET.rule + SHEET.headGap;
-    if (section.lines.some((l) => l.k === "entry")) y += SHEET.entryTop;
+    y += m.sectionTop;
+    y += m.headLine + m.headPad + m.rule + m.headGap;
+    if (section.lines.some((l) => l.k === "entry")) y += m.entryTop;
 
     section.lines.forEach((line, i) => {
       const last = i === section.lines.length - 1;
       if (line.k === "prose") {
-        y += wrapLines(line.text, SHEET.contentW) * SHEET.bodyLine;
+        y += wrapLines(line.text, m.contentW) * m.bodyLine;
       } else if (line.k === "skills") {
-        const rows = Math.ceil(line.items.length / SHEET.skillCols);
-        y += rows * SHEET.bodyLine + Math.max(0, rows - 1) * SHEET.skillRowGap;
+        const rows = Math.ceil(line.items.length / m.skillCols);
+        y += rows * m.bodyLine + Math.max(0, rows - 1) * m.skillRowGap;
       } else {
         const left = (line.when ? 1 : 0) + (line.loc ? 1 : 0);
         const right =
           (line.title ? 1 : 0) +
           (line.org ? 1 : 0) +
-          line.body.reduce((n, t) => n + wrapLines(t, SHEET.colRight), 0);
-        y += Math.max(left, right) * SHEET.bodyLine;
-        if (!last) y += SHEET.entryGap;
+          line.body.reduce((n, t) => n + wrapLines(t, m.contentW - m.colLeft), 0);
+        y += Math.max(left, right) * m.bodyLine;
+        if (!last) y += m.entryGap;
       }
     });
   }
 
-  return { pages: Math.max(1, Math.ceil(y / SHEET.contentH)), usedPx: Math.round(y) };
+  return { pages: Math.max(1, Math.ceil(y / m.contentH)), usedPx: Math.round(y) };
 }
 
-export function estimateCvPages(c: any, p: any): number {
-  return estimateCvDoc(buildCvDoc(c, p)).pages;
+export function estimateCvPages(c: any, p: any, design: CvDesign = {}): number {
+  return estimateCvDoc(buildCvDoc(c, p, design), design).pages;
 }
 
 /* ----------------------------- the document ------------------------------ */
 
-export type CvDocOptions = { frame?: boolean; accent?: string };
+export type CvDocOptions = {
+  /** kept for the editor's URL contract; the sheet is always a real page now */
+  frame?: boolean;
+  /** legacy accent key; `design.accent` wins when both are present */
+  accent?: string;
+  /** the CV's own document settings */
+  design?: CvDesign;
+};
 
 export function renderCvHtml(c: any, p: any, opts: CvDocOptions = {}): string {
-  const accent = CV_ACCENTS[String(opts.accent)] ?? CV_ACCENTS[DEFAULT_ACCENT];
-  const doc = buildCvDoc(c, p);
+  const design: CvDesign =
+    opts.accent && !opts.design?.accent ? { ...(opts.design ?? {}), accent: opts.accent } : (opts.design ?? {});
+  const accent = resolveAccent(design.accent);
+  const m = resolveMetrics(design);
+  const doc = buildCvDoc(c, p, design);
+
+  const face = design.font === "sans" ? "var(--sans)" : "var(--serif)";
+  const align = design.align === "left" ? "left" : "center";
+  // the frame class is interpolated into CSS, so only a known frame reaches it
+  const frame: IconFrame = design.icons && ICON_FRAMES.includes(design.icons) ? design.icons : "none";
+  // `circle-fill` is a shape plus a fill; the two are separate classes so a frame
+  // and its fill can be chosen independently without enumerating seven combos
+  const frameCls = frame === "none" ? "" : ` ico--${frame.replace("-fill", "")}${frame.endsWith("-fill") ? " ico--fill" : ""}`;
+  const headIcon = !design.headIcons || design.headIcons === "none" ? "" : design.headIcons;
+  const links = design.links ?? {};
+  const dateRight = design.datePos === "right";
+  const rule = m.rule > 0;
+  const headColour = design.headTone === "ink" ? "var(--ink)" : "var(--mark)";
 
   const linesHtml = (body: CvLine[]): string =>
     body
@@ -306,21 +552,27 @@ export function renderCvHtml(c: any, p: any, opts: CvDocOptions = {}): string {
           (line.title ? `<div class="t">${esc(line.title)}</div>` : "") +
           (line.org ? `<div class="org">${esc(line.org)}</div>` : "") +
           line.body.map((t) => `<p>${esc(t)}</p>`).join("");
-        return `<div class="entry"><div class="when">${left}</div><div class="what">${right}</div></div>`;
+        const when = `<div class="when">${left}</div>`;
+        const what = `<div class="what">${right}</div>`;
+        return `<div class="entry">${dateRight ? what + when : when + what}</div>`;
       })
       .join("");
 
   const sections = doc.sections
-    .map((s) => `<section><h2>${esc(s.head)}</h2>${linesHtml(s.lines)}</section>`)
+    .map((s) => {
+      const glyph = headIcon ? ICONS[s.icon ?? "star"](`hico hico--${headIcon}`) : "";
+      return `<section><h2>${glyph}${esc(s.head)}</h2>${linesHtml(s.lines)}</section>`;
+    })
     .join("");
 
   const contactHtml = doc.contact.length
     ? `<div class="contact">${doc.contact
-        .map((x) =>
-          x.url
-            ? `<a href="${esc(x.url)}">${ICONS[x.icon]()}<span>${esc(x.label)}</span></a>`
-            : `<span>${ICONS[x.icon]()}<span>${esc(x.label)}</span></span>`,
-        )
+        .map((x) => {
+          // the glyph is always drawn; `icons` only chooses its frame (the
+          // default, "none", is the reference's bare 14px outline)
+          const inner = `${ICONS[x.icon](`ico${frameCls}`)}<span>${esc(x.label)}</span>`;
+          return x.url ? `<a href="${esc(x.url)}">${inner}</a>` : `<span>${inner}</span>`;
+        })
         .join("")}</div>`
     : "";
 
@@ -346,22 +598,25 @@ export function renderCvHtml(c: any, p: any, opts: CvDocOptions = {}): string {
    which is also what the page estimate is computed from. */
 :root {
   --serif: Amiri, "Iowan Old Style", Palatino, "Palatino Linotype", "Book Antiqua", Georgia, "Times New Roman", serif;
+  --sans: "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", ui-sans-serif, system-ui, sans-serif;
   --rule: ${esc(accent)};
   --ink: #000;
   --mark: ${esc(accent)};
-  --side: ${PAPER_SIDE_MM}mm;
-  --myn: ${PAPER_TOP_MM}mm;
+  --side: ${mm(m.marginX)}mm;
+  --myn: ${mm(m.marginY)}mm;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: #fff; }
 /* vertical paper margin comes from the page box, so page 2 of a long CV is
-   inset exactly like page 1; the sheet then only supplies the side margins. */
-@page { size: A4; margin: var(--myn) 0; }
+   inset exactly like page 1; the sheet then only supplies the side margins.
+   Written as millimetres, not a variable: custom properties do not resolve
+   inside a page box, and an unresolved margin would silently become zero. */
+@page { size: ${m.page}; margin: ${mm(m.marginY)}mm 0; }
 
 .page {
-  width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff;
+  width: ${mm(m.pageW)}mm; min-height: ${mm(m.pageH)}mm; margin: 0 auto; background: #fff;
   padding: var(--myn) var(--side) 0;
-  font: 400 ${SHEET.bodySize}px/${SHEET.bodyLine}px var(--serif);
+  font: 400 ${px(m.bodySize)}px/${px(m.bodyLine)}px ${face};
   color: var(--ink); -webkit-font-kerning: normal;
   -webkit-print-color-adjust: exact; print-color-adjust: exact;
   /* the sheet is a document, not a web page: it must not inherit the app's
@@ -370,43 +625,59 @@ html, body { margin: 0; padding: 0; background: #fff; }
 }
 
 /* ── header ────────────────────────────────────────────────────────────── */
-.hdr { padding-bottom: ${SHEET.headerBottom}px; }
-.name { font: 700 ${SHEET.nameSize}px/${SHEET.nameLine} var(--serif); text-align: center; margin: 0; letter-spacing: 0; }
+.hdr { padding-bottom: ${px(m.headerBottom)}px; }
+.name { font: 700 ${px(m.nameSize)}px/${SHEET.nameLine} ${face}; text-align: ${align}; margin: 0; letter-spacing: 0; }
 .contact {
-  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
-  gap: 6px 14px; margin-top: ${SHEET.contactGap}px; font-size: ${SHEET.contactSize}px; line-height: ${SHEET.contactLine}px;
+  display: flex; flex-wrap: wrap; justify-content: ${align === "left" ? "flex-start" : "center"}; align-items: center;
+  gap: 6px 14px; margin-top: ${px(m.contactGap)}px; font-size: ${px(m.contactSize)}px; line-height: ${px(m.contactLine)}px;
 }
-.contact > a, .contact > span { display: inline-flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
+.contact > a, .contact > span { display: inline-flex; align-items: center; gap: 8px;
+  color: ${links.colored ? "var(--mark)" : "inherit"}; text-decoration: ${links.underline ? "underline" : "none"};
+  text-underline-offset: 2px; text-decoration-thickness: 0.75px; }
 .ico {
   width: 14px; height: 14px; flex: 0 0 14px; fill: none;
   stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
 }
+/* the frame the panel can draw around a contact icon: a shape, and a fill */
+.ico--outline, .ico--circle, .ico--rounded, .ico--square {
+  width: 20px; height: 20px; flex: 0 0 20px; padding: 2.6px; border: 1.2px solid var(--mark);
+}
+.ico--outline, .ico--square { border-radius: 0; }
+.ico--rounded { border-radius: 5px; }
+.ico--circle { border-radius: 50%; }
+.ico--fill { background: var(--mark); border-color: var(--mark); color: #fff; }
 
 /* ── sections ──────────────────────────────────────────────────────────── */
-section { margin-top: ${SHEET.sectionTop}px; }
+section { margin-top: ${px(m.sectionTop)}px; }
 h2 {
-  font: 700 ${SHEET.headSize}px/${SHEET.headLine}px var(--serif); color: var(--rule);
-  margin: 0 0 ${SHEET.headGap}px; padding-bottom: ${SHEET.headPad}px; border-bottom: ${SHEET.rule}px solid var(--rule);
+  font: 700 ${px(m.headSize)}px/${px(m.headLine)}px ${face}; color: ${headColour};
+  margin: 0 0 ${px(m.headGap)}px; padding-bottom: ${px(m.headPad)}px;
+  border-bottom: ${rule ? `${px(m.rule)}px solid var(--mark)` : "0"};
 }
+/* the heading glyph: a bare outline, or a chip filled with the accent */
+.hico { display: inline-block; vertical-align: -2.5px; margin-right: 7px;
+  width: ${px(m.headSize)}px; height: ${px(m.headSize)}px; }
+.hico--filled { padding: 2px; border-radius: 4px; background: var(--mark); color: #fff; }
 p { margin: 0; }
 
-/* ── dated entries: when/location left, title/org/prose right ──────────── */
-.entry { display: grid; grid-template-columns: ${SHEET.colLeft}px 1fr; margin-bottom: ${SHEET.entryGap}px; }
+/* ── dated entries: the dates column beside the entry body ──────────────── */
+.entry { display: grid; grid-template-columns: ${dateRight ? `1fr ${px(m.colLeft)}px` : `${px(m.colLeft)}px 1fr`};
+  margin-bottom: ${px(m.entryGap)}px; }
 .entry:last-child { margin-bottom: 0; }
 /* The reference starts an entry's first line 31px below its heading but prose
    lines at 30px — one pixel of its own box model, kept so every later section
    lands on the measured baseline instead of drifting. Padding, not margin:
    a margin here would collapse into the heading's own margin-bottom. */
-h2 + .entry { padding-top: ${SHEET.entryTop}px; }
-.when { font-size: ${SHEET.bodySize}px; line-height: ${SHEET.bodyLine}px; }
-.what .t { font-weight: 700; }
+h2 + .entry { padding-top: ${px(m.entryTop)}px; }
+.when { font-size: ${px(m.bodySize)}px; line-height: ${px(m.bodyLine)}px; }
+.what .t { font-size: ${px(m.entrySize)}px; line-height: ${px(m.bodyLine)}px; font-weight: 700; }
 .what .org { font-style: italic; }
 
-/* ── skills: three equal columns with a square marker, as measured ─────── */
-.skills { display: grid; grid-template-columns: repeat(${SHEET.skillCols}, 1fr);
-  column-gap: ${SHEET.skillColGap}px; row-gap: ${SHEET.skillRowGap}px; padding-left: ${SHEET.skillInset}px; }
-.skills > span { display: flex; align-items: center; gap: 6px; font-size: ${SHEET.bodySize}px;
-  line-height: ${SHEET.bodyLine}px; break-inside: avoid; }
+/* ── skills: equal columns with a square marker, as measured ───────────── */
+.skills { display: grid; grid-template-columns: repeat(${m.skillCols}, 1fr);
+  column-gap: ${px(m.skillColGap)}px; row-gap: ${px(m.skillRowGap)}px; padding-left: ${px(m.skillInset)}px; }
+.skills > span { display: flex; align-items: center; gap: 6px; font-size: ${px(m.bodySize)}px;
+  line-height: ${px(m.bodyLine)}px; break-inside: avoid; }
 .skills > span::before { content: ""; width: 4px; height: 4px; flex: 0 0 4px; background: var(--mark); }
 
 /* On screen the sheet carries the 297mm floor and the top margin itself, so the

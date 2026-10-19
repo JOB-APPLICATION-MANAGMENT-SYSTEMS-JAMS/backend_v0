@@ -293,6 +293,62 @@ test("the length check counts printed pages, so a CV over two pages fails", asyn
   assert.ok(r.suggestions.includes("Trim older roles or drop the least relevant lines"));
 });
 
+test("a CV that prints nothing scores as empty, not as a checklist", async () => {
+  // The shape the Studio creates for a new CV: every block sourced from the
+  // profile. With nothing on the profile, none of them prints a line — and a
+  // report that only asks whether the *block* exists called that 89% and green.
+  const current = await api<{ version: number }>("/profile");
+  await api("/profile", {
+    method: "PUT",
+    body: {
+      version: current.json!.data.version,
+      // identity merges on write, so clear the fields a previous test set; the
+      // account email still reaches the header, which is the only thing that
+      // legitimately prints on a CV like this
+      identity: { name: "Empty Person", headline: "", phone: "", location: "", links: {} },
+      skills: [],
+      experiences: [],
+      education: [],
+    },
+  });
+  const created = await api<{ id: string }>("/cvs", {
+    method: "POST",
+    body: {
+      name: "Empty CV",
+      career_category: "software_engineering",
+      blocks: [
+        { type: "summary", source: "profile" },
+        { type: "experience", source: "profile" },
+        { type: "skills", source: "profile" },
+        { type: "education", source: "profile" },
+      ],
+    },
+  });
+  const r = (await api<Report>(`/cvs/${created.json!.data.id}/match`)).json!.data;
+
+  const content = check(r, "content");
+  assert.equal(content.ok, false, "nothing prints, so there is no content to pass");
+  assert.equal(content.severity, "critical");
+  assert.match(content.evidence, /nothing prints/i, `evidence should say the page is empty, got: ${content.evidence}`);
+
+  // Every section check reads the printed page, so each of these is a real fail.
+  for (const key of ["experience", "education", "skills", "summary", "dates", "length", "quantified"]) {
+    const c = check(r, key);
+    assert.equal(c.ok, false, `${key} must not pass on an empty page (${c.evidence})`);
+  }
+  assert.match(check(r, "experience").evidence, /prints no roles/i);
+  assert.match(check(r, "skills").evidence, /prints no names/i);
+
+  assert.ok(r.ats.score < 25, `an empty CV scored ${r.ats.score}`);
+  assert.equal(r.ats.band, "weak");
+  assert.ok(r.ats.blockers >= 1, "an empty page is a critical blocker");
+  assert.match(r.ats.summary, /nothing prints/i);
+  assert.ok(
+    r.suggestions.some((s) => /summary, a role/i.test(s)),
+    `the empty page should be the first thing suggested, got: ${JSON.stringify(r.suggestions)}`,
+  );
+});
+
 test("an important failure costs more of the score than a polish one", async () => {
   // Same CV, then flip only the phone (important) and only the links (polish).
   // The email is not used here because the account address fills the header

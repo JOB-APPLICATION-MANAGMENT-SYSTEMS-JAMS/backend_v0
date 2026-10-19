@@ -15851,14 +15851,14 @@ var require_object_inspect = __commonJS({
     var gPO = (typeof Reflect === "function" ? Reflect.getPrototypeOf : Object.getPrototypeOf) || ([].__proto__ === Array.prototype ? function(O2) {
       return O2.__proto__;
     } : null);
-    function addNumericSeparator(num, str) {
-      if (num === Infinity || num === -Infinity || num !== num || num && num > -1e3 && num < 1e3 || $test.call(/e/, str)) {
+    function addNumericSeparator(num2, str) {
+      if (num2 === Infinity || num2 === -Infinity || num2 !== num2 || num2 && num2 > -1e3 && num2 < 1e3 || $test.call(/e/, str)) {
         return str;
       }
       var sepRegex = /[0-9](?=(?:[0-9]{3})+(?![0-9]))/g;
-      if (typeof num === "number") {
-        var int = num < 0 ? -$floor(-num) : $floor(num);
-        if (int !== num) {
+      if (typeof num2 === "number") {
+        var int = num2 < 0 ? -$floor(-num2) : $floor(num2);
+        if (int !== num2) {
           var intStr = String(int);
           var dec = $slice.call(str, intStr.length + 1);
           return $replace.call(intStr, sepRegex, "$&_") + "." + $replace.call($replace.call(dec, /([0-9]{3})/g, "$&_"), /_$/, "");
@@ -29294,9 +29294,9 @@ var require_semver = __commonJS({
         } else {
           this.prerelease = m2[4].split(".").map((id) => {
             if (/^[0-9]+$/.test(id)) {
-              const num = +id;
-              if (num >= 0 && num < MAX_SAFE_INTEGER) {
-                return num;
+              const num2 = +id;
+              if (num2 >= 0 && num2 < MAX_SAFE_INTEGER) {
+                return num2;
               }
             }
             return id;
@@ -33973,8 +33973,8 @@ var require_postgres_date = __commonJS({
     function bcYearToNegativeYear(year) {
       return -(year - 1);
     }
-    function is0To99(num) {
-      return num >= 0 && num < 100;
+    function is0To99(num2) {
+      return num2 >= 0 && num2 < 100;
     }
   }
 });
@@ -36134,18 +36134,18 @@ var require_buffer_writer = __commonJS({
           oldBuffer.copy(this.buffer);
         }
       }
-      addInt32(num) {
+      addInt32(num2) {
         this.ensure(4);
-        this.buffer[this.offset++] = num >>> 24 & 255;
-        this.buffer[this.offset++] = num >>> 16 & 255;
-        this.buffer[this.offset++] = num >>> 8 & 255;
-        this.buffer[this.offset++] = num >>> 0 & 255;
+        this.buffer[this.offset++] = num2 >>> 24 & 255;
+        this.buffer[this.offset++] = num2 >>> 16 & 255;
+        this.buffer[this.offset++] = num2 >>> 8 & 255;
+        this.buffer[this.offset++] = num2 >>> 0 & 255;
         return this;
       }
-      addInt16(num) {
+      addInt16(num2) {
         this.ensure(2);
-        this.buffer[this.offset++] = num >>> 8 & 255;
-        this.buffer[this.offset++] = num >>> 0 & 255;
+        this.buffer[this.offset++] = num2 >>> 8 & 255;
+        this.buffer[this.offset++] = num2 >>> 0 & 255;
         return this;
       }
       addCString(string) {
@@ -39149,6 +39149,7 @@ CREATE TABLE IF NOT EXISTS cvs (
   career_category TEXT NOT NULL DEFAULT 'software_engineering',
   targeting       TEXT NOT NULL DEFAULT '{}',           -- JSON {seniority[], keywords[], companies[]}
   blocks          TEXT NOT NULL DEFAULT '[]',           -- JSON block array (\xA724.1)
+  design          TEXT NOT NULL DEFAULT '{}',           -- JSON CvDesign: the document's own settings (page, type, colour)
   template_id     TEXT,
   lineage         TEXT NOT NULL DEFAULT '{}',           -- JSON {forked_from, forked_at}
   created_at      TEXT NOT NULL,
@@ -39613,7 +39614,8 @@ var init_db = __esm({
     sqlitePromise = null;
     ENSURE_COLUMNS = [
       { table: "job_postings", column: "contact_email", ddl: "ALTER TABLE job_postings ADD COLUMN contact_email TEXT" },
-      { table: "pitch_targets", column: "country", ddl: "ALTER TABLE pitch_targets ADD COLUMN country TEXT" }
+      { table: "pitch_targets", column: "country", ddl: "ALTER TABLE pitch_targets ADD COLUMN country TEXT" },
+      { table: "cvs", column: "design", ddl: "ALTER TABLE cvs ADD COLUMN design TEXT NOT NULL DEFAULT '{}'" }
     ];
     BOOT_SQL = [
       // pre-existing databases: the old index was global (source, external_id), which
@@ -52280,7 +52282,7 @@ function skillsOverlap(profile, posting) {
   const skills = profile.skills ?? [];
   if (!skills.length) return { value: 0.5, matched: [], missing: [] };
   const top = new Set((profile.topSkills ?? []).map((s2) => s2.toLowerCase()));
-  let num = 0;
+  let num2 = 0;
   let den = 0;
   const matched = [];
   const missing = [];
@@ -52293,13 +52295,13 @@ function skillsOverlap(profile, posting) {
     den += w2;
     const hit = family.some((f2) => text.includes(f2));
     if (hit) {
-      num += w2;
+      num2 += w2;
       matched.push(skill);
     } else {
       missing.push(skill);
     }
   }
-  return { value: den ? num / den : 0, matched, missing };
+  return { value: den ? num2 / den : 0, matched, missing };
 }
 function titleMatch(profile, posting) {
   const targets = [...profile.targetTitles ?? [], profile.headline ?? ""].filter(Boolean);
@@ -52432,16 +52434,75 @@ var init_scoring_service = __esm({
 });
 
 // src/lib/cv-document.ts
-function range(start, end) {
-  const a2 = String(start ?? "").trim();
-  const b2 = String(end ?? "").trim();
+function resolveMetrics(design = {}) {
+  const page = design.page === "letter" ? "letter" : "a4";
+  const paper = CV_PAPER[page];
+  const marginX = num(design.marginX, PAPER_SIDE_MM, 8, 35) * MM;
+  const marginY = num(design.marginY, PAPER_TOP_MM, 8, 35) * MM;
+  const pageW = paper.w * MM;
+  const pageH = paper.h * MM;
+  const contentW = pageW - 2 * marginX;
+  const grow = num(design.base, SHEET.bodySize / PT, 6, 16) / (SHEET.bodySize / PT);
+  const bodySize = SHEET.bodySize * grow;
+  const bodyLine = bodySize * num(design.lineHeight, SHEET.bodyLine / SHEET.bodySize, 1, 2.2);
+  return {
+    page,
+    pageW,
+    pageH,
+    marginX,
+    marginY,
+    contentW,
+    contentH: pageH - 2 * marginY,
+    bodySize,
+    bodyLine,
+    entrySize: bodySize + num(design.entryDelta, 0, -5, 14) * PT,
+    nameSize: SHEET.nameSize * grow + num(design.nameDelta, 0, -14, 30) * PT,
+    headSize: SHEET.headSize * grow + num(design.headDelta, 0, -6, 16) * PT,
+    contactSize: SHEET.contactSize * grow,
+    contactLine: SHEET.contactLine * grow,
+    contactGap: SHEET.contactGap * grow,
+    headerBottom: SHEET.headerBottom * grow,
+    sectionTop: num(design.sectionGap, SHEET.sectionTop, 6, 40) * grow,
+    headLine: SHEET.headLine * grow + num(design.headDelta, 0, -6, 16) * PT,
+    headPad: SHEET.headPad * grow,
+    rule: design.rule === false ? 0 : SHEET.rule * grow,
+    headGap: SHEET.headGap * grow,
+    entryTop: SHEET.entryTop * grow,
+    entryGap: num(design.entryGap, SHEET.entryGap, 2, 30) * grow,
+    // the entry columns keep the reference's proportion as the margins move
+    colLeft: SHEET.colLeft / SHEET.contentW * contentW,
+    skillCols: Math.round(num(design.skillCols, SHEET.skillCols, 1, 4)),
+    skillColGap: SHEET.skillColGap * grow,
+    skillRowGap: SHEET.skillRowGap * grow,
+    skillInset: SHEET.skillInset * grow
+  };
+}
+function resolveAccent(accent) {
+  const key = typeof accent === "string" ? accent.trim() : "";
+  if (CV_ACCENTS[key]) return CV_ACCENTS[key];
+  return /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(key) ? key : CV_ACCENTS[DEFAULT_ACCENT];
+}
+function formatDate(value, mode = "keep") {
+  const s2 = String(value ?? "").trim();
+  if (!s2 || s2 === "_") return s2;
+  if (mode === "hide") return "";
+  const m2 = YM.exec(s2);
+  if (!m2 || mode !== "month" && mode !== "dots") return s2;
+  const mo2 = Math.min(12, Math.max(1, +m2[2]));
+  return mode === "month" ? `${MONTHS[mo2 - 1]} ${m2[1]}` : `${String(mo2).padStart(2, "0")}.${m2[1]}`;
+}
+function range(start, end, dates = "keep") {
+  const a2 = formatDate(start, dates);
+  const b2 = formatDate(end, dates);
   if (!a2 && !b2) return "";
   if (!a2) return b2;
   return `${a2} \u2013 ${b2 || "Present"}`;
 }
-function buildCvDoc(c2, p2) {
+function buildCvDoc(c2, p2, design = {}) {
   const id = p2?.identity ?? {};
   const links = id.links ?? {};
+  const dates = design.dates;
+  const caps = design.caps;
   const contact = [
     id.email ? { icon: "mail", label: String(id.email), url: href(id.email) } : null,
     id.phone ? { icon: "phone", label: String(id.phone), url: href(id.phone) } : null,
@@ -52455,7 +52516,7 @@ function buildCvDoc(c2, p2) {
   const profSkills = p2?.skills ?? [];
   const sections = [];
   for (const b2 of c2?.blocks ?? []) {
-    const head = String(b2.title || HEADS[b2.type] || "Section");
+    const head = applyCaps(String(b2.title || HEADS[b2.type] || "Section"), caps);
     const body = [];
     if (b2.type === "summary" || b2.type === "custom") {
       for (const para of paras(b2.text)) body.push({ k: "prose", text: para });
@@ -52468,7 +52529,7 @@ function buildCvDoc(c2, p2) {
         for (const e2 of profExps)
           body.push({
             k: "entry",
-            when: range(e2.start_date, e2.end_date),
+            when: range(e2.start_date, e2.end_date, dates),
             loc: String(e2.location ?? ""),
             title: String(e2.title ?? ""),
             org: String(e2.company ?? ""),
@@ -52483,7 +52544,7 @@ function buildCvDoc(c2, p2) {
           const qual = [e2.degree, e2.field].map((x2) => String(x2 ?? "").trim()).filter(Boolean).join(" \xB7 ");
           body.push({
             k: "entry",
-            when: range(e2.start_date, e2.end_date),
+            when: range(e2.start_date, e2.end_date, dates),
             loc: String(e2.location ?? ""),
             title: qual,
             org: String(e2.school ?? ""),
@@ -52497,51 +52558,72 @@ function buildCvDoc(c2, p2) {
       const items = lines(b2.text).length ? lines(b2.text) : b2.bullets ?? [];
       if (items.length) body.push({ k: "entry", when: "", loc: "", body: items });
     }
-    if (body.length) sections.push({ head, lines: body });
+    if (body.length) sections.push({ head, icon: SECTION_ICONS[b2.type] ?? "star", lines: body });
   }
   return { name: String(id.name ?? "").trim() || String(c2?.name ?? ""), contact, sections };
 }
-function estimateCvDoc(doc) {
-  let y2 = PAPER_TOP_MM * MM;
-  y2 += SHEET.nameSize * SHEET.nameLine;
-  y2 += SHEET.contactGap + SHEET.contactLine;
-  y2 += SHEET.headerBottom;
+function estimateCvDoc(doc, design = {}) {
+  const m2 = resolveMetrics(design);
+  const charW = CHAR_W * (m2.bodySize / SHEET.bodySize);
+  let y2 = m2.marginY;
+  y2 += m2.nameSize * SHEET.nameLine;
+  const iconW = !design.icons || design.icons === "none" ? 22 : 28;
+  const contactWidth = doc.contact.reduce((n2, c2) => n2 + c2.label.length * charW + iconW + 14, 0);
+  y2 += m2.contactGap + m2.contactLine * Math.max(1, Math.ceil(contactWidth / m2.contentW));
+  y2 += m2.headerBottom;
   for (const section2 of doc.sections) {
-    y2 += SHEET.sectionTop;
-    y2 += SHEET.headLine + SHEET.headPad + SHEET.rule + SHEET.headGap;
-    if (section2.lines.some((l2) => l2.k === "entry")) y2 += SHEET.entryTop;
+    y2 += m2.sectionTop;
+    y2 += m2.headLine + m2.headPad + m2.rule + m2.headGap;
+    if (section2.lines.some((l2) => l2.k === "entry")) y2 += m2.entryTop;
     section2.lines.forEach((line, i2) => {
       const last = i2 === section2.lines.length - 1;
       if (line.k === "prose") {
-        y2 += wrapLines(line.text, SHEET.contentW) * SHEET.bodyLine;
+        y2 += wrapLines(line.text, m2.contentW) * m2.bodyLine;
       } else if (line.k === "skills") {
-        const rows = Math.ceil(line.items.length / SHEET.skillCols);
-        y2 += rows * SHEET.bodyLine + Math.max(0, rows - 1) * SHEET.skillRowGap;
+        const rows = Math.ceil(line.items.length / m2.skillCols);
+        y2 += rows * m2.bodyLine + Math.max(0, rows - 1) * m2.skillRowGap;
       } else {
         const left = (line.when ? 1 : 0) + (line.loc ? 1 : 0);
-        const right = (line.title ? 1 : 0) + (line.org ? 1 : 0) + line.body.reduce((n2, t2) => n2 + wrapLines(t2, SHEET.colRight), 0);
-        y2 += Math.max(left, right) * SHEET.bodyLine;
-        if (!last) y2 += SHEET.entryGap;
+        const right = (line.title ? 1 : 0) + (line.org ? 1 : 0) + line.body.reduce((n2, t2) => n2 + wrapLines(t2, m2.contentW - m2.colLeft), 0);
+        y2 += Math.max(left, right) * m2.bodyLine;
+        if (!last) y2 += m2.entryGap;
       }
     });
   }
-  return { pages: Math.max(1, Math.ceil(y2 / SHEET.contentH)), usedPx: Math.round(y2) };
+  return { pages: Math.max(1, Math.ceil(y2 / m2.contentH)), usedPx: Math.round(y2) };
 }
 function renderCvHtml(c2, p2, opts = {}) {
-  const accent = CV_ACCENTS[String(opts.accent)] ?? CV_ACCENTS[DEFAULT_ACCENT];
-  const doc = buildCvDoc(c2, p2);
+  const design = opts.accent && !opts.design?.accent ? { ...opts.design ?? {}, accent: opts.accent } : opts.design ?? {};
+  const accent = resolveAccent(design.accent);
+  const m2 = resolveMetrics(design);
+  const doc = buildCvDoc(c2, p2, design);
+  const face = design.font === "sans" ? "var(--sans)" : "var(--serif)";
+  const align = design.align === "left" ? "left" : "center";
+  const frame = design.icons && ICON_FRAMES.includes(design.icons) ? design.icons : "none";
+  const frameCls = frame === "none" ? "" : ` ico--${frame.replace("-fill", "")}${frame.endsWith("-fill") ? " ico--fill" : ""}`;
+  const headIcon = !design.headIcons || design.headIcons === "none" ? "" : design.headIcons;
+  const links = design.links ?? {};
+  const dateRight = design.datePos === "right";
+  const rule = m2.rule > 0;
+  const headColour = design.headTone === "ink" ? "var(--ink)" : "var(--mark)";
   const linesHtml = (body) => body.map((line) => {
     if (line.k === "prose") return `<p>${esc(line.text)}</p>`;
     if (line.k === "skills")
       return `<div class="skills">${line.items.map((x2) => `<span>${esc(x2)}</span>`).join("")}</div>`;
     const left = `${line.when ? `<div>${esc(line.when)}</div>` : ""}${line.loc ? `<div>${esc(line.loc)}</div>` : ""}`;
     const right = (line.title ? `<div class="t">${esc(line.title)}</div>` : "") + (line.org ? `<div class="org">${esc(line.org)}</div>` : "") + line.body.map((t2) => `<p>${esc(t2)}</p>`).join("");
-    return `<div class="entry"><div class="when">${left}</div><div class="what">${right}</div></div>`;
+    const when = `<div class="when">${left}</div>`;
+    const what = `<div class="what">${right}</div>`;
+    return `<div class="entry">${dateRight ? what + when : when + what}</div>`;
   }).join("");
-  const sections = doc.sections.map((s2) => `<section><h2>${esc(s2.head)}</h2>${linesHtml(s2.lines)}</section>`).join("");
-  const contactHtml = doc.contact.length ? `<div class="contact">${doc.contact.map(
-    (x2) => x2.url ? `<a href="${esc(x2.url)}">${ICONS[x2.icon]()}<span>${esc(x2.label)}</span></a>` : `<span>${ICONS[x2.icon]()}<span>${esc(x2.label)}</span></span>`
-  ).join("")}</div>` : "";
+  const sections = doc.sections.map((s2) => {
+    const glyph = headIcon ? ICONS[s2.icon ?? "star"](`hico hico--${headIcon}`) : "";
+    return `<section><h2>${glyph}${esc(s2.head)}</h2>${linesHtml(s2.lines)}</section>`;
+  }).join("");
+  const contactHtml = doc.contact.length ? `<div class="contact">${doc.contact.map((x2) => {
+    const inner = `${ICONS[x2.icon](`ico${frameCls}`)}<span>${esc(x2.label)}</span>`;
+    return x2.url ? `<a href="${esc(x2.url)}">${inner}</a>` : `<span>${inner}</span>`;
+  }).join("")}</div>` : "";
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -52564,22 +52646,25 @@ function renderCvHtml(c2, p2, opts = {}) {
    which is also what the page estimate is computed from. */
 :root {
   --serif: Amiri, "Iowan Old Style", Palatino, "Palatino Linotype", "Book Antiqua", Georgia, "Times New Roman", serif;
+  --sans: "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", ui-sans-serif, system-ui, sans-serif;
   --rule: ${esc(accent)};
   --ink: #000;
   --mark: ${esc(accent)};
-  --side: ${PAPER_SIDE_MM}mm;
-  --myn: ${PAPER_TOP_MM}mm;
+  --side: ${mm(m2.marginX)}mm;
+  --myn: ${mm(m2.marginY)}mm;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: #fff; }
 /* vertical paper margin comes from the page box, so page 2 of a long CV is
-   inset exactly like page 1; the sheet then only supplies the side margins. */
-@page { size: A4; margin: var(--myn) 0; }
+   inset exactly like page 1; the sheet then only supplies the side margins.
+   Written as millimetres, not a variable: custom properties do not resolve
+   inside a page box, and an unresolved margin would silently become zero. */
+@page { size: ${m2.page}; margin: ${mm(m2.marginY)}mm 0; }
 
 .page {
-  width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff;
+  width: ${mm(m2.pageW)}mm; min-height: ${mm(m2.pageH)}mm; margin: 0 auto; background: #fff;
   padding: var(--myn) var(--side) 0;
-  font: 400 ${SHEET.bodySize}px/${SHEET.bodyLine}px var(--serif);
+  font: 400 ${px(m2.bodySize)}px/${px(m2.bodyLine)}px ${face};
   color: var(--ink); -webkit-font-kerning: normal;
   -webkit-print-color-adjust: exact; print-color-adjust: exact;
   /* the sheet is a document, not a web page: it must not inherit the app's
@@ -52588,43 +52673,59 @@ html, body { margin: 0; padding: 0; background: #fff; }
 }
 
 /* \u2500\u2500 header \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
-.hdr { padding-bottom: ${SHEET.headerBottom}px; }
-.name { font: 700 ${SHEET.nameSize}px/${SHEET.nameLine} var(--serif); text-align: center; margin: 0; letter-spacing: 0; }
+.hdr { padding-bottom: ${px(m2.headerBottom)}px; }
+.name { font: 700 ${px(m2.nameSize)}px/${SHEET.nameLine} ${face}; text-align: ${align}; margin: 0; letter-spacing: 0; }
 .contact {
-  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
-  gap: 6px 14px; margin-top: ${SHEET.contactGap}px; font-size: ${SHEET.contactSize}px; line-height: ${SHEET.contactLine}px;
+  display: flex; flex-wrap: wrap; justify-content: ${align === "left" ? "flex-start" : "center"}; align-items: center;
+  gap: 6px 14px; margin-top: ${px(m2.contactGap)}px; font-size: ${px(m2.contactSize)}px; line-height: ${px(m2.contactLine)}px;
 }
-.contact > a, .contact > span { display: inline-flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
+.contact > a, .contact > span { display: inline-flex; align-items: center; gap: 8px;
+  color: ${links.colored ? "var(--mark)" : "inherit"}; text-decoration: ${links.underline ? "underline" : "none"};
+  text-underline-offset: 2px; text-decoration-thickness: 0.75px; }
 .ico {
   width: 14px; height: 14px; flex: 0 0 14px; fill: none;
   stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
 }
+/* the frame the panel can draw around a contact icon: a shape, and a fill */
+.ico--outline, .ico--circle, .ico--rounded, .ico--square {
+  width: 20px; height: 20px; flex: 0 0 20px; padding: 2.6px; border: 1.2px solid var(--mark);
+}
+.ico--outline, .ico--square { border-radius: 0; }
+.ico--rounded { border-radius: 5px; }
+.ico--circle { border-radius: 50%; }
+.ico--fill { background: var(--mark); border-color: var(--mark); color: #fff; }
 
 /* \u2500\u2500 sections \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
-section { margin-top: ${SHEET.sectionTop}px; }
+section { margin-top: ${px(m2.sectionTop)}px; }
 h2 {
-  font: 700 ${SHEET.headSize}px/${SHEET.headLine}px var(--serif); color: var(--rule);
-  margin: 0 0 ${SHEET.headGap}px; padding-bottom: ${SHEET.headPad}px; border-bottom: ${SHEET.rule}px solid var(--rule);
+  font: 700 ${px(m2.headSize)}px/${px(m2.headLine)}px ${face}; color: ${headColour};
+  margin: 0 0 ${px(m2.headGap)}px; padding-bottom: ${px(m2.headPad)}px;
+  border-bottom: ${rule ? `${px(m2.rule)}px solid var(--mark)` : "0"};
 }
+/* the heading glyph: a bare outline, or a chip filled with the accent */
+.hico { display: inline-block; vertical-align: -2.5px; margin-right: 7px;
+  width: ${px(m2.headSize)}px; height: ${px(m2.headSize)}px; }
+.hico--filled { padding: 2px; border-radius: 4px; background: var(--mark); color: #fff; }
 p { margin: 0; }
 
-/* \u2500\u2500 dated entries: when/location left, title/org/prose right \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
-.entry { display: grid; grid-template-columns: ${SHEET.colLeft}px 1fr; margin-bottom: ${SHEET.entryGap}px; }
+/* \u2500\u2500 dated entries: the dates column beside the entry body \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.entry { display: grid; grid-template-columns: ${dateRight ? `1fr ${px(m2.colLeft)}px` : `${px(m2.colLeft)}px 1fr`};
+  margin-bottom: ${px(m2.entryGap)}px; }
 .entry:last-child { margin-bottom: 0; }
 /* The reference starts an entry's first line 31px below its heading but prose
    lines at 30px \u2014 one pixel of its own box model, kept so every later section
    lands on the measured baseline instead of drifting. Padding, not margin:
    a margin here would collapse into the heading's own margin-bottom. */
-h2 + .entry { padding-top: ${SHEET.entryTop}px; }
-.when { font-size: ${SHEET.bodySize}px; line-height: ${SHEET.bodyLine}px; }
-.what .t { font-weight: 700; }
+h2 + .entry { padding-top: ${px(m2.entryTop)}px; }
+.when { font-size: ${px(m2.bodySize)}px; line-height: ${px(m2.bodyLine)}px; }
+.what .t { font-size: ${px(m2.entrySize)}px; line-height: ${px(m2.bodyLine)}px; font-weight: 700; }
 .what .org { font-style: italic; }
 
-/* \u2500\u2500 skills: three equal columns with a square marker, as measured \u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
-.skills { display: grid; grid-template-columns: repeat(${SHEET.skillCols}, 1fr);
-  column-gap: ${SHEET.skillColGap}px; row-gap: ${SHEET.skillRowGap}px; padding-left: ${SHEET.skillInset}px; }
-.skills > span { display: flex; align-items: center; gap: 6px; font-size: ${SHEET.bodySize}px;
-  line-height: ${SHEET.bodyLine}px; break-inside: avoid; }
+/* \u2500\u2500 skills: equal columns with a square marker, as measured \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.skills { display: grid; grid-template-columns: repeat(${m2.skillCols}, 1fr);
+  column-gap: ${px(m2.skillColGap)}px; row-gap: ${px(m2.skillRowGap)}px; padding-left: ${px(m2.skillInset)}px; }
+.skills > span { display: flex; align-items: center; gap: 6px; font-size: ${px(m2.bodySize)}px;
+  line-height: ${px(m2.bodyLine)}px; break-inside: avoid; }
 .skills > span::before { content: ""; width: 4px; height: 4px; flex: 0 0 4px; background: var(--mark); }
 
 /* On screen the sheet carries the 297mm floor and the top margin itself, so the
@@ -52645,7 +52746,7 @@ ${sections}
 </body>
 </html>`;
 }
-var MM, PAPER_TOP_MM, PAPER_SIDE_MM, CHAR_W, SHEET, wrapLines, CV_ACCENTS, DEFAULT_ACCENT, I, ICONS, esc, bare, href, lines, paras, HEADS;
+var MM, PAPER_TOP_MM, PAPER_SIDE_MM, CHAR_W, SHEET, wrapLines, ICON_FRAMES, CV_PAPER, PT, px, mm, num, MONTHS, YM, applyCaps, CV_ACCENTS, DEFAULT_ACCENT, I, ICONS, SECTION_ICONS, esc, bare, href, lines, paras, HEADS;
 var init_cv_document = __esm({
   "src/lib/cv-document.ts"() {
     "use strict";
@@ -52693,6 +52794,15 @@ var init_cv_document = __esm({
       }
     };
     wrapLines = (text, colWidth) => Math.max(1, Math.ceil(text.length / Math.floor(colWidth / CHAR_W)));
+    ICON_FRAMES = ["none", "outline", "circle", "rounded", "square", "circle-fill", "rounded-fill", "square-fill"];
+    CV_PAPER = { a4: { w: 210, h: 297 }, letter: { w: 215.9, h: 279.4 } };
+    PT = 96 / 72;
+    px = (n2) => String(Math.round(n2 * 100) / 100);
+    mm = (n2) => String(Math.round(n2 / MM * 1e3) / 1e3);
+    num = (v2, d2, lo2, hi2) => typeof v2 === "number" && Number.isFinite(v2) ? Math.min(hi2, Math.max(lo2, v2)) : d2;
+    MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    YM = /^(\d{4})[-/](\d{1,2})$/;
+    applyCaps = (s2, caps) => caps === "upper" ? s2.toUpperCase() : caps === "capitalize" ? s2.replace(/\S+/g, (w2) => w2[0].toUpperCase() + w2.slice(1).toLowerCase()) : s2;
     CV_ACCENTS = {
       /** the reference document: pure paper black */
       ink: "#000000",
@@ -52708,7 +52818,24 @@ var init_cv_document = __esm({
       github: (c2) => I('<path d="M9 19c-4 1.5-4-2-6-2.5m12 5v-3.9a3.4 3.4 0 0 0-.9-2.6c3-.3 4.9-1.7 4.9-5.9a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C5.8 2.4 4.8 2.7 4.8 2.7a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 3.4 9.1c0 4.2 1.9 5.6 4.9 5.9a3.4 3.4 0 0 0-.9 2.6V21" transform="translate(1.4 .5) scale(.92)"/>', c2),
       linkedin: (c2) => I('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 10.5V17M8 7.2v.01M12.5 17v-3.6a2.2 2.2 0 0 1 4.4 0V17M12.5 10.5V17"/>', c2),
       globe: (c2) => I('<circle cx="12" cy="12" r="9"/><path d="M3.2 9.5h17.6M3.2 14.5h17.6M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18Z"/>', c2),
-      pin: (c2) => I('<path d="M12 21.5s7-6.3 7-11.5a7 7 0 1 0-14 0c0 5.2 7 11.5 7 11.5Z"/><circle cx="12" cy="10" r="2.6"/>', c2)
+      pin: (c2) => I('<path d="M12 21.5s7-6.3 7-11.5a7 7 0 1 0-14 0c0 5.2 7 11.5 7 11.5Z"/><circle cx="12" cy="10" r="2.6"/>', c2),
+      // section-heading glyphs, for the `headIcons` setting
+      user: (c2) => I('<circle cx="12" cy="8" r="3.6"/><path d="M5.5 20c.6-3.6 3.3-5.6 6.5-5.6s5.9 2 6.5 5.6"/>', c2),
+      briefcase: (c2) => I('<rect x="3" y="7.5" width="18" height="12" rx="2"/><path d="M9 7.5V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.5M3 12.5h18"/>', c2),
+      code: (c2) => I('<path d="m9 8-5 4 5 4M15 8l5 4-5 4"/>', c2),
+      book: (c2) => I('<path d="M4 5.5A2 2 0 0 1 6 3.5h13v15H6a2 2 0 0 0-2 2Z"/><path d="M4 20.5A2 2 0 0 1 6 18.5h13"/>', c2),
+      award: (c2) => I('<circle cx="12" cy="9" r="5.5"/><path d="m8.5 14-1.5 7 5-3 5 3-1.5-7"/>', c2),
+      folder: (c2) => I('<path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h6a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>', c2),
+      star: (c2) => I('<path d="m12 3.5 2.7 5.6 6 .9-4.4 4.3 1.1 6-5.4-2.9-5.4 2.9 1.1-6L3.3 10l6-.9Z"/>', c2)
+    };
+    SECTION_ICONS = {
+      summary: "user",
+      experience: "briefcase",
+      skills: "code",
+      education: "book",
+      projects: "folder",
+      awards: "award",
+      custom: "star"
     };
     esc = (s2) => String(s2 ?? "").replace(/[&<>"]/g, (m2) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[m2]);
     bare = (v2) => String(v2 ?? "").trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
@@ -52810,6 +52937,10 @@ async function updateCV(userId, id, patch) {
     sets.push("blocks = ?");
     args.push(JSON.stringify(patch.blocks));
   }
+  if (patch.design !== void 0) {
+    sets.push("design = ?");
+    args.push(JSON.stringify(patch.design ?? {}));
+  }
   if (patch.template_id !== void 0) {
     sets.push("template_id = ?");
     args.push(patch.template_id);
@@ -52827,8 +52958,8 @@ async function duplicateCV(userId, id, name2) {
   const newCvId = newId();
   const now = nowIso();
   await run(
-    `INSERT INTO cvs (id, user_id, profile_id, name, archetype, career_category, targeting, blocks, template_id, lineage, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO cvs (id, user_id, profile_id, name, archetype, career_category, targeting, blocks, design, template_id, lineage, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     newCvId,
     userId,
     src.profile_id,
@@ -52837,6 +52968,7 @@ async function duplicateCV(userId, id, name2) {
     src.career_category,
     JSON.stringify(src.targeting),
     JSON.stringify(src.blocks),
+    JSON.stringify(src.design ?? {}),
     src.template_id,
     JSON.stringify({ forked_from: src.id, forked_at: now }),
     now,
@@ -52849,11 +52981,35 @@ async function matchCV(userId, cvId, postingId) {
   const profile = await getProfile(userId);
   const posting = postingId ? await get("SELECT * FROM job_postings WHERE id = ? AND user_id = ?", postingId, userId) : null;
   const jdKeywords = posting ? parseJson(posting.jd_keywords, []) : [];
-  const doc = buildCvDoc(cv, profile);
-  const { pages } = estimateCvDoc(doc);
+  const doc = buildCvDoc(cv, profile, cv.design);
+  const { pages } = estimateCvDoc(doc, cv.design);
   const id = profile.identity ?? {};
-  const blocks = Array.isArray(cv.blocks) ? cv.blocks : [];
-  const types2 = new Set(blocks.map((b2) => b2.type));
+  const cvBlocks = Array.isArray(cv.blocks) ? cv.blocks : [];
+  const sourced = (type) => cvBlocks.some((b2) => b2.type === type && b2.source === "profile");
+  const SECTION_TYPE = {
+    user: "summary",
+    briefcase: "experience",
+    code: "skills",
+    book: "education",
+    folder: "projects",
+    award: "awards",
+    star: "custom"
+  };
+  const printed = /* @__PURE__ */ new Map();
+  for (const sec of doc.sections) {
+    const kind = SECTION_TYPE[sec.icon ?? "star"] ?? "custom";
+    printed.set(kind, [...printed.get(kind) ?? [], ...sec.lines]);
+  }
+  const linesOf = (kind) => printed.get(kind) ?? [];
+  const entriesOf = (kind) => linesOf(kind).filter((l2) => l2.k === "entry");
+  const proseOf = (kind) => linesOf(kind).filter((l2) => l2.k === "prose");
+  const printedEntries = doc.sections.flatMap((sec) => sec.lines).filter((l2) => l2.k === "entry");
+  const expEntries = entriesOf("experience");
+  const eduEntries = entriesOf("education");
+  const skillItems = linesOf("skills").flatMap((l2) => l2.k === "skills" ? l2.items : []);
+  const summaryLines = [...proseOf("summary"), ...proseOf("custom")];
+  const datedEntries = printedEntries.filter((l2) => l2.when.trim().length > 0).length;
+  const hasContent = printedEntries.length > 0 || summaryLines.length > 0 || skillItems.length > 0;
   const bodyLines = doc.sections.flatMap(
     (sec) => sec.lines.flatMap((l2) => l2.k === "entry" ? l2.body : l2.k === "prose" ? [l2.text] : [])
   );
@@ -52872,20 +53028,23 @@ async function matchCV(userId, cvId, postingId) {
     (family.some((f2) => cvText.includes(f2)) ? matched : missing).push(kw);
   }
   const coverage = jdKeywords.length ? Math.round(matched.length / jdKeywords.length * 100) : null;
-  const expCount = (profile.experiences ?? []).length;
-  const eduCount = (profile.education ?? []).length;
-  const datedTotal = expCount + eduCount;
-  const undated = (profile.experiences ?? []).filter((e2) => !String(e2.start_date ?? "").trim()).length + (profile.education ?? []).filter((e2) => !String(e2.start_date ?? "").trim()).length;
   const pinned = Array.isArray(cv.targeting?.keywords) ? String(cv.targeting.keywords.join(" ")).trim() : "";
   const target = String(posting?.title ?? "").trim() || pinned || String(id.headline ?? "").trim();
   const targetWords = target.toLowerCase().split(/[^a-z0-9+#.]+/).filter((w2) => w2.length > 2);
   const targetHit = targetWords.length ? targetWords.filter((w2) => cvText.includes(w2)).length / targetWords.length : 1;
-  const has = (t2) => types2.has(t2);
   const inHeader = (icon) => doc.contact.find((c2) => c2.icon === icon);
   const mail = inHeader("mail");
   const phone = inHeader("phone");
   const headerLinks = ["linkedin", "github", "globe"].map(inHeader).filter(Boolean);
   const checks = [
+    {
+      key: "content",
+      label: "The page has content to send",
+      severity: "critical",
+      ok: hasContent,
+      evidence: hasContent ? `${doc.sections.length} section${doc.sections.length === 1 ? " prints" : "s print"} \u2014 ${printedEntries.length} role${printedEntries.length === 1 ? "" : "s"}, ${summaryLines.length} summary line${summaryLines.length === 1 ? "" : "s"}, ${skillItems.length} skill${skillItems.length === 1 ? "" : "s"}` : "nothing prints below the contact row",
+      fix: "Add a summary, a role and a few skills \u2014 an empty page cannot be parsed or ranked"
+    },
     {
       key: "email",
       label: "Email address in the contact row",
@@ -52912,49 +53071,49 @@ async function matchCV(userId, cvId, postingId) {
     },
     {
       key: "experience",
-      label: "Experience section",
+      label: "Experience section prints at least one role",
       severity: "important",
-      ok: has("experience"),
-      evidence: has("experience") ? `${expCount} dated role${expCount === 1 ? "" : "s"}` : "no experience block in this CV",
-      fix: "Add an experience block \u2014 parsers segment sections by their headings"
+      ok: expEntries.length > 0,
+      evidence: expEntries.length ? `${expEntries.length} role${expEntries.length === 1 ? "" : "s"} print on the page` : sourced("experience") ? "the experience block prints no roles \u2014 your profile has no roles to pull in" : "the experience block prints no roles",
+      fix: "Add a role on the Profile page, or write one in the block \u2014 parsers read what prints"
     },
     {
       key: "education",
-      label: "Education section",
+      label: "Education section prints at least one entry",
       severity: "important",
-      ok: has("education"),
-      evidence: has("education") ? `${eduCount} entr${eduCount === 1 ? "y" : "ies"}` : "no education block in this CV",
-      fix: "Add an education block"
+      ok: eduEntries.length > 0,
+      evidence: eduEntries.length ? `${eduEntries.length} entr${eduEntries.length === 1 ? "y" : "ies"} print on the page` : sourced("education") ? "the education block prints no entries \u2014 your profile has no schools to pull in" : "the education block prints no entries",
+      fix: "Add a school on the Profile page, or write the entry in the block"
     },
     {
       key: "skills",
-      label: "Skills section (keyword-friendly)",
+      label: "Skills print as a list (keyword-friendly)",
       severity: "important",
-      ok: has("skills"),
-      evidence: has("skills") ? `${(profile.skills ?? []).length} skills listed` : "no skills block in this CV",
-      fix: "Add a skills block \u2014 it is the cheapest place to match a job description"
+      ok: skillItems.length > 0,
+      evidence: skillItems.length ? `${skillItems.length} skill${skillItems.length === 1 ? "" : "s"} print as keywords` : sourced("skills") ? "the skills block prints no names \u2014 your profile has no skills to pull in" : "the skills block prints no names",
+      fix: "Add skills on the Profile page \u2014 it is the cheapest place to match a job description"
     },
     {
       key: "summary",
-      label: "Summary / profile section",
+      label: "Summary prints on the page",
       severity: "polish",
-      ok: has("summary") || has("custom"),
-      evidence: has("summary") || has("custom") ? "present" : "no summary block in this CV",
+      ok: summaryLines.length > 0,
+      evidence: summaryLines.length ? `${summaryLines.length} summary paragraph${summaryLines.length === 1 ? " prints" : "s print"}` : "no summary text prints",
       fix: "Add a three-line summary aimed at the role you want"
     },
     {
       key: "dates",
-      label: "Every role and school has a start date",
+      label: "Every printed role and school has a start date",
       severity: "important",
-      ok: datedTotal === 0 || undated === 0,
-      evidence: datedTotal === 0 ? "nothing dated yet" : undated ? `${undated} of ${datedTotal} entries lack a start date` : `all ${datedTotal} dated`,
+      ok: printedEntries.length > 0 && datedEntries === printedEntries.length,
+      evidence: printedEntries.length === 0 ? "nothing dated prints yet" : datedEntries === printedEntries.length ? `all ${printedEntries.length} printed entries are dated` : `${printedEntries.length - datedEntries} of ${printedEntries.length} printed entries have no start date`,
       fix: "Add start dates \u2014 tenure maths and gap detection both need them"
     },
     {
       key: "length",
       label: "Length \u2264 2 pages as printed",
       severity: "important",
-      ok: pages <= 2,
+      ok: hasContent && pages <= 2,
       evidence: `renders as ${pages} page${pages === 1 ? "" : "s"}`,
       fix: "Trim older roles or drop the least relevant lines"
     },
@@ -52963,7 +53122,8 @@ async function matchCV(userId, cvId, postingId) {
       label: "Some lines quantify an outcome",
       severity: "polish",
       ok: bodyLines.length > 0 && quantified / bodyLines.length >= 0.25,
-      evidence: `${quantified} of ${bodyLines.length} lines carry a figure`,
+      // "1 of 1 lines carry" reads wrong, and this is the row people act on
+      evidence: `${quantified} of ${bodyLines.length} line${bodyLines.length === 1 ? "" : "s"} ${quantified === 1 ? "carries" : "carry"} a figure`,
       fix: "Put a figure in a quarter of your lines: users, %, time or money saved"
     }
   ];
@@ -52992,7 +53152,7 @@ async function matchCV(userId, cvId, postingId) {
   const score = Math.round(weightEarned / weightTotal * 100);
   const blockers = checks.filter((c2) => !c2.ok && c2.severity === "critical").length;
   const band = score >= 85 ? "strong" : score >= 65 ? "decent" : "weak";
-  const summary2 = blockers ? `${blockers} thing${blockers > 1 ? "s" : ""} a parser or a recruiter will hit before anything else.` : band === "strong" ? "Nothing structural is in the way: this is ready to send." : "No blockers, the rest is polish.";
+  const summary2 = !hasContent ? "Nothing prints on this CV yet \u2014 add a summary, a role or a skill before sending." : blockers ? `${blockers} thing${blockers > 1 ? "s" : ""} a parser or a recruiter will hit before anything else.` : band === "strong" ? "Nothing structural is in the way: this is ready to send." : "No blockers, the rest is polish.";
   const signals = await profileSignals(userId);
   const jdScore = posting ? scorePosting(signals, { title: posting.title, description: posting.description, companyName: posting.company_name, seniority: posting.seniority, remote: !!posting.remote, location: posting.location, salaryMin: posting.salary_min, salaryMax: posting.salary_max, postedAt: posting.posted_at }) : null;
   return {
@@ -53095,6 +53255,7 @@ var init_cv_service = __esm({
       ...r2,
       targeting: parseJson(r2.targeting, {}),
       blocks: parseJson(r2.blocks, []),
+      design: parseJson(r2.design, {}),
       lineage: parseJson(r2.lineage, {})
     });
     WEIGHT = { critical: 3, important: 2, polish: 1 };
@@ -94281,7 +94442,7 @@ var init_resume_import_service = __esm({
 });
 
 // src/routes/core.ts
-var import_express2, profileRouter, profileSchema, cvRouter, cvSchema, templateRouter, captureRouter, captureLimiter, autofillRouter, companyRouter;
+var import_express2, profileRouter, profileSchema, cvRouter, designSchema, cvSchema, templateRouter, captureRouter, captureLimiter, autofillRouter, companyRouter;
 var init_core = __esm({
   "src/routes/core.ts"() {
     "use strict";
@@ -94347,12 +94508,37 @@ var init_core = __esm({
         next(e2);
       }
     });
+    designSchema = external_exports.object({
+      page: external_exports.enum(["a4", "letter"]).optional(),
+      accent: external_exports.string().max(32).optional(),
+      font: external_exports.enum(["serif", "sans"]).optional(),
+      base: external_exports.number().min(6).max(16).optional(),
+      nameDelta: external_exports.number().min(-14).max(30).optional(),
+      headDelta: external_exports.number().min(-6).max(16).optional(),
+      entryDelta: external_exports.number().min(-5).max(14).optional(),
+      lineHeight: external_exports.number().min(1).max(2.2).optional(),
+      sectionGap: external_exports.number().min(6).max(40).optional(),
+      entryGap: external_exports.number().min(2).max(30).optional(),
+      marginX: external_exports.number().min(8).max(35).optional(),
+      marginY: external_exports.number().min(8).max(35).optional(),
+      skillCols: external_exports.number().int().min(1).max(4).optional(),
+      caps: external_exports.enum(["none", "capitalize", "upper"]).optional(),
+      rule: external_exports.boolean().optional(),
+      headTone: external_exports.enum(["accent", "ink"]).optional(),
+      datePos: external_exports.enum(["left", "right"]).optional(),
+      align: external_exports.enum(["center", "left"]).optional(),
+      icons: external_exports.enum(["none", "outline", "circle", "rounded", "square", "circle-fill", "rounded-fill", "square-fill"]).optional(),
+      headIcons: external_exports.enum(["none", "outline", "filled"]).optional(),
+      links: external_exports.object({ underline: external_exports.boolean().optional(), colored: external_exports.boolean().optional() }).optional(),
+      dates: external_exports.enum(["keep", "month", "dots", "hide"]).optional()
+    });
     cvSchema = external_exports.object({
       name: external_exports.string().min(1),
       archetype: external_exports.enum(["opening", "pitch"]).optional(),
       career_category: external_exports.string().optional(),
       targeting: external_exports.record(external_exports.any()).optional(),
       blocks: external_exports.array(external_exports.record(external_exports.any())).optional(),
+      design: designSchema.optional(),
       template_id: external_exports.string().nullish()
     });
     cvRouter.post("/", async (req, res, next) => {
@@ -94410,8 +94596,16 @@ var init_core = __esm({
         const c2 = await getCV(req.userId, String(req.params.id));
         const p2 = await getProfile(req.userId);
         const q2 = req.query;
+        let preview;
+        if (typeof q2.design === "string" && q2.design.length <= 2e3) {
+          try {
+            preview = designSchema.parse(JSON.parse(q2.design));
+          } catch {
+            preview = void 0;
+          }
+        }
         res.setHeader("Content-Type", "text/html; charset=utf-8");
-        res.send(renderCvHtml(c2, p2, { frame: q2.frame === "1", accent: q2.accent }));
+        res.send(renderCvHtml(c2, p2, { frame: q2.frame === "1", accent: q2.accent, design: preview ?? c2.design }));
       } catch (e2) {
         next(e2);
       }

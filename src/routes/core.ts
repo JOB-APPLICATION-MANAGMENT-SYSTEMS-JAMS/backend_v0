@@ -73,12 +73,43 @@ cvRouter.get("/", async (req: AuthedRequest, res, next) => {
   }
 });
 
+/**
+ * The CV's document settings (§24.1). Validated here rather than trusted: the
+ * values become CSS lengths, so a string where a number belongs would print as
+ * `NaNpx`. Every bound matches the one `resolveMetrics` clamps to.
+ */
+const designSchema = z.object({
+  page: z.enum(["a4", "letter"]).optional(),
+  accent: z.string().max(32).optional(),
+  font: z.enum(["serif", "sans"]).optional(),
+  base: z.number().min(6).max(16).optional(),
+  nameDelta: z.number().min(-14).max(30).optional(),
+  headDelta: z.number().min(-6).max(16).optional(),
+  entryDelta: z.number().min(-5).max(14).optional(),
+  lineHeight: z.number().min(1).max(2.2).optional(),
+  sectionGap: z.number().min(6).max(40).optional(),
+  entryGap: z.number().min(2).max(30).optional(),
+  marginX: z.number().min(8).max(35).optional(),
+  marginY: z.number().min(8).max(35).optional(),
+  skillCols: z.number().int().min(1).max(4).optional(),
+  caps: z.enum(["none", "capitalize", "upper"]).optional(),
+  rule: z.boolean().optional(),
+  headTone: z.enum(["accent", "ink"]).optional(),
+  datePos: z.enum(["left", "right"]).optional(),
+  align: z.enum(["center", "left"]).optional(),
+  icons: z.enum(["none", "outline", "circle", "rounded", "square", "circle-fill", "rounded-fill", "square-fill"]).optional(),
+  headIcons: z.enum(["none", "outline", "filled"]).optional(),
+  links: z.object({ underline: z.boolean().optional(), colored: z.boolean().optional() }).optional(),
+  dates: z.enum(["keep", "month", "dots", "hide"]).optional(),
+});
+
 const cvSchema = z.object({
   name: z.string().min(1),
   archetype: z.enum(["opening", "pitch"]).optional(),
   career_category: z.string().optional(),
   targeting: z.record(z.any()).optional(),
   blocks: z.array(z.record(z.any())).optional(),
+  design: designSchema.optional(),
   template_id: z.string().nullish(),
 });
 
@@ -152,9 +183,23 @@ cvRouter.get("/:id/html", async (req: AuthedRequest, res, next) => {
   try {
     const c = await cv.getCV(req.userId!, String(req.params.id));
     const p = await profile.getProfile(req.userId!);
-    const q = req.query as { frame?: string; accent?: string };
+    const q = req.query as { frame?: string; accent?: string; design?: string };
+    // The editor sends the design it is *currently editing* as `?design=` so a
+    // setting lands on the sheet instantly rather than after the autosave, and a
+    // design it has just reset to `{}` previews as the default sheet instead of
+    // the last saved one. A malformed one is ignored, never a 500: the sheet can
+    // always fall back to what is stored.
+    let preview: unknown;
+    if (typeof q.design === "string" && q.design.length <= 2000) {
+      try {
+        preview = designSchema.parse(JSON.parse(q.design));
+      } catch {
+        preview = undefined;
+      }
+    }
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(renderCvHtml(c, p, { frame: q.frame === "1", accent: q.accent }));
+    // `?accent=` stays for the older deep links that still carry it
+    res.send(renderCvHtml(c, p, { frame: q.frame === "1", accent: q.accent, design: preview ?? c.design }));
   } catch (e) {
     next(e);
   }

@@ -5,7 +5,7 @@ import { getProfile, skillNames } from "./profile.service";
 import { tokenize, expand } from "../search/synonyms";
 import { profileSignals } from "./profile-signals";
 import { scorePosting } from "./scoring.service";
-import { buildCvDoc, estimateCvDoc, type CvDoc } from "../lib/cv-document";
+import { buildCvDoc, estimateCvDoc, type CvDesign, type CvDoc, type CvLine } from "../lib/cv-document";
 
 export interface CVBlock {
   type: "summary" | "experience" | "skills" | "projects" | "education" | "awards" | "custom";
@@ -36,6 +36,7 @@ const shape = (r: any) => ({
   ...r,
   targeting: parseJson(r.targeting, {}),
   blocks: parseJson(r.blocks, []),
+  design: parseJson(r.design, {}),
   lineage: parseJson(r.lineage, {}),
 });
 
@@ -51,6 +52,8 @@ export interface CreateCVInput {
   career_category?: string;
   targeting?: any;
   blocks?: CVBlock[];
+  /** the document's own settings; see `CvDesign` in `../lib/cv-document` */
+  design?: CvDesign;
   template_id?: string | null;
   profile_id?: string | null;
 }
@@ -116,6 +119,10 @@ export async function updateCV(userId: string, id: string, patch: Partial<Create
     sets.push("blocks = ?");
     args.push(JSON.stringify(patch.blocks));
   }
+  if (patch.design !== undefined) {
+    sets.push("design = ?");
+    args.push(JSON.stringify(patch.design ?? {}));
+  }
   if (patch.template_id !== undefined) {
     sets.push("template_id = ?");
     args.push(patch.template_id);
@@ -136,8 +143,8 @@ export async function duplicateCV(userId: string, id: string, name?: string) {
   const newCvId = newId();
   const now = nowIso();
   await run(
-    `INSERT INTO cvs (id, user_id, profile_id, name, archetype, career_category, targeting, blocks, template_id, lineage, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO cvs (id, user_id, profile_id, name, archetype, career_category, targeting, blocks, design, template_id, lineage, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     newCvId,
     userId,
     src.profile_id,
@@ -146,6 +153,7 @@ export async function duplicateCV(userId: string, id: string, name?: string) {
     src.career_category,
     JSON.stringify(src.targeting),
     JSON.stringify(src.blocks),
+    JSON.stringify(src.design ?? {}),
     src.template_id,
     JSON.stringify({ forked_from: src.id, forked_at: now }),
     now,
@@ -195,11 +203,50 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
 
   // Ask the document, not the block text: the page count below is the page the
   // printer produces, and the lines counted are the lines that get rendered.
-  const doc = buildCvDoc(cv, profile);
-  const { pages } = estimateCvDoc(doc);
+  const doc = buildCvDoc(cv, profile, cv.design);
+  const { pages } = estimateCvDoc(doc, cv.design);
   const id: any = profile.identity ?? {};
-  const blocks: any[] = Array.isArray(cv.blocks) ? cv.blocks : [];
-  const types = new Set(blocks.map((b) => b.type));
+  const cvBlocks: any[] = Array.isArray(cv.blocks) ? cv.blocks : [];
+  /** Whether a section is supposed to be pulled from the profile (so an empty
+   *  print is a missing profile entry, not a missing block). */
+  const sourced = (type: string) => cvBlocks.some((b) => b.type === type && b.source === "profile");
+
+  /**
+   * Score what prints, not what is configured. A block can exist and render
+   * nothing — an experience block sourced from a profile with no roles leaves the
+   * section out of the document entirely — so counting block types is how an empty
+   * CV ends up claiming "0 dated roles" and still scoring 89%. Each check below
+   * reads `doc.sections`, the same model the printer and the page count use.
+   */
+  const SECTION_TYPE: Record<string, string> = {
+    user: "summary",
+    briefcase: "experience",
+    code: "skills",
+    book: "education",
+    folder: "projects",
+    award: "awards",
+    star: "custom",
+  };
+  type CvEntry = Extract<CvLine, { k: "entry" }>;
+  const printed = new Map<string, CvLine[]>();
+  for (const sec of doc.sections) {
+    const kind = SECTION_TYPE[sec.icon ?? "star"] ?? "custom";
+    printed.set(kind, [...(printed.get(kind) ?? []), ...sec.lines]);
+  }
+  const linesOf = (kind: string) => printed.get(kind) ?? [];
+  const entriesOf = (kind: string) => linesOf(kind).filter((l): l is CvEntry => l.k === "entry");
+  const proseOf = (kind: string) =>
+    linesOf(kind).filter((l): l is Extract<CvLine, { k: "prose" }> => l.k === "prose");
+
+  const printedEntries = doc.sections
+    .flatMap((sec) => sec.lines)
+    .filter((l): l is CvEntry => l.k === "entry");
+  const expEntries = entriesOf("experience");
+  const eduEntries = entriesOf("education");
+  const skillItems = linesOf("skills").flatMap((l) => (l.k === "skills" ? l.items : []));
+  const summaryLines = [...proseOf("summary"), ...proseOf("custom")];
+  const datedEntries = printedEntries.filter((l) => l.when.trim().length > 0).length;
+  const hasContent = printedEntries.length > 0 || summaryLines.length > 0 || skillItems.length > 0;
 
   const bodyLines = doc.sections.flatMap((sec) =>
     sec.lines.flatMap((l) => (l.k === "entry" ? l.body : l.k === "prose" ? [l.text] : [])),
@@ -224,13 +271,6 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
   }
   const coverage = jdKeywords.length ? Math.round((matched.length / jdKeywords.length) * 100) : null;
 
-  const expCount = (profile.experiences ?? []).length;
-  const eduCount = (profile.education ?? []).length;
-  const datedTotal = expCount + eduCount;
-  const undated =
-    (profile.experiences ?? []).filter((e: any) => !String(e.start_date ?? "").trim()).length +
-    (profile.education ?? []).filter((e: any) => !String(e.start_date ?? "").trim()).length;
-
   // What the CV is aimed at: the posting it is tailored to, the keywords the user
   // pinned to it, or their own headline. `career_category` is deliberately not
   // used — it is a taxonomy tag that defaults to a value nobody chose, and asking
@@ -240,7 +280,6 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
   const targetWords = target.toLowerCase().split(/[^a-z0-9+#.]+/).filter((w) => w.length > 2);
   const targetHit = targetWords.length ? targetWords.filter((w) => cvText.includes(w)).length / targetWords.length : 1;
 
-  const has = (t: string) => types.has(t);
   // The contact row as it will print, not as the profile form holds it: the
   // document is what the parser and the recruiter actually see.
   const inHeader = (icon: CvDoc["contact"][number]["icon"]) => doc.contact.find((c) => c.icon === icon);
@@ -249,6 +288,19 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
   const headerLinks = (["linkedin", "github", "globe"] as const).map(inHeader).filter(Boolean);
 
   const checks: AtsCheck[] = [
+    {
+      key: "content",
+      label: "The page has content to send",
+      severity: "critical",
+      ok: hasContent,
+      evidence: hasContent
+        ? `${doc.sections.length} section${doc.sections.length === 1 ? " prints" : "s print"} — ` +
+          `${printedEntries.length} role${printedEntries.length === 1 ? "" : "s"}, ` +
+          `${summaryLines.length} summary line${summaryLines.length === 1 ? "" : "s"}, ` +
+          `${skillItems.length} skill${skillItems.length === 1 ? "" : "s"}`
+        : "nothing prints below the contact row",
+      fix: "Add a summary, a role and a few skills — an empty page cannot be parsed or ranked",
+    },
     {
       key: "email",
       label: "Email address in the contact row",
@@ -275,54 +327,68 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
     },
     {
       key: "experience",
-      label: "Experience section",
+      label: "Experience section prints at least one role",
       severity: "important",
-      ok: has("experience"),
-      evidence: has("experience") ? `${expCount} dated role${expCount === 1 ? "" : "s"}` : "no experience block in this CV",
-      fix: "Add an experience block — parsers segment sections by their headings",
+      ok: expEntries.length > 0,
+      evidence: expEntries.length
+        ? `${expEntries.length} role${expEntries.length === 1 ? "" : "s"} print on the page`
+        : sourced("experience")
+          ? "the experience block prints no roles — your profile has no roles to pull in"
+          : "the experience block prints no roles",
+      fix: "Add a role on the Profile page, or write one in the block — parsers read what prints",
     },
     {
       key: "education",
-      label: "Education section",
+      label: "Education section prints at least one entry",
       severity: "important",
-      ok: has("education"),
-      evidence: has("education") ? `${eduCount} entr${eduCount === 1 ? "y" : "ies"}` : "no education block in this CV",
-      fix: "Add an education block",
+      ok: eduEntries.length > 0,
+      evidence: eduEntries.length
+        ? `${eduEntries.length} entr${eduEntries.length === 1 ? "y" : "ies"} print on the page`
+        : sourced("education")
+          ? "the education block prints no entries — your profile has no schools to pull in"
+          : "the education block prints no entries",
+      fix: "Add a school on the Profile page, or write the entry in the block",
     },
     {
       key: "skills",
-      label: "Skills section (keyword-friendly)",
+      label: "Skills print as a list (keyword-friendly)",
       severity: "important",
-      ok: has("skills"),
-      evidence: has("skills") ? `${(profile.skills ?? []).length} skills listed` : "no skills block in this CV",
-      fix: "Add a skills block — it is the cheapest place to match a job description",
+      ok: skillItems.length > 0,
+      evidence: skillItems.length
+        ? `${skillItems.length} skill${skillItems.length === 1 ? "" : "s"} print as keywords`
+        : sourced("skills")
+          ? "the skills block prints no names — your profile has no skills to pull in"
+          : "the skills block prints no names",
+      fix: "Add skills on the Profile page — it is the cheapest place to match a job description",
     },
     {
       key: "summary",
-      label: "Summary / profile section",
+      label: "Summary prints on the page",
       severity: "polish",
-      ok: has("summary") || has("custom"),
-      evidence: has("summary") || has("custom") ? "present" : "no summary block in this CV",
+      ok: summaryLines.length > 0,
+      evidence: summaryLines.length
+        ? `${summaryLines.length} summary paragraph${summaryLines.length === 1 ? " prints" : "s print"}`
+        : "no summary text prints",
       fix: "Add a three-line summary aimed at the role you want",
     },
     {
       key: "dates",
-      label: "Every role and school has a start date",
+      label: "Every printed role and school has a start date",
       severity: "important",
-      ok: datedTotal === 0 || undated === 0,
+      ok: printedEntries.length > 0 && datedEntries === printedEntries.length,
       evidence:
-        datedTotal === 0
-          ? "nothing dated yet"
-          : undated
-            ? `${undated} of ${datedTotal} entries lack a start date`
-            : `all ${datedTotal} dated`,
+        printedEntries.length === 0
+          ? "nothing dated prints yet"
+          : datedEntries === printedEntries.length
+            ? `all ${printedEntries.length} printed entries are dated`
+            : `${printedEntries.length - datedEntries} of ${printedEntries.length} printed entries have no start date`,
       fix: "Add start dates — tenure maths and gap detection both need them",
     },
     {
       key: "length",
       label: "Length ≤ 2 pages as printed",
       severity: "important",
-      ok: pages <= 2,
+      ok: hasContent && pages <= 2,
       evidence: `renders as ${pages} page${pages === 1 ? "" : "s"}`,
       fix: "Trim older roles or drop the least relevant lines",
     },
@@ -331,7 +397,8 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
       label: "Some lines quantify an outcome",
       severity: "polish",
       ok: bodyLines.length > 0 && quantified / bodyLines.length >= 0.25,
-      evidence: `${quantified} of ${bodyLines.length} lines carry a figure`,
+      // "1 of 1 lines carry" reads wrong, and this is the row people act on
+      evidence: `${quantified} of ${bodyLines.length} line${bodyLines.length === 1 ? "" : "s"} ${quantified === 1 ? "carries" : "carry"} a figure`,
       fix: "Put a figure in a quarter of your lines: users, %, time or money saved",
     },
   ];
@@ -362,11 +429,13 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
   const score = Math.round((weightEarned / weightTotal) * 100);
   const blockers = checks.filter((c) => !c.ok && c.severity === "critical").length;
   const band: "strong" | "decent" | "weak" = score >= 85 ? "strong" : score >= 65 ? "decent" : "weak";
-  const summary = blockers
-    ? `${blockers} thing${blockers > 1 ? "s" : ""} a parser or a recruiter will hit before anything else.`
-    : band === "strong"
-      ? "Nothing structural is in the way: this is ready to send."
-      : "No blockers, the rest is polish.";
+  const summary = !hasContent
+    ? "Nothing prints on this CV yet — add a summary, a role or a skill before sending."
+    : blockers
+      ? `${blockers} thing${blockers > 1 ? "s" : ""} a parser or a recruiter will hit before anything else.`
+      : band === "strong"
+        ? "Nothing structural is in the way: this is ready to send."
+        : "No blockers, the rest is polish.";
 
   const signals = await profileSignals(userId);
   const jdScore = posting
