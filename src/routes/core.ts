@@ -8,7 +8,11 @@ import * as captureSvc from "../services/capture.service";
 import * as autofill from "../services/autofill.service";
 import * as resumeImport from "../services/resume-import.service";
 import { rateLimit } from "../core/middleware";
-import { renderCvHtml } from "../lib/cv-document";
+import * as net from "../services/network.service";
+import { get as dbGet } from "../core/db";
+import { notFound } from "../core/errors";
+import { buildCvDoc, renderCvHtml } from "../lib/cv-document";
+import { buildRedline } from "../lib/cv-redline";
 
 export const profileRouter = Router();
 profileRouter.use(requireAuth);
@@ -162,6 +166,41 @@ cvRouter.get("/:id/match", async (req: AuthedRequest, res, next) => {
   }
 });
 
+/* ── publishing & reviews ─────────────────────────────────────────────── */
+
+/** Publish/unpublish a CV and set the ownership line printed under it. */
+cvRouter.put("/:id/publish", async (req: AuthedRequest, res, next) => {
+  try {
+    const body = z.object({ public: z.boolean().optional(), copyright: z.string().max(240).nullish() }).parse(req.body ?? {});
+    ok(res, body.public ? "CV published" : "CV visibility updated", await net.publishCv(req.userId!, String(req.params.id), body));
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** The reviews on a CV: its owner sees them always, everyone else only if it is public. */
+cvRouter.get("/:id/reviews", async (req: AuthedRequest, res, next) => {
+  try {
+    const c = await dbGet<any>("SELECT id, user_id, public FROM cvs WHERE id = ?", String(req.params.id));
+    if (!c) throw notFound("CV");
+    if (!c.public && c.user_id !== req.userId) throw notFound("CV");
+    ok(res, "Reviews retrieved", await net.listCvReviews(c.id));
+  } catch (e) {
+    next(e);
+  }
+});
+
+cvRouter.post("/:id/reviews", async (req: AuthedRequest, res, next) => {
+  try {
+    const body = z
+      .object({ rating: z.number().min(1).max(5), body: z.string().min(10).max(2000), relationship: z.enum(["hirer", "recruiter", "mentor", "peer"]).optional() })
+      .parse(req.body ?? {});
+    ok(res, "Review saved", await net.addCvReview(req.userId!, String(req.params.id), body), 201);
+  } catch (e) {
+    next(e);
+  }
+});
+
 cvRouter.get("/:id/suggest", async (req: AuthedRequest, res, next) => {
   try {
     ok(res, "CV suggestions", await cv.suggestCVs(req.userId!, req.query.posting_id as string | undefined));
@@ -183,7 +222,7 @@ cvRouter.get("/:id/html", async (req: AuthedRequest, res, next) => {
   try {
     const c = await cv.getCV(req.userId!, String(req.params.id));
     const p = await profile.getProfile(req.userId!);
-    const q = req.query as { frame?: string; accent?: string; design?: string };
+    const q = req.query as { frame?: string; accent?: string; design?: string; redline?: string; kw?: string };
     // The editor sends the design it is *currently editing* as `?design=` so a
     // setting lands on the sheet instantly rather than after the autosave, and a
     // design it has just reset to `{}` previews as the default sheet instead of
@@ -197,9 +236,31 @@ cvRouter.get("/:id/html", async (req: AuthedRequest, res, next) => {
         preview = undefined;
       }
     }
+    // `?redline=1` renders the working copy: struck lines in red, rewrites and the
+    // missing figure or keyword in green. Computing it here (rather than passing
+    // markup over the wire) means the sheet and the ATS panel cannot disagree.
+    let redline: Record<string, { after: string; rule: string; note?: string }> | undefined;
+    if (q.redline === "1") {
+      const design = (preview ?? c.design) as Parameters<typeof buildCvDoc>[2];
+      const doc = buildCvDoc(c, p, design);
+      const missing = String(q.kw ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 3);
+      redline = buildRedline({ doc, missingKeywords: missing }).markup;
+    }
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     // `?accent=` stays for the older deep links that still carry it
-    res.send(renderCvHtml(c, p, { frame: q.frame === "1", accent: q.accent, design: preview ?? c.design }));
+    res.send(
+      renderCvHtml(c, p, {
+        frame: q.frame === "1",
+        accent: q.accent,
+        design: preview ?? c.design,
+        redline,
+        copyright: c.copyright ?? undefined,
+      })
+    );
   } catch (e) {
     next(e);
   }

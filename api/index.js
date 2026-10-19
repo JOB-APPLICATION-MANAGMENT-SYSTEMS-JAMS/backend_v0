@@ -68,13 +68,13 @@ var require_ms = __commonJS({
         "val is not a non-empty string or a valid number. val=" + JSON.stringify(val)
       );
     };
-    function parse2(str) {
-      str = String(str);
-      if (str.length > 100) {
+    function parse2(str2) {
+      str2 = String(str2);
+      if (str2.length > 100) {
         return;
       }
       var match = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
-        str
+        str2
       );
       if (!match) {
         return;
@@ -675,7 +675,7 @@ var require_node = __commonJS({
     var { formatters } = module.exports;
     formatters.o = function(v2) {
       this.inspectOpts.colors = this.useColors;
-      return util4.inspect(v2, this.inspectOpts).split("\n").map((str) => str.trim()).join(" ");
+      return util4.inspect(v2, this.inspectOpts).split("\n").map((str2) => str2.trim()).join(" ");
     };
     formatters.O = function(v2) {
       this.inspectOpts.colors = this.useColors;
@@ -701,8 +701,8 @@ var require_depd = __commonJS({
     var relative = __require("path").relative;
     module.exports = depd;
     var basePath = process.cwd();
-    function containsNamespace(str, namespace) {
-      var vals = str.split(/[ ,]+/);
+    function containsNamespace(str2, namespace) {
+      var vals = str2.split(/[ ,]+/);
       var ns2 = String(namespace).toLowerCase();
       for (var i2 = 0; i2 < vals.length; i2++) {
         var val = vals[i2];
@@ -729,21 +729,21 @@ var require_depd = __commonJS({
       return descriptor;
     }
     function createArgumentsString(arity) {
-      var str = "";
+      var str2 = "";
       for (var i2 = 0; i2 < arity; i2++) {
-        str += ", arg" + i2;
+        str2 += ", arg" + i2;
       }
-      return str.substr(2);
+      return str2.substr(2);
     }
     function createStackString(stack) {
-      var str = this.name + ": " + this.namespace;
+      var str2 = this.name + ": " + this.namespace;
       if (this.message) {
-        str += " deprecated " + this.message;
+        str2 += " deprecated " + this.message;
       }
       for (var i2 = 0; i2 < stack.length; i2++) {
-        str += "\n    at " + stack[i2].toString();
+        str2 += "\n    at " + stack[i2].toString();
       }
-      return str;
+      return str2;
     }
     function depd(namespace) {
       if (!namespace) {
@@ -772,15 +772,15 @@ var require_depd = __commonJS({
       if (process.noDeprecation) {
         return true;
       }
-      var str = process.env.NO_DEPRECATION || "";
-      return containsNamespace(str, namespace);
+      var str2 = process.env.NO_DEPRECATION || "";
+      return containsNamespace(str2, namespace);
     }
     function istraced(namespace) {
       if (process.traceDeprecation) {
         return true;
       }
-      var str = process.env.TRACE_DEPRECATION || "";
-      return containsNamespace(str, namespace);
+      var str2 = process.env.TRACE_DEPRECATION || "";
+      return containsNamespace(str2, namespace);
     }
     function log(message, site) {
       var haslisteners = eehaslisteners(process, "deprecation");
@@ -1214,8 +1214,8 @@ var require_toidentifier = __commonJS({
   "node_modules/.pnpm/toidentifier@1.0.1/node_modules/toidentifier/index.js"(exports, module) {
     "use strict";
     module.exports = toIdentifier;
-    function toIdentifier(str) {
-      return str.split(" ").map(function(token) {
+    function toIdentifier(str2) {
+      return str2.split(" ").map(function(token) {
         return token.slice(0, 1).toUpperCase() + token.slice(1);
       }).join("").replace(/[^ _0-9a-z]/gi, "");
     }
@@ -1439,16 +1439,16 @@ var require_bytes = __commonJS({
         }
       }
       var val = value / map2[unit.toLowerCase()];
-      var str = val.toFixed(decimalPlaces);
+      var str2 = val.toFixed(decimalPlaces);
       if (!fixedDecimals) {
-        str = str.replace(formatDecimalsRegExp, "$1");
+        str2 = str2.replace(formatDecimalsRegExp, "$1");
       }
       if (thousandsSeparator) {
-        str = str.split(".").map(function(s2, i2) {
+        str2 = str2.split(".").map(function(s2, i2) {
           return i2 === 0 ? s2.replace(formatThousandsRegExp, thousandsSeparator) : s2;
         }).join(".");
       }
-      return str + unitSeparator + unit;
+      return str2 + unitSeparator + unit;
     }
     function parse2(val) {
       if (typeof val === "number" && !isNaN(val)) {
@@ -1553,12 +1553,12 @@ var require_bom_handling = __commonJS({
       this.encoder = encoder;
       this.addBOM = true;
     }
-    PrependBOMWrapper.prototype.write = function(str) {
+    PrependBOMWrapper.prototype.write = function(str2) {
       if (this.addBOM) {
-        str = BOMChar + str;
+        str2 = BOMChar + str2;
         this.addBOM = false;
       }
-      return this.encoder.write(str);
+      return this.encoder.write(str2);
     };
     PrependBOMWrapper.prototype.end = function() {
       return this.encoder.end();
@@ -1657,31 +1657,31 @@ var require_internal = __commonJS({
     function InternalEncoder(options, codec) {
       this.enc = codec.enc;
     }
-    InternalEncoder.prototype.write = function(str) {
-      return Buffer2.from(str, this.enc);
+    InternalEncoder.prototype.write = function(str2) {
+      return Buffer2.from(str2, this.enc);
     };
     InternalEncoder.prototype.end = function() {
     };
     function InternalEncoderBase64(options, codec) {
       this.prevStr = "";
     }
-    InternalEncoderBase64.prototype.write = function(str) {
-      str = this.prevStr + str;
-      var completeQuads = str.length - str.length % 4;
-      this.prevStr = str.slice(completeQuads);
-      str = str.slice(0, completeQuads);
-      return Buffer2.from(str, "base64");
+    InternalEncoderBase64.prototype.write = function(str2) {
+      str2 = this.prevStr + str2;
+      var completeQuads = str2.length - str2.length % 4;
+      this.prevStr = str2.slice(completeQuads);
+      str2 = str2.slice(0, completeQuads);
+      return Buffer2.from(str2, "base64");
     };
     InternalEncoderBase64.prototype.end = function() {
       return Buffer2.from(this.prevStr, "base64");
     };
     function InternalEncoderCesu8(options, codec) {
     }
-    InternalEncoderCesu8.prototype.write = function(str) {
-      var buf = Buffer2.alloc(str.length * 3);
+    InternalEncoderCesu8.prototype.write = function(str2) {
+      var buf = Buffer2.alloc(str2.length * 3);
       var bufIdx = 0;
-      for (var i2 = 0; i2 < str.length; i2++) {
-        var charCode = str.charCodeAt(i2);
+      for (var i2 = 0; i2 < str2.length; i2++) {
+        var charCode = str2.charCodeAt(i2);
         if (charCode < 128) {
           buf[bufIdx++] = charCode;
         } else if (charCode < 2048) {
@@ -1762,25 +1762,25 @@ var require_internal = __commonJS({
     function InternalEncoderUtf8(options, codec) {
       this.highSurrogate = "";
     }
-    InternalEncoderUtf8.prototype.write = function(str) {
+    InternalEncoderUtf8.prototype.write = function(str2) {
       if (this.highSurrogate) {
-        str = this.highSurrogate + str;
+        str2 = this.highSurrogate + str2;
         this.highSurrogate = "";
       }
-      if (str.length > 0) {
-        var charCode = str.charCodeAt(str.length - 1);
+      if (str2.length > 0) {
+        var charCode = str2.charCodeAt(str2.length - 1);
         if (charCode >= 55296 && charCode < 56320) {
-          this.highSurrogate = str[str.length - 1];
-          str = str.slice(0, str.length - 1);
+          this.highSurrogate = str2[str2.length - 1];
+          str2 = str2.slice(0, str2.length - 1);
         }
       }
-      return Buffer2.from(str, this.enc);
+      return Buffer2.from(str2, this.enc);
     };
     InternalEncoderUtf8.prototype.end = function() {
       if (this.highSurrogate) {
-        var str = this.highSurrogate;
+        var str2 = this.highSurrogate;
         this.highSurrogate = "";
-        return Buffer2.from(str, this.enc);
+        return Buffer2.from(str2, this.enc);
       }
     };
   }
@@ -1807,8 +1807,8 @@ var require_utf32 = __commonJS({
       this.isLE = codec.isLE;
       this.highSurrogate = 0;
     }
-    Utf32Encoder.prototype.write = function(str) {
-      var src = Buffer2.from(str, "ucs2");
+    Utf32Encoder.prototype.write = function(str2) {
+      var src = Buffer2.from(str2, "ucs2");
       var dst = Buffer2.alloc(src.length * 2 + 4);
       var write32 = this.isLE ? dst.writeUInt32LE : dst.writeUInt32BE;
       var offset = 0;
@@ -1933,8 +1933,8 @@ var require_utf32 = __commonJS({
       }
       this.encoder = codec.iconv.getEncoder(options.defaultEncoding || "utf-32le", options);
     }
-    Utf32AutoEncoder.prototype.write = function(str) {
-      return this.encoder.write(str);
+    Utf32AutoEncoder.prototype.write = function(str2) {
+      return this.encoder.write(str2);
     };
     Utf32AutoEncoder.prototype.end = function() {
       return this.encoder.end();
@@ -2034,8 +2034,8 @@ var require_utf16 = __commonJS({
     Utf16BECodec.prototype.bomAware = true;
     function Utf16BEEncoder() {
     }
-    Utf16BEEncoder.prototype.write = function(str) {
-      var buf = Buffer2.from(str, "ucs2");
+    Utf16BEEncoder.prototype.write = function(str2) {
+      var buf = Buffer2.from(str2, "ucs2");
       for (var i2 = 0; i2 < buf.length; i2 += 2) {
         var tmp = buf[i2];
         buf[i2] = buf[i2 + 1];
@@ -2084,8 +2084,8 @@ var require_utf16 = __commonJS({
       }
       this.encoder = codec.iconv.getEncoder("utf-16le", options);
     }
-    Utf16Encoder.prototype.write = function(str) {
-      return this.encoder.write(str);
+    Utf16Encoder.prototype.write = function(str2) {
+      return this.encoder.write(str2);
     };
     Utf16Encoder.prototype.end = function() {
       return this.encoder.end();
@@ -2181,8 +2181,8 @@ var require_utf7 = __commonJS({
     function Utf7Encoder(options, codec) {
       this.iconv = codec.iconv;
     }
-    Utf7Encoder.prototype.write = function(str) {
-      return Buffer2.from(str.replace(nonDirectChars, function(chunk) {
+    Utf7Encoder.prototype.write = function(str2) {
+      return Buffer2.from(str2.replace(nonDirectChars, function(chunk) {
         return "+" + (chunk === "+" ? "" : this.iconv.encode(chunk, "utf16-be").toString("base64").replace(/=+$/, "")) + "-";
       }.bind(this)));
     };
@@ -2266,14 +2266,14 @@ var require_utf7 = __commonJS({
       this.base64Accum = Buffer2.alloc(6);
       this.base64AccumIdx = 0;
     }
-    Utf7IMAPEncoder.prototype.write = function(str) {
+    Utf7IMAPEncoder.prototype.write = function(str2) {
       var inBase64 = this.inBase64;
       var base64Accum = this.base64Accum;
       var base64AccumIdx = this.base64AccumIdx;
-      var buf = Buffer2.alloc(str.length * 5 + 10);
+      var buf = Buffer2.alloc(str2.length * 5 + 10);
       var bufIdx = 0;
-      for (var i3 = 0; i3 < str.length; i3++) {
-        var uChar = str.charCodeAt(i3);
+      for (var i3 = 0; i3 < str2.length; i3++) {
+        var uChar = str2.charCodeAt(i3);
         if (uChar >= 32 && uChar <= 126) {
           if (inBase64) {
             if (base64AccumIdx > 0) {
@@ -2414,10 +2414,10 @@ var require_sbcs_codec = __commonJS({
     function SBCSEncoder(options, codec) {
       this.encodeBuf = codec.encodeBuf;
     }
-    SBCSEncoder.prototype.write = function(str) {
-      var buf = Buffer2.alloc(str.length);
-      for (var i2 = 0; i2 < str.length; i2++) {
-        buf[i2] = this.encodeBuf[str.charCodeAt(i2)];
+    SBCSEncoder.prototype.write = function(str2) {
+      var buf = Buffer2.alloc(str2.length);
+      for (var i2 = 0; i2 < str2.length; i2++) {
+        buf[i2] = this.encodeBuf[str2.charCodeAt(i2)];
       }
       return buf;
     };
@@ -3293,8 +3293,8 @@ var require_dbcs_codec = __commonJS({
       this.defaultCharSingleByte = codec.defCharSB;
       this.gb18030 = codec.gb18030;
     }
-    DBCSEncoder.prototype.write = function(str) {
-      var newBuf = Buffer2.alloc(str.length * (this.gb18030 ? 4 : 3));
+    DBCSEncoder.prototype.write = function(str2) {
+      var newBuf = Buffer2.alloc(str2.length * (this.gb18030 ? 4 : 3));
       var leadSurrogate = this.leadSurrogate;
       var seqObj = this.seqObj;
       var nextChar = -1;
@@ -3302,8 +3302,8 @@ var require_dbcs_codec = __commonJS({
       var j2 = 0;
       while (true) {
         if (nextChar === -1) {
-          if (i3 == str.length) break;
-          var uCode = str.charCodeAt(i3++);
+          if (i3 == str2.length) break;
+          var uCode = str2.charCodeAt(i3++);
         } else {
           var uCode = nextChar;
           nextChar = -1;
@@ -5141,10 +5141,10 @@ var require_lib = __commonJS({
     module.exports.encodings = null;
     module.exports.defaultCharUnicode = "\uFFFD";
     module.exports.defaultCharSingleByte = "?";
-    module.exports.encode = function encode4(str, encoding, options) {
-      str = "" + (str || "");
+    module.exports.encode = function encode4(str2, encoding, options) {
+      str2 = "" + (str2 || "");
       var encoder = module.exports.getEncoder(encoding, options);
-      var res = encoder.write(str);
+      var res = encoder.write(str2);
       var trail = encoder.end();
       return trail && trail.length > 0 ? Buffer2.concat([res, trail]) : res;
     };
@@ -5397,7 +5397,7 @@ var require_raw_body = __commonJS({
       }
       var buffer = decoder ? "" : [];
       stream.on("aborted", onAborted);
-      stream.on("close", cleanup);
+      stream.on("close", cleanup2);
       stream.on("data", onData);
       stream.on("end", onEnd);
       stream.on("error", onEnd);
@@ -5414,7 +5414,7 @@ var require_raw_body = __commonJS({
           invokeCallback();
         }
         function invokeCallback() {
-          cleanup();
+          cleanup2();
           if (args[0]) {
             halt(stream);
           }
@@ -5461,13 +5461,13 @@ var require_raw_body = __commonJS({
           done(null, string);
         }
       }
-      function cleanup() {
+      function cleanup2() {
         buffer = null;
         stream.removeListener("aborted", onAborted);
         stream.removeListener("data", onData);
         stream.removeListener("end", onEnd);
         stream.removeListener("error", onEnd);
-        stream.removeListener("close", cleanup);
+        stream.removeListener("close", cleanup2);
       }
     }
     function tryRequireAsyncHooks() {
@@ -5516,10 +5516,10 @@ var require_ee_first = __commonJS({
         }
       }
       function callback() {
-        cleanup();
+        cleanup2();
         done.apply(null, arguments);
       }
-      function cleanup() {
+      function cleanup2() {
         var x2;
         for (var i3 = 0; i3 < cleanups.length; i3++) {
           x2 = cleanups[i3];
@@ -5529,7 +5529,7 @@ var require_ee_first = __commonJS({
       function thunk(fn3) {
         done = fn3;
       }
-      thunk.cancel = cleanup;
+      thunk.cancel = cleanup2;
       return thunk;
     }
     function listener(event, done) {
@@ -5752,9 +5752,9 @@ var require_dist = __commonJS({
       }
       return { type, index, parameters };
     }
-    function skipValue(str, index, len, stopChar) {
+    function skipValue(str2, index, len, stopChar) {
       while (index < len) {
-        const code = str.charCodeAt(index);
+        const code = str2.charCodeAt(index);
         if (code === SEMI || code === stopChar)
           break;
         index++;
@@ -5779,12 +5779,12 @@ var require_dist = __commonJS({
       }
       return end;
     }
-    function qstring(str) {
-      if (TOKEN_REGEXP.test(str))
-        return str;
-      if (TEXT_REGEXP.test(str))
-        return `"${str.replace(QUOTE_REGEXP, "\\$&")}"`;
-      throw new TypeError(`Invalid parameter value: ${str}`);
+    function qstring(str2) {
+      if (TOKEN_REGEXP.test(str2))
+        return str2;
+      if (TEXT_REGEXP.test(str2))
+        return `"${str2.replace(QUOTE_REGEXP, "\\$&")}"`;
+      throw new TypeError(`Invalid parameter value: ${str2}`);
     }
   }
 });
@@ -15220,11 +15220,11 @@ var require_mime_types = __commonJS({
       }
       return false;
     }
-    function contentType(str) {
-      if (!str || typeof str !== "string") {
+    function contentType(str2) {
+      if (!str2 || typeof str2 !== "string") {
         return false;
       }
-      var mime = str.indexOf("/") === -1 ? exports.lookup(str) : str;
+      var mime = str2.indexOf("/") === -1 ? exports.lookup(str2) : str2;
       if (!mime) {
         return false;
       }
@@ -15597,14 +15597,14 @@ var require_read = __commonJS({
             return;
           }
         }
-        let str = body;
+        let str2 = body;
         try {
           debug("parse body");
-          str = typeof body !== "string" && encoding !== null ? iconv.decode(body, encoding) : body;
-          req.body = parse2(str, encoding);
+          str2 = typeof body !== "string" && encoding !== null ? iconv.decode(body, encoding) : body;
+          req.body = parse2(str2, encoding);
         } catch (err) {
           next(createError(400, err, {
-            body: str,
+            body: str2,
             type: err.type || "entity.parse.failed"
           }));
           return;
@@ -15721,11 +15721,11 @@ var require_json = __commonJS({
         }
       };
     }
-    function createStrictSyntaxError(str, char) {
-      const index = str.indexOf(char);
+    function createStrictSyntaxError(str2, char) {
+      const index = str2.indexOf(char);
       let partial = "";
       if (index !== -1) {
-        partial = str.substring(0, index) + JSON_SYNTAX_CHAR.repeat(str.length - index);
+        partial = str2.substring(0, index) + JSON_SYNTAX_CHAR.repeat(str2.length - index);
       }
       try {
         JSON.parse(partial);
@@ -15733,14 +15733,14 @@ var require_json = __commonJS({
       } catch (e2) {
         return normalizeJsonSyntaxError(e2, {
           message: e2.message.replace(JSON_SYNTAX_REGEXP, function(placeholder) {
-            return str.substring(index, index + placeholder.length);
+            return str2.substring(index, index + placeholder.length);
           }),
           stack: e2.stack
         });
       }
     }
-    function firstchar(str) {
-      const match = FIRST_CHAR_REGEXP.exec(str);
+    function firstchar(str2) {
+      const match = FIRST_CHAR_REGEXP.exec(str2);
       return match ? match[1] : void 0;
     }
     function normalizeJsonSyntaxError(error2, obj) {
@@ -15851,20 +15851,20 @@ var require_object_inspect = __commonJS({
     var gPO = (typeof Reflect === "function" ? Reflect.getPrototypeOf : Object.getPrototypeOf) || ([].__proto__ === Array.prototype ? function(O2) {
       return O2.__proto__;
     } : null);
-    function addNumericSeparator(num2, str) {
-      if (num2 === Infinity || num2 === -Infinity || num2 !== num2 || num2 && num2 > -1e3 && num2 < 1e3 || $test.call(/e/, str)) {
-        return str;
+    function addNumericSeparator(num2, str2) {
+      if (num2 === Infinity || num2 === -Infinity || num2 !== num2 || num2 && num2 > -1e3 && num2 < 1e3 || $test.call(/e/, str2)) {
+        return str2;
       }
       var sepRegex = /[0-9](?=(?:[0-9]{3})+(?![0-9]))/g;
       if (typeof num2 === "number") {
         var int = num2 < 0 ? -$floor(-num2) : $floor(num2);
         if (int !== num2) {
           var intStr = String(int);
-          var dec = $slice.call(str, intStr.length + 1);
+          var dec = $slice.call(str2, intStr.length + 1);
           return $replace.call(intStr, sepRegex, "$&_") + "." + $replace.call($replace.call(dec, /([0-9]{3})/g, "$&_"), /_$/, "");
         }
       }
-      return $replace.call(str, sepRegex, "$&_");
+      return $replace.call(str2, sepRegex, "$&_");
     }
     var utilInspect = require_util_inspect();
     var inspectCustom = utilInspect.custom;
@@ -15914,8 +15914,8 @@ var require_object_inspect = __commonJS({
         if (obj === 0) {
           return Infinity / obj > 0 ? "0" : "-0";
         }
-        var str = String(obj);
-        return numericSeparator ? addNumericSeparator(obj, str) : str;
+        var str2 = String(obj);
+        return numericSeparator ? addNumericSeparator(obj, str2) : str2;
       }
       if (typeof obj === "bigint") {
         var bigIntStr = String(obj) + "n";
@@ -16235,15 +16235,15 @@ var require_object_inspect = __commonJS({
       }
       return typeof x2.nodeName === "string" && typeof x2.getAttribute === "function";
     }
-    function inspectString(str, opts) {
-      if (str.length > opts.maxStringLength) {
-        var remaining = str.length - opts.maxStringLength;
+    function inspectString(str2, opts) {
+      if (str2.length > opts.maxStringLength) {
+        var remaining = str2.length - opts.maxStringLength;
         var trailer = "... " + remaining + " more character" + (remaining > 1 ? "s" : "");
-        return inspectString($slice.call(str, 0, opts.maxStringLength), opts) + trailer;
+        return inspectString($slice.call(str2, 0, opts.maxStringLength), opts) + trailer;
       }
       var quoteRE = quoteREs[opts.quoteStyle || "single"];
       quoteRE.lastIndex = 0;
-      var s2 = $replace.call($replace.call(str, quoteRE, "\\$1"), /[\x00-\x1f]/g, lowbyte);
+      var s2 = $replace.call($replace.call(str2, quoteRE, "\\$1"), /[\x00-\x1f]/g, lowbyte);
       return wrapQuotes(s2, "single", opts);
     }
     function lowbyte(c2) {
@@ -16260,8 +16260,8 @@ var require_object_inspect = __commonJS({
       }
       return "\\x" + (n2 < 16 ? "0" : "") + $toUpperCase.call(n2.toString(16));
     }
-    function markBoxed(str) {
-      return "Object(" + str + ")";
+    function markBoxed(str2) {
+      return "Object(" + str2 + ")";
     }
     function weakCollectionOf(type) {
       return type + " { ? }";
@@ -16726,14 +16726,14 @@ var require_implementation = __commonJS({
       return arr;
     };
     var joiny = function(arr, joiner) {
-      var str = "";
+      var str2 = "";
       for (var i2 = 0; i2 < arr.length; i2 += 1) {
-        str += arr[i2];
+        str2 += arr[i2];
         if (i2 + 1 < arr.length) {
-          str += joiner;
+          str2 += joiner;
         }
       }
-      return str;
+      return str2;
     };
     module.exports = function bind(that) {
       var target = this;
@@ -17613,8 +17613,8 @@ var require_utils2 = __commonJS({
         return acc;
       }, target);
     };
-    var decode3 = function(str, defaultDecoder, charset) {
-      var strWithoutPlus = str.replace(/\+/g, " ");
+    var decode3 = function(str2, defaultDecoder, charset) {
+      var strWithoutPlus = str2.replace(/\+/g, " ");
       if (charset === "iso-8859-1") {
         return strWithoutPlus.replace(/%[0-9a-f]{2}/gi, unescape);
       }
@@ -17625,15 +17625,15 @@ var require_utils2 = __commonJS({
       }
     };
     var limit = 1024;
-    var encode4 = function encode5(str, defaultEncoder, charset, kind, format) {
-      if (str.length === 0) {
-        return str;
+    var encode4 = function encode5(str2, defaultEncoder, charset, kind, format) {
+      if (str2.length === 0) {
+        return str2;
       }
-      var string = str;
-      if (typeof str === "symbol") {
-        string = Symbol.prototype.toString.call(str);
-      } else if (typeof str !== "string") {
-        string = String(str);
+      var string = str2;
+      if (typeof str2 === "symbol") {
+        string = Symbol.prototype.toString.call(str2);
+      } else if (typeof str2 !== "string") {
+        string = String(str2);
       }
       if (charset === "iso-8859-1") {
         return escape(string).replace(/%u[0-9a-f]{4}/gi, function($0) {
@@ -18083,8 +18083,8 @@ var require_parse = __commonJS({
       strictNullHandling: false,
       throwOnLimitExceeded: false
     };
-    var interpretNumericEntities = function(str) {
-      return str.replace(/&#(\d+);/g, function($0, numberStr) {
+    var interpretNumericEntities = function(str2) {
+      return str2.replace(/&#(\d+);/g, function($0, numberStr) {
         return String.fromCharCode(parseInt(numberStr, 10));
       });
     };
@@ -18110,9 +18110,9 @@ var require_parse = __commonJS({
     };
     var isoSentinel = "utf8=%26%2310003%3B";
     var charsetSentinel = "utf8=%E2%9C%93";
-    var parseValues = function parseQueryStringValues(str, options) {
+    var parseValues = function parseQueryStringValues(str2, options) {
       var obj = { __proto__: null };
-      var cleanStr = options.ignoreQueryPrefix ? str.replace(/^\?/, "") : str;
+      var cleanStr = options.ignoreQueryPrefix ? str2.replace(/^\?/, "") : str2;
       cleanStr = cleanStr.replace(/%5B/gi, "[").replace(/%5D/gi, "]");
       var limit = options.parameterLimit === Infinity ? void 0 : options.parameterLimit;
       var parts = cleanStr.split(
@@ -18359,17 +18359,17 @@ var require_parse = __commonJS({
         throwOnLimitExceeded: typeof opts.throwOnLimitExceeded === "boolean" ? opts.throwOnLimitExceeded : false
       };
     };
-    module.exports = function(str, opts) {
+    module.exports = function(str2, opts) {
       var options = normalizeParseOptions(opts);
-      if (str === "" || str === null || typeof str === "undefined") {
+      if (str2 === "" || str2 === null || typeof str2 === "undefined") {
         return options.plainObjects ? { __proto__: null } : {};
       }
-      var tempObj = typeof str === "string" ? parseValues(str, options) : str;
+      var tempObj = typeof str2 === "string" ? parseValues(str2, options) : str2;
       var obj = options.plainObjects ? { __proto__: null } : {};
       var keys = Object.keys(tempObj);
       for (var i2 = 0; i2 < keys.length; ++i2) {
         var key = keys[i2];
-        var newObj = parseKeys(key, tempObj[key], options, typeof str === "string");
+        var newObj = parseKeys(key, tempObj[key], options, typeof str2 === "string");
         obj = utils.merge(obj, newObj, options);
       }
       if (options.allowSparse === true) {
@@ -18541,17 +18541,17 @@ var require_escape_html = __commonJS({
     var matchHtmlRegExp = /["'&<>]/;
     module.exports = escapeHtml;
     function escapeHtml(string) {
-      var str = "" + string;
-      var match = matchHtmlRegExp.exec(str);
+      var str2 = "" + string;
+      var match = matchHtmlRegExp.exec(str2);
       if (!match) {
-        return str;
+        return str2;
       }
       var escape2;
       var html = "";
       var index = 0;
       var lastIndex = 0;
-      for (index = match.index; index < str.length; index++) {
-        switch (str.charCodeAt(index)) {
+      for (index = match.index; index < str2.length; index++) {
+        switch (str2.charCodeAt(index)) {
           case 34:
             escape2 = "&quot;";
             break;
@@ -18571,12 +18571,12 @@ var require_escape_html = __commonJS({
             continue;
         }
         if (lastIndex !== index) {
-          html += str.substring(lastIndex, index);
+          html += str2.substring(lastIndex, index);
         }
         lastIndex = index + 1;
         html += escape2;
       }
-      return lastIndex !== index ? html + str.substring(lastIndex, index) : html;
+      return lastIndex !== index ? html + str2.substring(lastIndex, index) : html;
     }
   }
 });
@@ -18616,20 +18616,20 @@ var require_parseurl = __commonJS({
       parsed._raw = url2;
       return req._parsedOriginalUrl = parsed;
     }
-    function fastparse(str) {
-      if (typeof str !== "string" || str.charCodeAt(0) !== 47) {
-        return parse2(str);
+    function fastparse(str2) {
+      if (typeof str2 !== "string" || str2.charCodeAt(0) !== 47) {
+        return parse2(str2);
       }
-      var pathname = str;
+      var pathname = str2;
       var query = null;
       var search = null;
-      for (var i2 = 1; i2 < str.length; i2++) {
-        switch (str.charCodeAt(i2)) {
+      for (var i2 = 1; i2 < str2.length; i2++) {
+        switch (str2.charCodeAt(i2)) {
           case 63:
             if (search === null) {
-              pathname = str.substring(0, i2);
-              query = str.substring(i2 + 1);
-              search = str.substring(i2);
+              pathname = str2.substring(0, i2);
+              query = str2.substring(i2 + 1);
+              search = str2.substring(i2);
             }
             break;
           case 9:
@@ -18646,12 +18646,12 @@ var require_parseurl = __commonJS({
           /* #  */
           case 160:
           case 65279:
-            return parse2(str);
+            return parse2(str2);
         }
       }
       var url2 = Url !== void 0 ? new Url() : {};
-      url2.path = str;
-      url2.href = str;
+      url2.path = str2;
+      url2.href = str2;
       url2.pathname = pathname;
       if (search !== null) {
         url2.query = query;
@@ -18974,14 +18974,14 @@ var require_content_type = __commonJS({
       return header;
     }
     function qstring(val) {
-      var str = String(val);
-      if (TOKEN_REGEXP.test(str)) {
-        return str;
+      var str2 = String(val);
+      if (TOKEN_REGEXP.test(str2)) {
+        return str2;
       }
-      if (str.length > 0 && !TEXT_REGEXP.test(str)) {
+      if (str2.length > 0 && !TEXT_REGEXP.test(str2)) {
         throw new TypeError("invalid parameter value");
       }
-      return '"' + str.replace(QUOTE_REGEXP, "\\$1") + '"';
+      return '"' + str2.replace(QUOTE_REGEXP, "\\$1") + '"';
     }
     function ContentType(type) {
       this.parameters = /* @__PURE__ */ Object.create(null);
@@ -19768,11 +19768,11 @@ var require_proxy_addr = __commonJS({
     }
     function parseipNotation(note) {
       var pos = note.lastIndexOf("/");
-      var str = pos !== -1 ? note.substring(0, pos) : note;
-      if (!isip(str)) {
-        throw new TypeError("invalid IP address: " + str);
+      var str2 = pos !== -1 ? note.substring(0, pos) : note;
+      if (!isip(str2)) {
+        throw new TypeError("invalid IP address: " + str2);
       }
-      var ip = parseip(str);
+      var ip = parseip(str2);
       if (pos === -1 && ip.kind() === "ipv6" && ip.isIPv4MappedAddress()) {
         ip = ip.toIPv4Address();
       }
@@ -19897,22 +19897,22 @@ var require_utils3 = __commonJS({
     exports.normalizeTypes = function(types2) {
       return types2.map(exports.normalizeType);
     };
-    function acceptParams(str) {
-      var length = str.length;
-      var colonIndex = str.indexOf(";");
+    function acceptParams(str2) {
+      var length = str2.length;
+      var colonIndex = str2.indexOf(";");
       var index = colonIndex === -1 ? length : colonIndex;
-      var ret = { value: str.slice(0, index).trim(), quality: 1, params: {} };
+      var ret = { value: str2.slice(0, index).trim(), quality: 1, params: {} };
       while (index < length) {
-        var splitIndex = str.indexOf("=", index);
+        var splitIndex = str2.indexOf("=", index);
         if (splitIndex === -1) break;
-        var colonIndex = str.indexOf(";", index);
+        var colonIndex = str2.indexOf(";", index);
         var endIndex = colonIndex === -1 ? length : colonIndex;
         if (splitIndex > endIndex) {
-          index = str.lastIndexOf(";", splitIndex - 1) + 1;
+          index = str2.lastIndexOf(";", splitIndex - 1) + 1;
           continue;
         }
-        var key = str.slice(index, splitIndex).trim();
-        var value = str.slice(splitIndex + 1, endIndex).trim();
+        var key = str2.slice(index, splitIndex).trim();
+        var value = str2.slice(splitIndex + 1, endIndex).trim();
         if (key === "q") {
           ret.quality = parseFloat(value);
         } else {
@@ -19995,8 +19995,8 @@ var require_utils3 = __commonJS({
         return etag(buf, options);
       };
     }
-    function parseExtendedQueryString(str) {
-      return qs2.parse(str, {
+    function parseExtendedQueryString(str2) {
+      return qs2.parse(str2, {
         allowPrototypes: true
       });
     }
@@ -20104,11 +20104,11 @@ var require_dist2 = __commonJS({
     var ID_START = /^[$_\p{ID_Start}]$/u;
     var ID_CONTINUE = /^[$\u200c\u200d\p{ID_Continue}]$/u;
     var ID = /^[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*$/u;
-    function escapeText(str) {
-      return str.replace(/[{}()\[\]+?!:*\\]/g, "\\$&");
+    function escapeText(str2) {
+      return str2.replace(/[{}()\[\]+?!:*\\]/g, "\\$&");
     }
-    function escape2(str) {
-      return str.replace(/[.+*?^${}()[\]|/\\]/g, "\\$&");
+    function escape2(str2) {
+      return str2.replace(/[.+*?^${}()[\]|/\\]/g, "\\$&");
     }
     var TokenData = class {
       constructor(tokens, originalPath) {
@@ -20128,9 +20128,9 @@ var require_dist2 = __commonJS({
       }
     };
     exports.PathError = PathError;
-    function parse2(str, options = {}) {
+    function parse2(str2, options = {}) {
       const { encodePath = NOOP_VALUE } = options;
-      const chars = [...str];
+      const chars = [...str2];
       let index = 0;
       function consumeUntil(end) {
         const output = [];
@@ -20152,7 +20152,7 @@ var require_dist2 = __commonJS({
           }
           if (value === "\\") {
             if (index === chars.length) {
-              throw new PathError(`Unexpected end after \\ at index ${index}`, str);
+              throw new PathError(`Unexpected end after \\ at index ${index}`, str2);
             }
             path5 += chars[index++];
             continue;
@@ -20177,11 +20177,11 @@ var require_dist2 = __commonJS({
                 name2 += chars[index];
               }
               if (quoteStart) {
-                throw new PathError(`Unterminated quote at index ${quoteStart}`, str);
+                throw new PathError(`Unterminated quote at index ${quoteStart}`, str2);
               }
             }
             if (!name2) {
-              throw new PathError(`Missing parameter name at index ${index}`, str);
+              throw new PathError(`Missing parameter name at index ${index}`, str2);
             }
             writePath();
             output.push({ type, name: name2 });
@@ -20196,17 +20196,17 @@ var require_dist2 = __commonJS({
             continue;
           }
           if (value === "}" || value === "(" || value === ")" || value === "[" || value === "]" || value === "+" || value === "?" || value === "!") {
-            throw new PathError(`Unexpected ${value} at index ${index - 1}`, str);
+            throw new PathError(`Unexpected ${value} at index ${index - 1}`, str2);
           }
           path5 += value;
         }
         if (end) {
-          throw new PathError(`Unexpected end at index ${index}, expected ${end}`, str);
+          throw new PathError(`Unexpected end at index ${index}, expected ${end}`, str2);
         }
         writePath();
         return output;
       }
-      return new TokenData(consumeUntil(""), str);
+      return new TokenData(consumeUntil(""), str2);
     }
     function compile(path5, options = {}) {
       const { encode: encode4 = encodeURIComponent, delimiter: delimiter2 = DEFAULT_DELIMITER } = options;
@@ -20741,11 +20741,11 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router9;
+    module.exports = Router10;
     module.exports.Route = Route;
-    function Router9(options) {
-      if (!(this instanceof Router9)) {
-        return new Router9(options);
+    function Router10(options) {
+      if (!(this instanceof Router10)) {
+        return new Router10(options);
       }
       const opts = options || {};
       function router(req, res, next) {
@@ -20759,9 +20759,9 @@ var require_router = __commonJS({
       router.stack = [];
       return router;
     }
-    Router9.prototype = function() {
+    Router10.prototype = function() {
     };
-    Router9.prototype.param = function param(name2, fn2) {
+    Router10.prototype.param = function param(name2, fn2) {
       if (!name2) {
         throw new TypeError("argument name is required");
       }
@@ -20781,7 +20781,7 @@ var require_router = __commonJS({
       params.push(fn2);
       return this;
     };
-    Router9.prototype.handle = function handle(req, res, callback) {
+    Router10.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20908,7 +20908,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router9.prototype.use = function use(handler2) {
+    Router10.prototype.use = function use(handler2) {
       let offset = 0;
       let path5 = "/";
       if (typeof handler2 !== "function") {
@@ -20941,7 +20941,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router9.prototype.route = function route(path5) {
+    Router10.prototype.route = function route(path5) {
       const route2 = new Route(path5);
       const layer = new Layer(path5, {
         sensitive: this.caseSensitive,
@@ -20956,7 +20956,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router9.prototype[method] = function(path5) {
+      Router10.prototype[method] = function(path5) {
         const route = this.route(path5);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21139,7 +21139,7 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve3 = __require("node:path").resolve;
     var once = require_once();
-    var Router9 = require_router();
+    var Router10 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app = exports = module.exports = {};
@@ -21155,7 +21155,7 @@ var require_application = __commonJS({
         enumerable: true,
         get: function getrouter() {
           if (router === null) {
-            router = new Router9({
+            router = new Router10({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
@@ -21950,19 +21950,19 @@ var require_fresh = __commonJS({
       var timestamp = date && Date.parse(date);
       return typeof timestamp === "number" ? timestamp : NaN;
     }
-    function parseTokenList(str) {
+    function parseTokenList(str2) {
       var end = 0;
       var list = [];
       var start = 0;
-      for (var i2 = 0, len = str.length; i2 < len; i2++) {
-        switch (str.charCodeAt(i2)) {
+      for (var i2 = 0, len = str2.length; i2 < len; i2++) {
+        switch (str2.charCodeAt(i2)) {
           case 32:
             if (start === end) {
               start = end = i2 + 1;
             }
             break;
           case 44:
-            list.push(str.substring(start, end));
+            list.push(str2.substring(start, end));
             start = end = i2 + 1;
             break;
           default:
@@ -21970,7 +21970,7 @@ var require_fresh = __commonJS({
             break;
         }
       }
-      list.push(str.substring(start, end));
+      list.push(str2.substring(start, end));
       return list;
     }
   }
@@ -21981,17 +21981,17 @@ var require_range_parser = __commonJS({
   "node_modules/.pnpm/range-parser@1.3.0/node_modules/range-parser/index.js"(exports, module) {
     "use strict";
     module.exports = rangeParser;
-    function rangeParser(size, str, options) {
-      if (typeof str !== "string") {
+    function rangeParser(size, str2, options) {
+      if (typeof str2 !== "string") {
         throw new TypeError("argument str must be a string");
       }
-      var index = str.indexOf("=");
+      var index = str2.indexOf("=");
       if (index === -1) {
         return -2;
       }
-      var arr = str.slice(index + 1).split(",");
+      var arr = str2.slice(index + 1).split(",");
       var ranges = [];
-      ranges.type = str.slice(0, index);
+      ranges.type = str2.slice(0, index);
       for (var i2 = 0; i2 < arr.length; i2++) {
         var indexOf = arr[i2].indexOf("-");
         if (indexOf === -1) {
@@ -22026,8 +22026,8 @@ var require_range_parser = __commonJS({
       }
       return options && options.combine ? combineRanges(ranges) : ranges;
     }
-    function parsePos(str) {
-      if (/^\d+$/.test(str)) return Number(str);
+    function parsePos(str2) {
+      if (/^\d+$/.test(str2)) return Number(str2);
       return NaN;
     }
     function combineRanges(ranges) {
@@ -22286,8 +22286,8 @@ var require_content_disposition = __commonJS({
       }
       return string;
     }
-    function decodefield(str) {
-      const match = EXT_VALUE_REGEXP.exec(str);
+    function decodefield(str2) {
+      const match = EXT_VALUE_REGEXP.exec(str2);
       if (!match) {
         throw new TypeError("invalid extended field value");
       }
@@ -22366,12 +22366,12 @@ var require_content_disposition = __commonJS({
       return "%" + String(char).charCodeAt(0).toString(16).toUpperCase();
     }
     function qstring(val) {
-      var str = String(val);
-      return '"' + str.replace(QUOTE_REGEXP, "\\$1") + '"';
+      var str2 = String(val);
+      return '"' + str2.replace(QUOTE_REGEXP, "\\$1") + '"';
     }
     function ustring(val) {
-      var str = String(val);
-      var encoded = encodeURIComponent(str).replace(ENCODE_URL_ATTR_CHAR_REGEXP, pencode);
+      var str2 = String(val);
+      var encoded = encodeURIComponent(str2).replace(ENCODE_URL_ATTR_CHAR_REGEXP, pencode);
       return "UTF-8''" + encoded;
     }
     function ContentDisposition(type, parameters) {
@@ -22399,26 +22399,26 @@ var require_content_disposition = __commonJS({
       code >= 65 && code <= 70 || // A-F
       code >= 97 && code <= 102;
     }
-    function hasHexEscape(str) {
-      const maxIndex = str.length - 3;
+    function hasHexEscape(str2) {
+      const maxIndex = str2.length - 3;
       let lastIndex = -1;
-      while ((lastIndex = str.indexOf("%", lastIndex + 1)) !== -1 && lastIndex <= maxIndex) {
-        if (isHexDigit2(str[lastIndex + 1]) && isHexDigit2(str[lastIndex + 2])) {
+      while ((lastIndex = str2.indexOf("%", lastIndex + 1)) !== -1 && lastIndex <= maxIndex) {
+        if (isHexDigit2(str2[lastIndex + 1]) && isHexDigit2(str2[lastIndex + 2])) {
           return true;
         }
       }
       return false;
     }
-    function decodeHexEscapes(str) {
-      const firstEscape = str.indexOf("%");
-      if (firstEscape === -1) return str;
-      let result = str.slice(0, firstEscape);
-      for (let idx = firstEscape; idx < str.length; idx++) {
-        if (str[idx] === "%" && idx + 2 < str.length && isHexDigit2(str[idx + 1]) && isHexDigit2(str[idx + 2])) {
-          result += String.fromCharCode(Number.parseInt(str[idx + 1] + str[idx + 2], 16));
+    function decodeHexEscapes(str2) {
+      const firstEscape = str2.indexOf("%");
+      if (firstEscape === -1) return str2;
+      let result = str2.slice(0, firstEscape);
+      for (let idx = firstEscape; idx < str2.length; idx++) {
+        if (str2[idx] === "%" && idx + 2 < str2.length && isHexDigit2(str2[idx + 1]) && isHexDigit2(str2[idx + 2])) {
+          result += String.fromCharCode(Number.parseInt(str2[idx + 1] + str2[idx + 2], 16));
           idx += 2;
         } else {
-          result += str[idx];
+          result += str2[idx];
         }
       }
       return result;
@@ -22456,54 +22456,54 @@ var require_cookie = __commonJS({
     var cookieValueRegExp = /^("?)[\u0021\u0023-\u002B\u002D-\u003A\u003C-\u005B\u005D-\u007E]*\1$/;
     var domainValueRegExp = /^([.]?[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)([.][a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;
     var pathValueRegExp = /^[\u0020-\u003A\u003D-\u007E]*$/;
-    function parse2(str, opt) {
-      if (typeof str !== "string") {
+    function parse2(str2, opt) {
+      if (typeof str2 !== "string") {
         throw new TypeError("argument str must be a string");
       }
       var obj = {};
-      var len = str.length;
+      var len = str2.length;
       if (len < 2) return obj;
       var dec = opt && opt.decode || decode3;
       var index = 0;
       var eqIdx = 0;
       var endIdx = 0;
       do {
-        eqIdx = str.indexOf("=", index);
+        eqIdx = str2.indexOf("=", index);
         if (eqIdx === -1) break;
-        endIdx = str.indexOf(";", index);
+        endIdx = str2.indexOf(";", index);
         if (endIdx === -1) {
           endIdx = len;
         } else if (eqIdx > endIdx) {
-          index = str.lastIndexOf(";", eqIdx - 1) + 1;
+          index = str2.lastIndexOf(";", eqIdx - 1) + 1;
           continue;
         }
-        var keyStartIdx = startIndex(str, index, eqIdx);
-        var keyEndIdx = endIndex(str, eqIdx, keyStartIdx);
-        var key = str.slice(keyStartIdx, keyEndIdx);
+        var keyStartIdx = startIndex(str2, index, eqIdx);
+        var keyEndIdx = endIndex(str2, eqIdx, keyStartIdx);
+        var key = str2.slice(keyStartIdx, keyEndIdx);
         if (!__hasOwnProperty.call(obj, key)) {
-          var valStartIdx = startIndex(str, eqIdx + 1, endIdx);
-          var valEndIdx = endIndex(str, endIdx, valStartIdx);
-          if (str.charCodeAt(valStartIdx) === 34 && str.charCodeAt(valEndIdx - 1) === 34) {
+          var valStartIdx = startIndex(str2, eqIdx + 1, endIdx);
+          var valEndIdx = endIndex(str2, endIdx, valStartIdx);
+          if (str2.charCodeAt(valStartIdx) === 34 && str2.charCodeAt(valEndIdx - 1) === 34) {
             valStartIdx++;
             valEndIdx--;
           }
-          var val = str.slice(valStartIdx, valEndIdx);
+          var val = str2.slice(valStartIdx, valEndIdx);
           obj[key] = tryDecode(val, dec);
         }
         index = endIdx + 1;
       } while (index < len);
       return obj;
     }
-    function startIndex(str, index, max) {
+    function startIndex(str2, index, max) {
       do {
-        var code = str.charCodeAt(index);
+        var code = str2.charCodeAt(index);
         if (code !== 32 && code !== 9) return index;
       } while (++index < max);
       return max;
     }
-    function endIndex(str, index, min) {
+    function endIndex(str2, index, min) {
       while (index > min) {
-        var code = str.charCodeAt(--index);
+        var code = str2.charCodeAt(--index);
         if (code !== 32 && code !== 9) return index + 1;
       }
       return min;
@@ -22520,54 +22520,54 @@ var require_cookie = __commonJS({
       if (!cookieValueRegExp.test(value)) {
         throw new TypeError("argument val is invalid");
       }
-      var str = name2 + "=" + value;
-      if (!opt) return str;
+      var str2 = name2 + "=" + value;
+      if (!opt) return str2;
       if (null != opt.maxAge) {
         var maxAge = Math.floor(opt.maxAge);
         if (!isFinite(maxAge)) {
           throw new TypeError("option maxAge is invalid");
         }
-        str += "; Max-Age=" + maxAge;
+        str2 += "; Max-Age=" + maxAge;
       }
       if (opt.domain) {
         if (!domainValueRegExp.test(opt.domain)) {
           throw new TypeError("option domain is invalid");
         }
-        str += "; Domain=" + opt.domain;
+        str2 += "; Domain=" + opt.domain;
       }
       if (opt.path) {
         if (!pathValueRegExp.test(opt.path)) {
           throw new TypeError("option path is invalid");
         }
-        str += "; Path=" + opt.path;
+        str2 += "; Path=" + opt.path;
       }
       if (opt.expires) {
         var expires = opt.expires;
         if (!isDate(expires) || isNaN(expires.valueOf())) {
           throw new TypeError("option expires is invalid");
         }
-        str += "; Expires=" + expires.toUTCString();
+        str2 += "; Expires=" + expires.toUTCString();
       }
       if (opt.httpOnly) {
-        str += "; HttpOnly";
+        str2 += "; HttpOnly";
       }
       if (opt.secure) {
-        str += "; Secure";
+        str2 += "; Secure";
       }
       if (opt.partitioned) {
-        str += "; Partitioned";
+        str2 += "; Partitioned";
       }
       if (opt.priority) {
         var priority = typeof opt.priority === "string" ? opt.priority.toLowerCase() : opt.priority;
         switch (priority) {
           case "low":
-            str += "; Priority=Low";
+            str2 += "; Priority=Low";
             break;
           case "medium":
-            str += "; Priority=Medium";
+            str2 += "; Priority=Medium";
             break;
           case "high":
-            str += "; Priority=High";
+            str2 += "; Priority=High";
             break;
           default:
             throw new TypeError("option priority is invalid");
@@ -22577,34 +22577,34 @@ var require_cookie = __commonJS({
         var sameSite = typeof opt.sameSite === "string" ? opt.sameSite.toLowerCase() : opt.sameSite;
         switch (sameSite) {
           case true:
-            str += "; SameSite=Strict";
+            str2 += "; SameSite=Strict";
             break;
           case "lax":
-            str += "; SameSite=Lax";
+            str2 += "; SameSite=Lax";
             break;
           case "strict":
-            str += "; SameSite=Strict";
+            str2 += "; SameSite=Strict";
             break;
           case "none":
-            str += "; SameSite=None";
+            str2 += "; SameSite=None";
             break;
           default:
             throw new TypeError("option sameSite is invalid");
         }
       }
-      return str;
+      return str2;
     }
-    function decode3(str) {
-      return str.indexOf("%") !== -1 ? decodeURIComponent(str) : str;
+    function decode3(str2) {
+      return str2.indexOf("%") !== -1 ? decodeURIComponent(str2) : str2;
     }
     function isDate(val) {
       return __toString.call(val) === "[object Date]";
     }
-    function tryDecode(str, decode4) {
+    function tryDecode(str2, decode4) {
       try {
-        return decode4(str);
+        return decode4(str2);
       } catch (e2) {
-        return str;
+        return str2;
       }
     }
   }
@@ -22952,12 +22952,12 @@ var require_send = __commonJS({
       var stream2 = fs6.createReadStream(path6, options);
       this.emit("stream", stream2);
       stream2.pipe(res);
-      function cleanup() {
+      function cleanup2() {
         stream2.destroy();
       }
-      onFinished(res, cleanup);
+      onFinished(res, cleanup2);
       stream2.on("error", function onerror(err) {
-        cleanup();
+        cleanup2();
         self2.onStatError(err);
       });
       stream2.on("end", function onend() {
@@ -23003,13 +23003,13 @@ var require_send = __commonJS({
         res.removeHeader(header);
       }
     }
-    function collapseLeadingSlashes(str) {
-      for (var i2 = 0; i2 < str.length; i2++) {
-        if (str[i2] !== "/") {
+    function collapseLeadingSlashes(str2) {
+      for (var i2 = 0; i2 < str2.length; i2++) {
+        if (str2[i2] !== "/") {
           break;
         }
       }
-      return i2 > 1 ? "/" + str.substr(i2) : str;
+      return i2 > 1 ? "/" + str2.substr(i2) : str2;
     }
     function containsDotFile(parts) {
       for (var i2 = 0; i2 < parts.length; i2++) {
@@ -23056,12 +23056,12 @@ var require_send = __commonJS({
       var timestamp = date && Date.parse(date);
       return typeof timestamp === "number" ? timestamp : NaN;
     }
-    function parseTokenList(str) {
+    function parseTokenList(str2) {
       var end = 0;
       var list = [];
       var start = 0;
-      for (var i2 = 0, len = str.length; i2 < len; i2++) {
-        switch (str.charCodeAt(i2)) {
+      for (var i2 = 0, len = str2.length; i2 < len; i2++) {
+        switch (str2.charCodeAt(i2)) {
           case 32:
             if (start === end) {
               start = end = i2 + 1;
@@ -23069,7 +23069,7 @@ var require_send = __commonJS({
             break;
           case 44:
             if (start !== end) {
-              list.push(str.substring(start, end));
+              list.push(str2.substring(start, end));
             }
             start = end = i2 + 1;
             break;
@@ -23079,7 +23079,7 @@ var require_send = __commonJS({
         }
       }
       if (start !== end) {
-        list.push(str.substring(start, end));
+        list.push(str2.substring(start, end));
       }
       return list;
     }
@@ -23543,9 +23543,9 @@ var require_response = __commonJS({
         opts = {};
       }
       opts._locals = self2.locals;
-      done = done || function(err, str) {
+      done = done || function(err, str2) {
         if (err) return req.next(err);
-        self2.send(str);
+        self2.send(str2);
       };
       app.render(view, opts, done);
     };
@@ -23701,13 +23701,13 @@ var require_serve_static = __commonJS({
         stream.pipe(res);
       };
     }
-    function collapseLeadingSlashes(str) {
-      for (var i2 = 0; i2 < str.length; i2++) {
-        if (str.charCodeAt(i2) !== 47) {
+    function collapseLeadingSlashes(str2) {
+      for (var i2 = 0; i2 < str2.length; i2++) {
+        if (str2.charCodeAt(i2) !== 47) {
           break;
         }
       }
-      return i2 > 1 ? "/" + str.substr(i2) : str;
+      return i2 > 1 ? "/" + str2.substr(i2) : str2;
     }
     function createHtmlDocument(title, body) {
       return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<title>' + title + "</title>\n</head>\n<body>\n<pre>" + body + "</pre>\n</body>\n</html>\n";
@@ -23748,7 +23748,7 @@ var require_express = __commonJS({
     var EventEmitter7 = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router9 = require_router();
+    var Router10 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication2;
@@ -23770,8 +23770,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router9.Route;
-    exports.Router = Router9;
+    exports.Route = Router10.Route;
+    exports.Router = Router10;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -34891,20 +34891,20 @@ var require_utils4 = __commonJS({
       }
       return config2;
     }
-    var escapeIdentifier2 = function(str) {
-      return '"' + str.replace(/"/g, '""') + '"';
+    var escapeIdentifier2 = function(str2) {
+      return '"' + str2.replace(/"/g, '""') + '"';
     };
-    var escapeLiteral2 = function(str) {
+    var escapeLiteral2 = function(str2) {
       let hasBackslash = false;
       let escaped = "'";
-      if (str == null) {
+      if (str2 == null) {
         return "''";
       }
-      if (typeof str !== "string") {
+      if (typeof str2 !== "string") {
         return "''";
       }
-      for (let i2 = 0; i2 < str.length; i2++) {
-        const c2 = str[i2];
+      for (let i2 = 0; i2 < str2.length; i2++) {
+        const c2 = str2[i2];
         if (c2 === "'") {
           escaped += c2 + c2;
         } else if (c2 === "\\") {
@@ -35319,22 +35319,22 @@ var require_type_overrides = __commonJS({
 var require_pg_connection_string = __commonJS({
   "node_modules/.pnpm/pg-connection-string@2.14.0/node_modules/pg-connection-string/index.js"(exports, module) {
     "use strict";
-    function parse2(str, options = {}) {
-      if (str.charAt(0) === "/") {
-        const config3 = str.split(" ");
+    function parse2(str2, options = {}) {
+      if (str2.charAt(0) === "/") {
+        const config3 = str2.split(" ");
         return { host: config3[0], database: config3[1] };
       }
       const config2 = /* @__PURE__ */ Object.create(null);
       let result;
       let dummyHost = false;
-      if (/ |%[^a-f0-9]|%[a-f0-9][^a-f0-9]/i.test(str)) {
-        str = encodeURI(str).replace(/%25(\d\d)/g, "%$1");
+      if (/ |%[^a-f0-9]|%[a-f0-9][^a-f0-9]/i.test(str2)) {
+        str2 = encodeURI(str2).replace(/%25(\d\d)/g, "%$1");
       }
       try {
         try {
-          result = new URL(str, "postgres://base");
+          result = new URL(str2, "postgres://base");
         } catch (e2) {
-          result = new URL(str.replace("@/", "@___DUMMY___/"), "postgres://base");
+          result = new URL(str2.replace("@/", "@___DUMMY___/"), "postgres://base");
           dummyHost = true;
         }
       } catch (err) {
@@ -35480,8 +35480,8 @@ var require_pg_connection_string = __commonJS({
       }, /* @__PURE__ */ Object.create(null));
       return poolConfig;
     }
-    function parseIntoClientConfig(str) {
-      return toClientConfig(parse2(str));
+    function parseIntoClientConfig(str2) {
+      return toClientConfig(parse2(str2));
     }
     function deprecatedSslModeWarning(sslmode) {
       if (!deprecatedSslModeWarning.warned && typeof process !== "undefined" && process.emitWarning) {
@@ -37902,11 +37902,11 @@ var require_client = __commonJS({
       // escapeIdentifier and escapeLiteral moved to utility functions & exported
       // on PG
       // re-exported here for backwards compatibility
-      escapeIdentifier(str) {
-        return utils.escapeIdentifier(str);
+      escapeIdentifier(str2) {
+        return utils.escapeIdentifier(str2);
       }
-      escapeLiteral(str) {
-        return utils.escapeLiteral(str);
+      escapeLiteral(str2) {
+        return utils.escapeLiteral(str2);
       }
       _pulseQueryQueue() {
         if (this.pipeline) {
@@ -39435,6 +39435,94 @@ CREATE TABLE IF NOT EXISTS pitch_attachments (
 -- the lca.logcluster.org contact-list catalog (slug \u2192 country + sector), discovered
 -- from the sitemap once and then served from here: a cold serverless start must not
 -- depend on fetching 4 x 500KB sitemap shards before it can list what it knows.
+-- \u2500\u2500 the network: people, platform jobs, events, CV reviews \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+-- These four tables are what turns the app from a private tracker into a place
+-- where the same people hire, get hired, teach and are reviewed.
+
+-- a public presence, written by its owner. The answers column is the guided
+-- interview (see PEOPLE_QUESTIONS) so Discover can show a person, not a form dump.
+CREATE TABLE IF NOT EXISTS public_profiles (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  display_name  TEXT NOT NULL,
+  headline      TEXT,
+  profession    TEXT,
+  seniority     TEXT,
+  location      TEXT,
+  bio           TEXT,
+  links         TEXT NOT NULL DEFAULT '{}',   -- JSON: github, linkedin, x, instagram, website, dribbble, behance
+  offers        TEXT NOT NULL DEFAULT '[]',   -- JSON array: what this person can do for someone
+  looking_for   TEXT,
+  answers       TEXT NOT NULL DEFAULT '[]',   -- JSON [{q, a}]
+  open_to       TEXT NOT NULL DEFAULT '[]',   -- JSON: full-time, contract, mentorship, collaboration, hiring
+  visible       INTEGER NOT NULL DEFAULT 1,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_people_prof ON public_profiles(profession, visible);
+
+-- jobs posted *on this platform*, as opposed to aggregated board listings.
+CREATE TABLE IF NOT EXISTS platform_jobs (
+  id              TEXT PRIMARY KEY,
+  posted_by       TEXT REFERENCES users(id) ON DELETE SET NULL,
+  company         TEXT NOT NULL,
+  title           TEXT NOT NULL,
+  profession      TEXT NOT NULL,
+  seniority       TEXT,
+  location        TEXT,
+  remote          INTEGER NOT NULL DEFAULT 0,
+  employment_type TEXT NOT NULL DEFAULT 'full-time',
+  salary_min      INTEGER,
+  salary_max      INTEGER,
+  currency        TEXT,
+  description     TEXT,
+  tags            TEXT NOT NULL DEFAULT '[]',
+  contact_email   TEXT,
+  status          TEXT NOT NULL DEFAULT 'open',
+  demo            INTEGER NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_hirer_jobs_prof ON platform_jobs(profession, status);
+
+-- events, trainings, seminars, hiring meetups, stories and program ads.
+CREATE TABLE IF NOT EXISTS event_listings (
+  id          TEXT PRIMARY KEY,
+  title       TEXT NOT NULL,
+  kind        TEXT NOT NULL,               -- hiring | training | seminar | story | meetup | ad
+  host        TEXT NOT NULL,
+  city        TEXT,
+  country     TEXT,
+  venue       TEXT,
+  format      TEXT NOT NULL DEFAULT 'in-person',   -- in-person | virtual | hybrid
+  starts_at   TEXT NOT NULL,
+  ends_at     TEXT,
+  description TEXT,
+  tags        TEXT NOT NULL DEFAULT '[]',
+  url         TEXT,
+  price       TEXT,
+  seats       INTEGER,
+  featured    INTEGER NOT NULL DEFAULT 0,
+  demo        INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_events_city ON event_listings(city, starts_at);
+
+-- reviews left on a CV its owner chose to publish. One per reviewer per CV.
+CREATE TABLE IF NOT EXISTS cv_reviews (
+  id            TEXT PRIMARY KEY,
+  cv_id         TEXT NOT NULL REFERENCES cvs(id) ON DELETE CASCADE,
+  owner_id      TEXT NOT NULL,
+  reviewer_id   TEXT NOT NULL,
+  reviewer_name TEXT NOT NULL,
+  reviewer_role TEXT,
+  relationship  TEXT NOT NULL DEFAULT 'peer',   -- hirer | recruiter | peer | mentor
+  rating        INTEGER NOT NULL,
+  body          TEXT NOT NULL,
+  created_at    TEXT NOT NULL,
+  UNIQUE (cv_id, reviewer_id)
+);
+CREATE INDEX IF NOT EXISTS ix_reviews_cv ON cv_reviews(cv_id, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS logcluster_pages (
   slug          TEXT PRIMARY KEY,
   country       TEXT NOT NULL,
@@ -39615,7 +39703,11 @@ var init_db = __esm({
     ENSURE_COLUMNS = [
       { table: "job_postings", column: "contact_email", ddl: "ALTER TABLE job_postings ADD COLUMN contact_email TEXT" },
       { table: "pitch_targets", column: "country", ddl: "ALTER TABLE pitch_targets ADD COLUMN country TEXT" },
-      { table: "cvs", column: "design", ddl: "ALTER TABLE cvs ADD COLUMN design TEXT NOT NULL DEFAULT '{}'" }
+      { table: "cvs", column: "design", ddl: "ALTER TABLE cvs ADD COLUMN design TEXT NOT NULL DEFAULT '{}'" },
+      // publishing: a CV is private until its owner says otherwise, and a published
+      // one can carry an ownership line at the foot of the page
+      { table: "cvs", column: "public", ddl: "ALTER TABLE cvs ADD COLUMN public INTEGER NOT NULL DEFAULT 0" },
+      { table: "cvs", column: "copyright", ddl: "ALTER TABLE cvs ADD COLUMN copyright TEXT" }
     ];
     BOOT_SQL = [
       // pre-existing databases: the old index was global (source, external_id), which
@@ -39995,11 +40087,11 @@ function legacyParse(input, parseQueryString, whatwgError, slashesDenoteHost) {
   result.password = legacyAuth && legacyAuth.length ? legacyAuth.join(":") : null;
   return result;
 }
-function safeDecode(str) {
+function safeDecode(str2) {
   try {
-    return decodeURIComponent(str);
+    return decodeURIComponent(str2);
   } catch (_err) {
-    return str;
+    return str2;
   }
 }
 function normalizeHostname(raw, href2) {
@@ -40975,10 +41067,10 @@ var init_shared = __esm({
         });
       });
     };
-    parseConnectionUrl = (str) => {
-      str = str || "";
+    parseConnectionUrl = (str2) => {
+      str2 = str2 || "";
       const options = {};
-      const url = parse(str, true);
+      const url = parse(str2, true);
       switch (url.protocol) {
         case "smtp:":
           options.secure = false;
@@ -41142,11 +41234,11 @@ var init_shared = __esm({
       });
       return target;
     };
-    encodeXText = (str) => {
-      if (!/[^\x21-\x2A\x2C-\x3C\x3E-\x7E]/.test(str)) {
-        return str;
+    encodeXText = (str2) => {
+      if (!/[^\x21-\x2A\x2C-\x3C\x3E-\x7E]/.test(str2)) {
+        return str2;
       }
-      const buf = Buffer.from(str);
+      const buf = Buffer.from(str2);
       let result = "";
       for (let i2 = 0, len = buf.length; i2 < len; i2++) {
         const c2 = buf[i2];
@@ -43277,18 +43369,18 @@ function encode2(buffer) {
   }
   return buffer.toString("base64");
 }
-function wrap(str, lineLength) {
-  str = (str || "").toString();
+function wrap(str2, lineLength) {
+  str2 = (str2 || "").toString();
   lineLength = Math.max(Number(lineLength) || 76, 1);
-  if (str.length <= lineLength) {
-    return str;
+  if (str2.length <= lineLength) {
+    return str2;
   }
   const result = [];
   let pos = 0;
   const chunkLength = lineLength * 1024;
   const wrapRegex = new RegExp(".{" + lineLength + "}", "g");
-  while (pos < str.length) {
-    const wrappedLines = str.substr(pos, chunkLength).replace(wrapRegex, "$&\r\n").trim();
+  while (pos < str2.length) {
+    const wrappedLines = str2.substr(pos, chunkLength).replace(wrapRegex, "$&\r\n").trim();
     result.push(wrappedLines);
     pos += chunkLength;
   }
@@ -43388,19 +43480,19 @@ function encode3(buffer) {
   }
   return result;
 }
-function wrap2(str, lineLength) {
-  str = (str || "").toString();
+function wrap2(str2, lineLength) {
+  str2 = (str2 || "").toString();
   lineLength = Math.max(Number(lineLength) || 76, MIN_LINE_LENGTH);
-  if (str.length <= lineLength) {
-    return str;
+  if (str2.length <= lineLength) {
+    return str2;
   }
   let pos = 0;
-  const len = str.length;
+  const len = str2.length;
   let match, code, line;
   const lineMargin = Math.floor(lineLength / 3);
   let result = "";
   while (pos < len) {
-    line = str.substr(pos, lineLength);
+    line = str2.substr(pos, lineLength);
     if (match = line.match(/\r\n/)) {
       line = line.substr(0, match.index + match[0].length);
       result += line;
@@ -43436,7 +43528,7 @@ function wrap2(str, lineLength) {
       }
     }
     if (!line.length) {
-      line = str.substr(pos, lineLength);
+      line = str2.substr(pos, lineLength);
     }
     if (pos + line.length < len && line.substr(-1) !== "\n") {
       if (line.length === lineLength && line.match(/[=][\da-f]{2}$/i)) {
@@ -43543,11 +43635,11 @@ function isPlainText(value, isParam) {
 function quoteString(value) {
   return '"' + (value || "").toString().replace(/["\\]/g, "\\$&") + '"';
 }
-function hasLongerLines(str, lineLength) {
-  if (str.length > 128 * 1024) {
+function hasLongerLines(str2, lineLength) {
+  if (str2.length > 128 * 1024) {
     return true;
   }
-  return new RegExp("^.{" + (lineLength + 1) + ",}", "m").test(str);
+  return new RegExp("^.{" + (lineLength + 1) + ",}", "m").test(str2);
 }
 function encodeWord(data, mimeWordEncoding, maxLength) {
   mimeWordEncoding = (mimeWordEncoding || "Q").toString().toUpperCase().trim().charAt(0);
@@ -43659,9 +43751,9 @@ function buildHeaderParam(key, data, maxLength) {
         }
       ];
     }
-    encodedStr = encodedStr.replace(new RegExp(".{" + maxLength + "}", "g"), (str) => {
+    encodedStr = encodedStr.replace(new RegExp(".{" + maxLength + "}", "g"), (str2) => {
       list.push({
-        line: str
+        line: str2
       });
       return "";
     });
@@ -43741,7 +43833,7 @@ function buildHeaderParam(key, data, maxLength) {
     value: item.line
   }));
 }
-function parseHeaderValue(str) {
+function parseHeaderValue(str2) {
   const response = {
     value: "",
     params: {}
@@ -43757,8 +43849,8 @@ function parseHeaderValue(str) {
   let quote = false;
   let escaped = false;
   let chr;
-  for (let i2 = 0, len = str.length; i2 < len; i2++) {
-    chr = str.charAt(i2);
+  for (let i2 = 0, len = str2.length; i2 < len; i2++) {
+    chr = str2.charAt(i2);
     if (type === "key") {
       if (chr === "=") {
         key = value.trim().toLowerCase();
@@ -43849,15 +43941,15 @@ function detectExtension2(mimeType) {
 function detectMimeType2(extension) {
   return detectMimeType(extension);
 }
-function foldLines(str, lineLength, afterSpace) {
-  str = (str || "").toString();
+function foldLines(str2, lineLength, afterSpace) {
+  str2 = (str2 || "").toString();
   lineLength = lineLength || 76;
   let pos = 0;
-  const len = str.length;
+  const len = str2.length;
   let result = "";
   let line, match;
   while (pos < len) {
-    line = str.substr(pos, lineLength);
+    line = str2.substr(pos, lineLength);
     if (line.length < lineLength) {
       result += line;
       break;
@@ -43869,7 +43961,7 @@ function foldLines(str, lineLength, afterSpace) {
       continue;
     } else if ((match = line.match(/(\s+)[^\s]*$/)) && match[0].length - (afterSpace ? (match[1] || "").length : 0) < line.length) {
       line = line.substr(0, line.length - (match[0].length - (afterSpace ? (match[1] || "").length : 0)));
-    } else if (match = str.substr(pos + line.length).match(/^[^\s]+(\s*)/)) {
+    } else if (match = str2.substr(pos + line.length).match(/^[^\s]+(\s*)/)) {
       line = line + match[0].substr(0, match[0].length - (!afterSpace ? (match[1] || "").length : 0));
     }
     result += line;
@@ -43880,20 +43972,20 @@ function foldLines(str, lineLength, afterSpace) {
   }
   return result;
 }
-function splitMimeEncodedString(str, maxlen) {
+function splitMimeEncodedString(str2, maxlen) {
   const lines2 = [];
   let curLine, fallbackLine, match, chr, done;
   maxlen = Math.max(maxlen || 0, 12);
-  while (str.length) {
-    curLine = str.substr(0, maxlen);
+  while (str2.length) {
+    curLine = str2.substr(0, maxlen);
     if (match = curLine.match(/[=][0-9A-F]?$/i)) {
       curLine = curLine.substr(0, match.index);
     }
-    fallbackLine = curLine.length ? curLine : str.substr(0, maxlen);
+    fallbackLine = curLine.length ? curLine : str2.substr(0, maxlen);
     done = false;
     while (!done && curLine.length) {
       done = true;
-      if (match = str.substr(curLine.length).match(/^[=]([0-9A-F]{2})/i)) {
+      if (match = str2.substr(curLine.length).match(/^[=]([0-9A-F]{2})/i)) {
         chr = parseInt(match[1], 16);
         if (chr < 194 && chr > 127) {
           curLine = curLine.substr(0, curLine.length - 3);
@@ -43905,7 +43997,7 @@ function splitMimeEncodedString(str, maxlen) {
       curLine = fallbackLine;
     }
     lines2.push(curLine);
-    str = str.substr(curLine.length);
+    str2 = str2.substr(curLine.length);
   }
   return lines2;
 }
@@ -43924,14 +44016,14 @@ function encodeURICharComponent(chr) {
   }
   return res;
 }
-function safeEncodeURIComponent(str) {
-  str = (str || "").toString();
+function safeEncodeURIComponent(str2) {
+  str2 = (str2 || "").toString();
   try {
-    str = encodeURIComponent(str);
+    str2 = encodeURIComponent(str2);
   } catch (_E) {
-    str = encodeURIComponent(Buffer.from(str, "utf-8").toString("utf-8"));
+    str2 = encodeURIComponent(Buffer.from(str2, "utf-8").toString("utf-8"));
   }
-  return str.replace(/[\x00-\x1F *'()<>@,;:\\"[\]?=\u007F-\uFFFF]/g, (chr) => encodeURICharComponent(chr));
+  return str2.replace(/[\x00-\x1F *'()<>@,;:\\"[\]?=\u007F-\uFFFF]/g, (chr) => encodeURICharComponent(chr));
 }
 var init_mime_funcs = __esm({
   "node_modules/.pnpm/nodemailer@10.0.12/node_modules/nodemailer/dist/esm/mime-funcs/index.js"() {
@@ -44199,13 +44291,13 @@ function _handleAddress(tokens, depth) {
   }
   return addresses;
 }
-function addressparser(str, options) {
+function addressparser(str2, options) {
   options = options || {};
   const depth = options._depth || 0;
   if (depth > MAX_NESTED_GROUP_DEPTH) {
     return [];
   }
-  const tokenizer = new Tokenizer(str);
+  const tokenizer = new Tokenizer(str2);
   const tokens = tokenizer.tokenize();
   const addresses = [];
   let address = [];
@@ -44265,8 +44357,8 @@ var init_addressparser = __esm({
     LOOSE_ADDR_SPEC = /^[^@\s]+@\S+$/;
     LOOSE_TEXT_ADDR = /\s*\b[^@\s]+@[^\s]+\b\s*/y;
     Tokenizer = class {
-      constructor(str) {
-        this.str = (str || "").toString();
+      constructor(str2) {
+        this.str = (str2 || "").toString();
         this.operatorCurrent = "";
         this.operatorExpecting = "";
         this.node = null;
@@ -45437,7 +45529,7 @@ var init_mime_node = __esm({
           case "References":
             value = [].concat.apply([], [].concat(value || "").map((elm) => {
               elm = (elm || "").toString().replace(/\r?\n|\r/g, " ").replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "").trim();
-              return elm.replace(/<[^>]*>/g, (str) => str.replace(/\s/g, "")).split(/\s+/);
+              return elm.replace(/<[^>]*>/g, (str2) => str2.replace(/\s/g, "")).split(/\s+/);
             })).map((elm) => {
               if (elm.charAt(0) !== "<") {
                 elm = "<" + elm;
@@ -47508,15 +47600,15 @@ import tls2 from "node:tls";
 import os2 from "node:os";
 import crypto7 from "node:crypto";
 import { PassThrough as PassThrough4 } from "node:stream";
-function decodeServerResponse(str) {
-  if (!str) {
-    return str;
+function decodeServerResponse(str2) {
+  if (!str2) {
+    return str2;
   }
-  const utf8 = Buffer.from(str, "binary").toString("utf8");
-  return utf8.includes("\uFFFD") ? str : utf8;
+  const utf8 = Buffer.from(str2, "binary").toString("utf8");
+  return utf8.includes("\uFFFD") ? str2 : utf8;
 }
-function isPartialResponse(str) {
-  return isPartialLine(str.slice(str.lastIndexOf("\n") + 1));
+function isPartialResponse(str2) {
+  return isPartialLine(str2.slice(str2.lastIndexOf("\n") + 1));
 }
 function isPartialLine(line) {
   return /^\d+-/.test(line);
@@ -47887,21 +47979,21 @@ var init_smtp_connection = __esm({
                 done = callbackPromise(resolve4, reject2);
               });
             }
-            this._responseActions.push((str) => {
-              lastResponse = str;
-              let codes = str.match(/^(\d+)(?:\s(\d+\.\d+\.\d+))?\s/);
+            this._responseActions.push((str2) => {
+              lastResponse = str2;
+              let codes = str2.match(/^(\d+)(?:\s(\d+\.\d+\.\d+))?\s/);
               let data = {
                 command: cmd,
-                response: str
+                response: str2
               };
               if (codes) {
                 data.status = Number(codes[1]) || 0;
                 if (codes[2]) {
                   data.code = codes[2];
                 }
-                data.text = str.substr(codes[0].length);
+                data.text = str2.substr(codes[0].length);
               } else {
-                data.text = str;
+                data.text = str2;
                 data.status = 0;
               }
               done(null, data);
@@ -47929,14 +48021,14 @@ var init_smtp_connection = __esm({
             this._handleXOauth2Token(false, callback);
             return;
           case "LOGIN":
-            this._responseActions.push((str) => {
-              this._actionAUTH_LOGIN_USER(str, callback);
+            this._responseActions.push((str2) => {
+              this._actionAUTH_LOGIN_USER(str2, callback);
             });
             this._sendCommand("AUTH LOGIN");
             return;
           case "PLAIN":
-            this._responseActions.push((str) => {
-              this._actionAUTHComplete(str, callback);
+            this._responseActions.push((str2) => {
+              this._actionAUTHComplete(str2, callback);
             });
             this._sendCommand(
               "AUTH PLAIN " + Buffer.from(
@@ -47955,8 +48047,8 @@ var init_smtp_connection = __esm({
             );
             return;
           case "CRAM-MD5":
-            this._responseActions.push((str) => {
-              this._actionAUTH_CRAM_MD5(str, callback);
+            this._responseActions.push((str2) => {
+              this._actionAUTH_CRAM_MD5(str2, callback);
             });
             this._sendCommand("AUTH CRAM-MD5");
             return;
@@ -48018,7 +48110,7 @@ var init_smtp_connection = __esm({
             return callback(err);
           }
           const envelopeTime = Date.now();
-          const stream = this._createSendStream((err2, str) => {
+          const stream = this._createSendStream((err2, str2) => {
             if (err2) {
               return callback(err2);
             }
@@ -48026,7 +48118,7 @@ var init_smtp_connection = __esm({
             result.envelopeTime = envelopeTime - startTime;
             result.messageTime = Date.now() - envelopeTime;
             result.messageSize = stream.outByteCount;
-            result.response = str;
+            result.response = str2;
             return callback(null, result);
           });
           if (typeof message.pipe === "function") {
@@ -48048,9 +48140,9 @@ var init_smtp_connection = __esm({
           return callback(this._formatError(isDestroyedMessage, "ECONNECTION", false, "API"));
         }
         this._sendCommand("RSET");
-        this._responseActions.push((str) => {
-          if (str.charAt(0) !== "2") {
-            return callback(this._formatError("Could not reset session state. response=" + str, "EPROTOCOL", str, "RSET"));
+        this._responseActions.push((str2) => {
+          if (str2.charAt(0) !== "2") {
+            return callback(this._formatError("Could not reset session state. response=" + str2, "EPROTOCOL", str2, "RSET"));
           }
           this._envelope = false;
           return callback(null, true);
@@ -48339,18 +48431,18 @@ var init_smtp_connection = __esm({
           this._responseQueue.unshift(raw);
           return;
         }
-        const str = this.lastServerResponse = decodeServerResponse(raw);
+        const str2 = this.lastServerResponse = decodeServerResponse(raw);
         if (this.options.debug || this.options.transactionLog) {
           this.logger.debug({
             tnx: "server"
-          }, str.replace(/\r?\n$/, ""));
+          }, str2.replace(/\r?\n$/, ""));
         }
         const action = this._responseActions.shift();
         if (typeof action === "function") {
-          action.call(this, str);
+          action.call(this, str2);
           setImmediate(() => this._processResponse());
         } else {
-          return this._onError(new Error("Unexpected Response"), "EPROTOCOL", str, "CONN");
+          return this._onError(new Error("Unexpected Response"), "EPROTOCOL", str2, "CONN");
         }
       }
       /**
@@ -48360,7 +48452,7 @@ var init_smtp_connection = __esm({
        * @param logStr Optional string to be used for logging instead of the actual string
        * @internal
        */
-      _sendCommand(str, logStr) {
+      _sendCommand(str2, logStr) {
         if (this._destroyed) {
           return;
         }
@@ -48371,9 +48463,9 @@ var init_smtp_connection = __esm({
         if (this.options.debug || this.options.transactionLog) {
           this.logger.debug({
             tnx: "client"
-          }, (logStr || str || "").toString().replace(/\r?\n$/, ""));
+          }, (logStr || str2 || "").toString().replace(/\r?\n$/, ""));
         }
-        socket.write(Buffer.from(str + "\r\n", "utf-8"));
+        socket.write(Buffer.from(str2 + "\r\n", "utf-8"));
       }
       /**
        * Initiates a new message by submitting envelope data, starting with
@@ -48427,8 +48519,8 @@ var init_smtp_connection = __esm({
             return callback(this._formatError("Server does not support REQUIRETLS extension (RFC 8689)", "EREQUIRETLS", false, "MAIL FROM"));
           }
         }
-        this._responseActions.push((str) => {
-          this._actionMAIL(str, callback);
+        this._responseActions.push((str2) => {
+          this._actionMAIL(str2, callback);
         });
         if (useSmtpUtf8 && this._supportedExtensions.includes("SMTPUTF8")) {
           args.push("SMTPUTF8");
@@ -48521,13 +48613,13 @@ var init_smtp_connection = __esm({
         if (this.options.lmtp) {
           envelope.accepted.forEach((recipient, i2) => {
             const final = i2 === envelope.accepted.length - 1;
-            this._responseActions.push((str) => {
-              this._actionLMTPStream(recipient, final, str, callback);
+            this._responseActions.push((str2) => {
+              this._actionLMTPStream(recipient, final, str2, callback);
             });
           });
         } else {
-          this._responseActions.push((str) => {
-            this._actionSMTPStream(str, callback);
+          this._responseActions.push((str2) => {
+            this._actionSMTPStream(str2, callback);
           });
         }
         this._currentDataStream = dataStream;
@@ -48567,10 +48659,10 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionGreeting(str) {
+      _actionGreeting(str2) {
         clearTimeout(this._greetingTimeout);
-        if (str.substr(0, 3) !== "220") {
-          this._onError(new Error("Invalid greeting. response=" + str), "EPROTOCOL", str, "CONN");
+        if (str2.substr(0, 3) !== "220") {
+          this._onError(new Error("Invalid greeting. response=" + str2), "EPROTOCOL", str2, "CONN");
           return;
         }
         if (this.options.lmtp) {
@@ -48588,12 +48680,12 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionLHLO(str) {
-        if (str.charAt(0) !== "2") {
-          this._onError(new Error("Invalid LHLO. response=" + str), "EPROTOCOL", str, "LHLO");
+      _actionLHLO(str2) {
+        if (str2.charAt(0) !== "2") {
+          this._onError(new Error("Invalid LHLO. response=" + str2), "EPROTOCOL", str2, "LHLO");
           return;
         }
-        this._actionEHLO(str);
+        this._actionEHLO(str2);
       }
       /**
        * Handles server response for EHLO command. If it yielded in
@@ -48604,58 +48696,58 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionEHLO(str) {
+      _actionEHLO(str2) {
         let match;
-        if (str.substr(0, 3) === "421") {
-          this._onError(new Error("Server terminates connection. response=" + str), "ECONNECTION", str, "EHLO");
+        if (str2.substr(0, 3) === "421") {
+          this._onError(new Error("Server terminates connection. response=" + str2), "ECONNECTION", str2, "EHLO");
           return;
         }
-        if (str.charAt(0) !== "2") {
+        if (str2.charAt(0) !== "2") {
           if (this.options.requireTLS) {
-            this._onError(new Error("EHLO failed but HELO does not support required STARTTLS. response=" + str), "ECONNECTION", str, "EHLO");
+            this._onError(new Error("EHLO failed but HELO does not support required STARTTLS. response=" + str2), "ECONNECTION", str2, "EHLO");
             return;
           }
           this._responseActions.push(this._actionHELO);
           this._sendCommand("HELO " + this.name);
           return;
         }
-        this._ehloLines = str.split(/\r?\n/).map((line) => line.replace(/^\d+[ -]/, "").trim()).filter((line) => line).slice(1);
-        if (!this.secure && !this.options.ignoreTLS && (/[ -]STARTTLS\b/im.test(str) || this.options.requireTLS)) {
+        this._ehloLines = str2.split(/\r?\n/).map((line) => line.replace(/^\d+[ -]/, "").trim()).filter((line) => line).slice(1);
+        if (!this.secure && !this.options.ignoreTLS && (/[ -]STARTTLS\b/im.test(str2) || this.options.requireTLS)) {
           this._sendCommand("STARTTLS");
           this._responseActions.push(this._actionSTARTTLS);
           return;
         }
-        if (/[ -]SMTPUTF8\b/im.test(str)) {
+        if (/[ -]SMTPUTF8\b/im.test(str2)) {
           this._supportedExtensions.push("SMTPUTF8");
         }
-        if (/[ -]DSN\b/im.test(str)) {
+        if (/[ -]DSN\b/im.test(str2)) {
           this._supportedExtensions.push("DSN");
         }
-        if (/[ -]8BITMIME\b/im.test(str)) {
+        if (/[ -]8BITMIME\b/im.test(str2)) {
           this._supportedExtensions.push("8BITMIME");
         }
-        if (/[ -]REQUIRETLS\b/im.test(str)) {
+        if (/[ -]REQUIRETLS\b/im.test(str2)) {
           this._supportedExtensions.push("REQUIRETLS");
         }
-        if (/[ -]PIPELINING\b/im.test(str)) {
+        if (/[ -]PIPELINING\b/im.test(str2)) {
           this._supportedExtensions.push("PIPELINING");
         }
-        if (/[ -]AUTH\b/i.test(str)) {
+        if (/[ -]AUTH\b/i.test(str2)) {
           this.allowsAuth = true;
         }
-        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)PLAIN/i.test(str)) {
+        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)PLAIN/i.test(str2)) {
           this._supportedAuth.push("PLAIN");
         }
-        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)LOGIN/i.test(str)) {
+        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)LOGIN/i.test(str2)) {
           this._supportedAuth.push("LOGIN");
         }
-        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)CRAM-MD5/i.test(str)) {
+        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)CRAM-MD5/i.test(str2)) {
           this._supportedAuth.push("CRAM-MD5");
         }
-        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)XOAUTH2/i.test(str)) {
+        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)XOAUTH2/i.test(str2)) {
           this._supportedAuth.push("XOAUTH2");
         }
-        if (match = str.match(/[ -]SIZE(?:[ \t]+(\d+))?/im)) {
+        if (match = str2.match(/[ -]SIZE(?:[ \t]+(\d+))?/im)) {
           this._supportedExtensions.push("SIZE");
           this._maxAllowedSize = Number(match[1]) || 0;
         }
@@ -48668,9 +48760,9 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionHELO(str) {
-        if (str.charAt(0) !== "2") {
-          this._onError(new Error("Invalid HELO. response=" + str), "EPROTOCOL", str, "HELO");
+      _actionHELO(str2) {
+        if (str2.charAt(0) !== "2") {
+          this._onError(new Error("Invalid HELO. response=" + str2), "EPROTOCOL", str2, "HELO");
           return;
         }
         this.allowsAuth = true;
@@ -48684,8 +48776,8 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionSTARTTLS(str) {
-        if (str.charAt(0) !== "2") {
+      _actionSTARTTLS(str2) {
+        if (str2.charAt(0) !== "2") {
           if (this.options.opportunisticTLS) {
             this.logger.info({
               tnx: "smtp"
@@ -48693,7 +48785,7 @@ var init_smtp_connection = __esm({
             this.emit("connect");
             return;
           }
-          this._onError(new Error("Error upgrading connection with STARTTLS"), "ETLS", str, "STARTTLS");
+          this._onError(new Error("Error upgrading connection with STARTTLS"), "ETLS", str2, "STARTTLS");
           return;
         }
         this._upgradeConnection((err, secured) => {
@@ -48727,13 +48819,13 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionAUTH_LOGIN_USER(str, callback) {
-        if (!/^334[ -]/.test(str)) {
-          callback(this._formatError('Invalid login sequence while waiting for "334 VXNlcm5hbWU6"', "EAUTH", str, "AUTH LOGIN"));
+      _actionAUTH_LOGIN_USER(str2, callback) {
+        if (!/^334[ -]/.test(str2)) {
+          callback(this._formatError('Invalid login sequence while waiting for "334 VXNlcm5hbWU6"', "EAUTH", str2, "AUTH LOGIN"));
           return;
         }
-        this._responseActions.push((str2) => {
-          this._actionAUTH_LOGIN_PASS(str2, callback);
+        this._responseActions.push((str3) => {
+          this._actionAUTH_LOGIN_PASS(str3, callback);
         });
         this._sendCommand(Buffer.from(this._auth.credentials.user + "", "utf-8").toString("base64"));
       }
@@ -48747,17 +48839,17 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionAUTH_CRAM_MD5(str, callback) {
-        const challengeMatch = str.match(/^334\s+(.+)$/);
+      _actionAUTH_CRAM_MD5(str2, callback) {
+        const challengeMatch = str2.match(/^334\s+(.+)$/);
         if (!challengeMatch) {
-          return callback(this._formatError("Invalid login sequence while waiting for server challenge string", "EAUTH", str, "AUTH CRAM-MD5"));
+          return callback(this._formatError("Invalid login sequence while waiting for server challenge string", "EAUTH", str2, "AUTH CRAM-MD5"));
         }
         const base64decoded = Buffer.from(challengeMatch[1], "base64").toString("ascii");
         const hmacMD5 = crypto7.createHmac("md5", this._auth.credentials.pass);
         hmacMD5.update(base64decoded);
         const prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
-        this._responseActions.push((str2) => {
-          this._actionAUTH_CRAM_MD5_PASS(str2, callback);
+        this._responseActions.push((str3) => {
+          this._actionAUTH_CRAM_MD5_PASS(str3, callback);
         });
         this._sendCommand(
           Buffer.from(prepended).toString("base64"),
@@ -48772,9 +48864,9 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionAUTH_CRAM_MD5_PASS(str, callback) {
-        if (!str.match(/^235\s+/)) {
-          return callback(this._formatError('Invalid login sequence while waiting for "235"', "EAUTH", str, "AUTH CRAM-MD5"));
+      _actionAUTH_CRAM_MD5_PASS(str2, callback) {
+        if (!str2.match(/^235\s+/)) {
+          return callback(this._formatError('Invalid login sequence while waiting for "235"', "EAUTH", str2, "AUTH CRAM-MD5"));
         }
         this.logger.info({
           tnx: "smtp",
@@ -48793,12 +48885,12 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionAUTH_LOGIN_PASS(str, callback) {
-        if (!/^334[ -]/.test(str)) {
-          return callback(this._formatError('Invalid login sequence while waiting for "334 UGFzc3dvcmQ6"', "EAUTH", str, "AUTH LOGIN"));
+      _actionAUTH_LOGIN_PASS(str2, callback) {
+        if (!/^334[ -]/.test(str2)) {
+          return callback(this._formatError('Invalid login sequence while waiting for "334 UGFzc3dvcmQ6"', "EAUTH", str2, "AUTH LOGIN"));
         }
-        this._responseActions.push((str2) => {
-          this._actionAUTHComplete(str2, callback);
+        this._responseActions.push((str3) => {
+          this._actionAUTHComplete(str3, callback);
         });
         this._sendCommand(
           Buffer.from((this._auth.credentials.pass || "").toString(), "utf-8").toString("base64"),
@@ -48813,15 +48905,15 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionAUTHComplete(str, isRetry, callback) {
+      _actionAUTHComplete(str2, isRetry, callback) {
         if (!callback && typeof isRetry === "function") {
           callback = isRetry;
           isRetry = false;
         }
-        if (str.substr(0, 3) === "334") {
-          this._responseActions.push((str2) => {
+        if (str2.substr(0, 3) === "334") {
+          this._responseActions.push((str3) => {
             if (isRetry || this._authMethod !== "XOAUTH2") {
-              this._actionAUTHComplete(str2, true, callback);
+              this._actionAUTHComplete(str3, true, callback);
             } else {
               setImmediate(() => this._handleXOauth2Token(true, callback));
             }
@@ -48829,14 +48921,14 @@ var init_smtp_connection = __esm({
           this._sendCommand("");
           return;
         }
-        if (str.charAt(0) !== "2") {
+        if (str2.charAt(0) !== "2") {
           this.logger.info({
             tnx: "smtp",
             username: this._auth.user,
             action: "authfail",
             method: this._authMethod
           }, "User %s failed to authenticate", JSON.stringify(this._auth.user));
-          return callback(this._formatError("Invalid login", "EAUTH", str, "AUTH " + this._authMethod));
+          return callback(this._formatError("Invalid login", "EAUTH", str2, "AUTH " + this._authMethod));
         }
         this.logger.info({
           tnx: "smtp",
@@ -48853,11 +48945,11 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionMAIL(str, callback) {
+      _actionMAIL(str2, callback) {
         const envelope = this._envelope;
-        if (Number(str.charAt(0)) !== 2) {
-          const message = this._usingSmtpUtf8 && /^550 /.test(str) && /[\x80-\uFFFF]/.test(envelope.from) ? "Internationalized mailbox name not allowed" : "Mail command failed";
-          return callback(this._formatError(message, "EENVELOPE", str, "MAIL FROM"));
+        if (Number(str2.charAt(0)) !== 2) {
+          const message = this._usingSmtpUtf8 && /^550 /.test(str2) && /[\x80-\uFFFF]/.test(envelope.from) ? "Internationalized mailbox name not allowed" : "Mail command failed";
+          return callback(this._formatError(message, "EENVELOPE", str2, "MAIL FROM"));
         }
         if (!envelope.rcptQueue.length) {
           return callback(this._formatError("Can't send mail - no recipients defined", "EENVELOPE", false, "API"));
@@ -48867,8 +48959,8 @@ var init_smtp_connection = __esm({
         do {
           const curRecipient = envelope.rcptQueue.shift();
           this._recipientQueue.push(curRecipient);
-          this._responseActions.push((str2) => {
-            this._actionRCPT(str2, callback);
+          this._responseActions.push((str3) => {
+            this._actionRCPT(str3, callback);
           });
           this._sendCommand("RCPT TO:<" + curRecipient + ">" + this._getDsnRcptToArgs());
         } while (usePipelining && envelope.rcptQueue.length);
@@ -48879,14 +48971,14 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionRCPT(str, callback) {
+      _actionRCPT(str2, callback) {
         const envelope = this._envelope;
         let err;
         const curRecipient = this._recipientQueue.shift();
-        if (Number(str.charAt(0)) !== 2) {
-          const message = this._usingSmtpUtf8 && /^553 /.test(str) && /[\x80-\uFFFF]/.test(curRecipient) ? "Internationalized mailbox name not allowed" : "Recipient command failed";
+        if (Number(str2.charAt(0)) !== 2) {
+          const message = this._usingSmtpUtf8 && /^553 /.test(str2) && /[\x80-\uFFFF]/.test(curRecipient) ? "Internationalized mailbox name not allowed" : "Recipient command failed";
           envelope.rejected.push(curRecipient);
-          err = this._formatError(message, "EENVELOPE", str, "RCPT TO");
+          err = this._formatError(message, "EENVELOPE", str2, "RCPT TO");
           err.recipient = curRecipient;
           envelope.rejectedErrors.push(err);
         } else {
@@ -48894,13 +48986,13 @@ var init_smtp_connection = __esm({
         }
         if (!envelope.rcptQueue.length && !this._recipientQueue.length) {
           if (envelope.rejected.length < envelope.to.length) {
-            this._responseActions.push((str2) => {
-              this._actionDATA(str2, callback);
+            this._responseActions.push((str3) => {
+              this._actionDATA(str3, callback);
             });
             this._sendCommand("DATA");
           } else {
             const deferred = envelope.rejectedErrors.find((rejectedErr) => rejectedErr.responseCode && rejectedErr.responseCode < 500);
-            const reply = deferred?.response ?? str;
+            const reply = deferred?.response ?? str2;
             err = this._formatError("Can't send mail - all recipients were rejected", "EENVELOPE", reply, "RCPT TO");
             err.rejected = envelope.rejected;
             err.rejectedErrors = envelope.rejectedErrors;
@@ -48909,8 +49001,8 @@ var init_smtp_connection = __esm({
         } else if (envelope.rcptQueue.length) {
           const nextRecipient = envelope.rcptQueue.shift();
           this._recipientQueue.push(nextRecipient);
-          this._responseActions.push((str2) => {
-            this._actionRCPT(str2, callback);
+          this._responseActions.push((str3) => {
+            this._actionRCPT(str3, callback);
           });
           this._sendCommand("RCPT TO:<" + nextRecipient + ">" + this._getDsnRcptToArgs());
         }
@@ -48921,10 +49013,10 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionDATA(str, callback) {
+      _actionDATA(str2, callback) {
         const envelope = this._envelope;
-        if (!/^[23]/.test(str)) {
-          return callback(this._formatError("Data command failed", "EENVELOPE", str, "DATA"));
+        if (!/^[23]/.test(str2)) {
+          return callback(this._formatError("Data command failed", "EENVELOPE", str2, "DATA"));
         }
         const response = {
           accepted: envelope.accepted,
@@ -48945,11 +49037,11 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionSMTPStream(str, callback) {
-        if (Number(str.charAt(0)) !== 2) {
-          return callback(this._formatError("Message failed", "EMESSAGE", str, "DATA"));
+      _actionSMTPStream(str2, callback) {
+        if (Number(str2.charAt(0)) !== 2) {
+          return callback(this._formatError("Message failed", "EMESSAGE", str2, "DATA"));
         }
-        return callback(null, str);
+        return callback(null, str2);
       }
       /**
        * Handle response for a DATA stream
@@ -48961,11 +49053,11 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionLMTPStream(recipient, final, str, callback) {
+      _actionLMTPStream(recipient, final, str2, callback) {
         const envelope = this._envelope;
         let err;
-        if (Number(str.charAt(0)) !== 2) {
-          err = this._formatError("Message failed for recipient " + recipient, "EMESSAGE", str, "DATA");
+        if (Number(str2.charAt(0)) !== 2) {
+          err = this._formatError("Message failed for recipient " + recipient, "EMESSAGE", str2, "DATA");
           err.recipient = recipient;
           envelope.rejected.push(recipient);
           envelope.rejectedErrors.push(err);
@@ -48976,7 +49068,7 @@ var init_smtp_connection = __esm({
           }
         }
         if (final) {
-          return callback(null, str);
+          return callback(null, str2);
         }
       }
       /** @internal */
@@ -48991,8 +49083,8 @@ var init_smtp_connection = __esm({
             }, "User %s failed to authenticate", JSON.stringify(this._auth.user));
             return callback(this._formatError(err, "EAUTH", false, "AUTH XOAUTH2"));
           }
-          this._responseActions.push((str) => {
-            this._actionAUTHComplete(str, isRetry, callback);
+          this._responseActions.push((str2) => {
+            this._actionAUTHComplete(str2, isRetry, callback);
           });
           this._sendCommand(
             "AUTH XOAUTH2 " + this._auth.oauth2.buildXOAuth2Token(accessToken),
@@ -52606,12 +52698,20 @@ function renderCvHtml(c2, p2, opts = {}) {
   const dateRight = design.datePos === "right";
   const rule = m2.rule > 0;
   const headColour = design.headTone === "ink" ? "var(--ink)" : "var(--mark)";
+  const redline = opts.redline ?? {};
+  const marked = (text) => {
+    const mark = redline[text];
+    if (!mark) return esc(text);
+    const body = mark.after ? `<del>${esc(text)}</del> <ins>${esc(mark.after)}</ins>` : esc(text);
+    const note = mark.note ? ` <ins class="rl-note">+ ${esc(mark.note)}</ins>` : "";
+    return body + note;
+  };
   const linesHtml = (body) => body.map((line) => {
-    if (line.k === "prose") return `<p>${esc(line.text)}</p>`;
+    if (line.k === "prose") return `<p>${marked(line.text)}</p>`;
     if (line.k === "skills")
       return `<div class="skills">${line.items.map((x2) => `<span>${esc(x2)}</span>`).join("")}</div>`;
     const left = `${line.when ? `<div>${esc(line.when)}</div>` : ""}${line.loc ? `<div>${esc(line.loc)}</div>` : ""}`;
-    const right = (line.title ? `<div class="t">${esc(line.title)}</div>` : "") + (line.org ? `<div class="org">${esc(line.org)}</div>` : "") + line.body.map((t2) => `<p>${esc(t2)}</p>`).join("");
+    const right = (line.title ? `<div class="t">${esc(line.title)}</div>` : "") + (line.org ? `<div class="org">${esc(line.org)}</div>` : "") + line.body.map((t2) => `<p>${marked(t2)}</p>`).join("");
     const when = `<div class="when">${left}</div>`;
     const what = `<div class="what">${right}</div>`;
     return `<div class="entry">${dateRight ? what + when : when + what}</div>`;
@@ -52728,10 +52828,29 @@ h2 + .entry { padding-top: ${px(m2.entryTop)}px; }
   line-height: ${px(m2.bodyLine)}px; break-inside: avoid; }
 .skills > span::before { content: ""; width: 4px; height: 4px; flex: 0 0 4px; background: var(--mark); }
 
+/* \u2500\u2500 redline: what goes, and what replaces it \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+/* Review marks, not document formatting: red says strike this line, green says
+   the rewrite (or the figure/claim the line is missing). */
+del { color: #9f1414; background: #fdecec; text-decoration: line-through; text-decoration-thickness: 1px; }
+ins { color: #0a6b3b; background: #e9f7ee; text-decoration: none; border-bottom: 1px solid rgb(10 107 59 / 0.5); }
+ins.rl-note { display: inline-block; background: transparent; border: 1px dashed rgb(10 107 59 / 0.55);
+  border-radius: 2px; padding: 0 3px; font-style: italic; font-size: 0.92em; }
+
+/* the ownership line a published CV carries */
+.copy { margin-top: ${px(m2.sectionTop)}px; padding-top: 6px; border-top: 1px solid rgb(0 0 0 / 0.12);
+  font-size: 8pt; text-align: center; color: rgb(0 0 0 / 0.62); }
+
 /* On screen the sheet carries the 297mm floor and the top margin itself, so the
    preview shows a real page. On paper the page box supplies the vertical margin
    \u2014 which is what gives page 2 of a long CV the same inset as page 1. */
 @media print { .page { min-height: 0; margin: 0; padding-top: 0; } }
+/* Annotated sheets are a working copy. Printing accepts the edits: the struck
+   line disappears, the rewrite prints as plain text, and the note stays advice. */
+@media print {
+  del { display: none; }
+  ins { color: inherit; background: none; border: 0; text-decoration: none; }
+  ins.rl-note { display: none; }
+}
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -52742,6 +52861,7 @@ h2 + .entry { padding-top: ${px(m2.entryTop)}px; }
   ${contactHtml}
 </header>
 ${sections}
+${opts.copyright ? `<footer class="copy">${esc(opts.copyright)}</footer>` : ""}
 </div>
 </body>
 </html>`;
@@ -52859,6 +52979,305 @@ var init_cv_document = __esm({
   }
 });
 
+// src/lib/cv-redline.ts
+function polish(line) {
+  const reasons = [];
+  let text = String(line ?? "").replace(/\s+/g, " ").trim();
+  if (!text) return { text, reasons };
+  const misspelled = text.replace(/\b([a-zA-Z]+)\b/g, (w2) => SPELLING[w2.toLowerCase()] ?? w2);
+  if (misspelled !== text) {
+    reasons.push({ rule: "grammar", why: "Spelling: " + [...text.matchAll(/\b([a-zA-Z]+)\b/g)].map((m2) => m2[1]).filter((w2) => SPELLING[w2.toLowerCase()]).slice(0, 2).join(", ") });
+    text = misspelled;
+  }
+  if (FIRST_PERSON.test(text)) {
+    text = capitalise(text.replace(FIRST_PERSON, ""));
+    reasons.push({ rule: "first-person", why: "A CV is already about you \u2014 drop \u201CI/we\u201D" });
+  }
+  const dup = text.match(/\b(\w+)\s+\1\b/i);
+  if (dup) {
+    text = text.replace(/\b(\w+)\s+\1\b/gi, "$1");
+    reasons.push({ rule: "duplicate", why: `Repeated word: \u201C${dup[1]}\u201D` });
+  }
+  for (const w2 of WEAK_OPENERS) {
+    if (!w2.re.test(text)) continue;
+    const rest = text.replace(w2.re, "");
+    const [first, ...tail] = rest.split(" ");
+    const verb = GERUND[first?.toLowerCase() ?? ""] ?? "";
+    text = cleanup(w2.replacement ? `${w2.replacement}${rest}` : `${verb || capitalise(first ?? "")} ${tail.join(" ")}`);
+    reasons.push({ rule: "weak-verb", why: w2.why });
+    break;
+  }
+  const passive = text.match(PASSIVE);
+  if (passive) {
+    text = cleanup(capitalise(text.replace(PASSIVE, (_m, verb) => verb)));
+    reasons.push({ rule: "passive", why: `\u201Cwas/were ${passive[1]}\u201D \u2192 \u201C${passive[1]}\u201D` });
+  }
+  const fillerHits = [];
+  for (const f2 of WORD_FIXES) {
+    if (!f2.re.test(text)) continue;
+    f2.re.lastIndex = 0;
+    text = text.replace(f2.re, f2.to);
+    fillerHits.push(f2.why);
+    f2.re.lastIndex = 0;
+  }
+  if (fillerHits.length) reasons.push({ rule: "filler", why: fillerHits.slice(0, 2).join("; ") });
+  const vowelExceptions = /^(university|universities|user|users|unique|unit|one|once|european|ubiquitous)/i;
+  text = text.replace(/\ba\s+([\w'-]+)/gi, (m2, word) => /^[aeiou]/i.test(word) && !vowelExceptions.test(word) ? `an ${word}` : m2);
+  text = text.replace(/\ban\s+([\w'-]+)/gi, (m2, word) => /^[bcdfgjklmnpqrstvwxyz]/i.test(word) && !/^hour|^honest|^honour|^honor/i.test(word) ? `a ${word}` : m2);
+  const before = text;
+  text = cleanup(text).replace(/\.{2,}/g, ".").replace(/,\s*,/g, ",").replace(/([.!?])\s+([a-z])/g, (_m, p2, c2) => `${p2} ${c2.toUpperCase()}`);
+  if (text !== before && !reasons.some((r2) => r2.rule === "grammar")) {
+    reasons.push({ rule: "grammar", why: "Tidied spacing and punctuation" });
+  }
+  if (text && text !== line.trim()) text = capitalise(text);
+  return { text, reasons };
+}
+function worthRewriting(text) {
+  const t2 = text.trim();
+  if (t2.length < 24) return false;
+  return t2.split(/\s+/).length >= 4;
+}
+function buildRedline({ doc, missingKeywords = [], max = 14 }) {
+  const edits = [];
+  const markup = {};
+  let n2 = 0;
+  const push = (e2) => {
+    if (edits.length >= max) return;
+    const id = `rl-${++n2}`;
+    edits.push({ ...e2, id });
+    if (e2.kind === "replace") markup[e2.before] = { after: e2.after, rule: e2.rule };
+    else markup[e2.before] = { after: "", rule: e2.rule, note: e2.after };
+  };
+  let firstProse = null;
+  let firstBody = null;
+  for (const section2 of doc.sections) {
+    for (const line of section2.lines) {
+      const texts = line.k === "prose" ? [{ text: line.text, isShown: true }] : line.k === "entry" ? line.body.map((t2) => ({ text: t2, isShown: false })) : [];
+      for (const { text, isShown } of texts) {
+        if (!firstProse && line.k === "prose") firstProse = text;
+        if (!firstBody && line.k === "entry" && text) firstBody = { section: section2.head, line: text };
+        if (!worthRewriting(text)) continue;
+        const { text: after, reasons } = polish(text);
+        if (after !== text && reasons.length) {
+          const rule = reasons[0].rule;
+          push({
+            section: section2.head,
+            kind: "replace",
+            before: text,
+            after,
+            reason: reasons.map((r2) => r2.why).join("; "),
+            rule,
+            severity: "important"
+          });
+          continue;
+        }
+        if (isShown) continue;
+        if (reasons.length) {
+          push({
+            section: section2.head,
+            kind: "replace",
+            before: text,
+            after,
+            reason: reasons[0].why,
+            rule: reasons[0].rule,
+            severity: "polish"
+          });
+          continue;
+        }
+        if (!FIGURE.test(text)) {
+          push({
+            section: section2.head,
+            kind: "add",
+            before: text,
+            after: "add a figure: % \xB7 users \xB7 hours or money saved",
+            reason: "A line without a number is a claim a recruiter cannot check",
+            rule: "no-figure",
+            severity: "polish"
+          });
+        } else if (text.length > LONG_LINE) {
+          push({
+            section: section2.head,
+            kind: "add",
+            before: text,
+            after: "split at the second clause \u2014 two bullets scan faster than one",
+            reason: "Over 210 characters; recruiters scan, they do not read",
+            rule: "too-long",
+            severity: "polish"
+          });
+        }
+      }
+    }
+  }
+  const anchor = firstProse ?? firstBody?.line ?? null;
+  const anchorSection = firstProse ? doc.sections.find((s2) => s2.lines.some((l2) => l2.k === "prose" && l2.text === firstProse))?.head ?? "Summary" : firstBody?.section ?? "Experience";
+  for (const kw of missingKeywords.slice(0, 3)) {
+    if (edits.length >= max) break;
+    const text = `add \u201C${kw}\u201D if it is genuinely true of your work`;
+    const id = `rl-${++n2}`;
+    edits.push({
+      id,
+      section: "Skills",
+      kind: "add",
+      before: anchor ?? "",
+      after: text,
+      reason: "Asked for by the job description and not printed anywhere",
+      rule: "keyword",
+      severity: "important"
+    });
+    if (anchor && !markup[anchor]) markup[anchor] = { after: "", rule: "keyword", note: text };
+    else if (anchor && markup[anchor]) markup[anchor] = { ...markup[anchor], note: `${markup[anchor].note ? `${markup[anchor].note} \xB7 ` : ""}${text}` };
+  }
+  const important = edits.filter((e2) => e2.severity === "important").length;
+  const polishCount = edits.length - important;
+  const hygiene = Math.max(0, Math.round(100 - important * 9 - polishCount * 3));
+  const rules = [...new Set(edits.map((e2) => e2.rule))];
+  const by_rule = rules.map((rule) => ({ rule, count: edits.filter((e2) => e2.rule === rule).length, label: RULE_LABEL[rule] })).sort((a2, b2) => b2.count - a2.count);
+  return {
+    edits,
+    markup,
+    counts: {
+      replace: edits.filter((e2) => e2.kind === "replace").length,
+      add: edits.filter((e2) => e2.kind === "add").length,
+      important,
+      polish: polishCount
+    },
+    hygiene,
+    summary: edits.length ? `${edits.length} line${edits.length === 1 ? "" : "s"} to tighten \u2014 ${important} change${important === 1 ? "" : "s"} the wording, ${polishCount} add a figure or split a run-on.` : "Nothing mechanical to strike: the wording is already tight.",
+    by_rule
+  };
+}
+var RULE_LABEL, WEAK_OPENERS, GERUND, WORD_FIXES, SPELLING, FIGURE, PASSIVE, FIRST_PERSON, LONG_LINE, capitalise, cleanup;
+var init_cv_redline = __esm({
+  "src/lib/cv-redline.ts"() {
+    "use strict";
+    RULE_LABEL = {
+      "weak-verb": "Weak opener",
+      passive: "Passive voice",
+      "first-person": "First person",
+      filler: "Filler / wordy",
+      grammar: "Grammar",
+      duplicate: "Repeated word",
+      "no-figure": "No figure",
+      "too-long": "Too long",
+      keyword: "Missing keyword"
+    };
+    WEAK_OPENERS = [
+      { re: /^responsible for\s+/i, replacement: "", why: "\u201CResponsible for\u201D says the role existed, not what changed" },
+      { re: /^worked on\s+/i, replacement: "Delivered ", why: "\u201CWorked on\u201D hides whether it shipped" },
+      { re: /^worked (?:with|as)\s+/i, replacement: "Partnered with ", why: "Name the outcome, not the proximity" },
+      { re: /^(?:helped|assisted)(?:\s+(?:with|to|in))?\s+/i, replacement: "Supported ", why: "\u201CHelped\u201D leaves your own contribution unclear" },
+      { re: /^involved in\s+/i, replacement: "Contributed to ", why: "Say what you contributed" },
+      { re: /^tasked with\s+/i, replacement: "Owned ", why: "Ownership reads stronger than assignment" },
+      { re: /^duties included\s+/i, replacement: "Owned ", why: "A duty list is not an achievement" },
+      { re: /^participated in\s+/i, replacement: "Contributed to ", why: "Participation is not impact" },
+      { re: /^was responsible for\s+/i, replacement: "Owned ", why: "Passive framing of an active job" },
+      { re: /^proven ability to\s+/i, replacement: "", why: "A claim about yourself, not evidence" },
+      { re: /^experience (?:in|with)\s+/i, replacement: "", why: "Show the experience instead of naming it" }
+    ];
+    GERUND = {
+      managing: "Managed",
+      building: "Built",
+      leading: "Led",
+      developing: "Developed",
+      designing: "Designed",
+      maintaining: "Maintained",
+      creating: "Created",
+      implementing: "Implemented",
+      running: "Ran",
+      writing: "Wrote",
+      testing: "Tested",
+      deploying: "Deployed",
+      supporting: "Supported",
+      mentoring: "Mentored",
+      reviewing: "Reviewed",
+      coordinating: "Coordinated",
+      delivering: "Delivered",
+      improving: "Improved",
+      automating: "Automated",
+      migrating: "Migrated",
+      teaching: "Taught",
+      analyzing: "Analyzed",
+      analysing: "Analysed",
+      training: "Trained",
+      hiring: "Hired",
+      owning: "Owned",
+      driving: "Led",
+      overseeing: "Oversaw",
+      establishing: "Established",
+      launching: "Launched",
+      scaling: "Scaled",
+      reducing: "Reduced",
+      increasing: "Increased",
+      processing: "Processed",
+      handling: "Handled",
+      organizing: "Organized",
+      organising: "Organised",
+      scheduling: "Scheduled",
+      reporting: "Reported",
+      presenting: "Presented",
+      negotiating: "Negotiated",
+      onboarding: "Onboarded"
+    };
+    WORD_FIXES = [
+      { re: /\bin order to\b/gi, to: "to", why: "\u201Cin order to\u201D \u2192 \u201Cto\u201D" },
+      { re: /\butili[sz]e\b/gi, to: "use", why: "\u201Cutilize\u201D \u2192 \u201Cuse\u201D" },
+      { re: /\butili[sz]ed\b/gi, to: "used", why: "\u201Cutilized\u201D \u2192 \u201Cused\u201D" },
+      { re: /\butili[sz]ing\b/gi, to: "using", why: "\u201Cutilizing\u201D \u2192 \u201Cusing\u201D" },
+      { re: /\bleverag(?:e|es)\b/gi, to: "use", why: "\u201Cleverage\u201D \u2192 \u201Cuse\u201D" },
+      { re: /\bleveraged\b/gi, to: "used", why: "\u201Cleveraged\u201D \u2192 \u201Cused\u201D" },
+      { re: /\bleveraging\b/gi, to: "using", why: "\u201Cleveraging\u201D \u2192 \u201Cusing\u201D" },
+      { re: /\bspearhead(?:ed|ing|s)?\b/gi, to: "led", why: "\u201Cspearheaded\u201D \u2192 \u201Cled\u201D" },
+      { re: /\ba total of\b/gi, to: "", why: "\u201Ca total of\u201D adds nothing" },
+      { re: /\bvarious\b\s*/gi, to: "", why: "\u201Cvarious\u201D is not a quantity" },
+      { re: /\bsuccessfully\b\s*/gi, to: "", why: "\u201Csuccessfully\u201D is assumed" },
+      { re: /\b(?:very|really|basically|actually|simply)\b\s*/gi, to: "", why: "Intensifiers weaken a line" },
+      { re: /\bresponsible for\b/gi, to: "owned", why: "Mid-sentence \u201Cresponsible for\u201D \u2192 \u201Cowned\u201D" },
+      { re: /\bassisted with\b/gi, to: "supported", why: "\u201Cassisted with\u201D \u2192 \u201Csupported\u201D" },
+      { re: /\bworked closely with\b/gi, to: "partnered with", why: "Tighter phrasing" },
+      { re: /\bon a daily basis\b/gi, to: "daily", why: "Three words for one" },
+      { re: /\bdue to the fact that\b/gi, to: "because", why: "Five words for \u201Cbecause\u201D" },
+      { re: /\bat this point in time\b/gi, to: "now", why: "Four words for \u201Cnow\u201D" },
+      { re: /\bteam player\b/gi, to: "collaborator", why: "Show collaboration, don't claim it" }
+    ];
+    SPELLING = {
+      recieve: "receive",
+      recieved: "received",
+      seperate: "separate",
+      seperated: "separated",
+      definately: "definitely",
+      occured: "occurred",
+      succesful: "successful",
+      sucessful: "successful",
+      managment: "management",
+      acheive: "achieve",
+      acheived: "achieved",
+      responsibilty: "responsibility",
+      enviroment: "environment",
+      goverment: "government",
+      buisness: "business",
+      perfomance: "performance",
+      colaborate: "collaborate",
+      colaboration: "collaboration",
+      comunication: "communication",
+      implementaion: "implementation",
+      maintainance: "maintenance",
+      dependant: "dependent",
+      liason: "liaison",
+      publically: "publicly",
+      arguement: "argument",
+      experiance: "experience",
+      knowlege: "knowledge",
+      sucess: "success"
+    };
+    FIGURE = /(\d|%|\bper cent\b|[$€£₦])/;
+    PASSIVE = /^(?:was|were|been|is|are|being)\s+([a-z]+(?:ed|en|wn|ne|lt|ght))\b/i;
+    FIRST_PERSON = /^(?:i|we)\s+/i;
+    LONG_LINE = 210;
+    capitalise = (s2) => s2 ? s2.charAt(0).toUpperCase() + s2.slice(1) : s2;
+    cleanup = (s2) => s2.replace(/\s{2,}/g, " ").replace(/\s+([,.;:])/g, "$1").trim();
+  }
+});
+
 // src/services/cv.service.ts
 async function listCVs(userId, filter = {}) {
   const where = ["user_id = ?"];
@@ -52944,6 +53363,14 @@ async function updateCV(userId, id, patch) {
   if (patch.template_id !== void 0) {
     sets.push("template_id = ?");
     args.push(patch.template_id);
+  }
+  if (patch.public !== void 0) {
+    sets.push("public = ?");
+    args.push(patch.public ? 1 : 0);
+  }
+  if (patch.copyright !== void 0) {
+    sets.push("copyright = ?");
+    args.push(patch.copyright ? String(patch.copyright).slice(0, 240) : null);
   }
   await run(`UPDATE cvs SET ${sets.join(", ")} WHERE id = ? AND user_id = ?`, ...args, id, userId);
   return getCV(userId, id);
@@ -53153,6 +53580,38 @@ async function matchCV(userId, cvId, postingId) {
   const blockers = checks.filter((c2) => !c2.ok && c2.severity === "critical").length;
   const band = score >= 85 ? "strong" : score >= 65 ? "decent" : "weak";
   const summary2 = !hasContent ? "Nothing prints on this CV yet \u2014 add a summary, a role or a skill before sending." : blockers ? `${blockers} thing${blockers > 1 ? "s" : ""} a parser or a recruiter will hit before anything else.` : band === "strong" ? "Nothing structural is in the way: this is ready to send." : "No blockers, the rest is polish.";
+  const redline = buildRedline({ doc, missingKeywords: missing });
+  const failing = checks.filter((c2) => !c2.ok && c2.key !== "content");
+  const potential = Math.min(100, Math.round((weightEarned + failing.reduce((n2, c2) => n2 + WEIGHT[c2.severity], 0)) / weightTotal * 100));
+  const advice = [];
+  if (!hasContent) {
+    advice.push({ key: "start", title: "Give the page something to score", detail: "Add a summary, one role and five skills, then re-run this check.", gain: 100 });
+  }
+  const worst = [...failing].sort((a2, b2) => WEIGHT[b2.severity] - WEIGHT[a2.severity]);
+  for (const c2 of worst.slice(0, 4)) {
+    advice.push({
+      key: c2.key,
+      title: c2.label,
+      detail: c2.fix,
+      gain: Math.round(WEIGHT[c2.severity] / weightTotal * 100)
+    });
+  }
+  if (redline.edits.length) {
+    advice.push({
+      key: "redline",
+      title: `Tighten ${redline.counts.replace} line${redline.counts.replace === 1 ? "" : "s"} and add ${redline.counts.add} detail${redline.counts.add === 1 ? "" : "s"}`,
+      detail: redline.summary,
+      gain: Math.min(12, redline.counts.important * 2)
+    });
+  }
+  if (missing.length) {
+    advice.push({
+      key: "keywords",
+      title: `Cover ${missing.length} job-description keyword${missing.length === 1 ? "" : "s"}`,
+      detail: `Missing: ${missing.slice(0, 6).join(", ")} \u2014 add only the ones that are true.`,
+      gain: 10
+    });
+  }
   const signals = await profileSignals(userId);
   const jdScore = posting ? scorePosting(signals, { title: posting.title, description: posting.description, companyName: posting.company_name, seniority: posting.seniority, remote: !!posting.remote, location: posting.location, salaryMin: posting.salary_min, salaryMax: posting.salary_max, postedAt: posting.posted_at }) : null;
   return {
@@ -53161,6 +53620,10 @@ async function matchCV(userId, cvId, postingId) {
     ats: { score, checks, pages, band, blockers, summary: summary2, weight_total: weightTotal, weight_earned: weightEarned },
     keywords: { matched, missing, coverage_pct: coverage, jd_total: jdKeywords.length },
     jd_match: jdScore ? { score: jdScore.score, explain: jdScore.explain } : null,
+    /** score if every failing row turns green — the ceiling, not a promise */
+    potential_score: potential,
+    advice,
+    redline,
     suggestions: [
       ...missing.slice(0, 6).map((k2) => `Keyword from the JD not in your CV: \u201C${k2}\u201D (only add if true)`),
       ...checks.filter((c2) => !c2.ok).sort((a2, b2) => WEIGHT[b2.severity] - WEIGHT[a2.severity]).map((c2) => c2.fix)
@@ -53251,6 +53714,7 @@ var init_cv_service = __esm({
     init_profile_signals();
     init_scoring_service();
     init_cv_document();
+    init_cv_redline();
     shape = (r2) => ({
       ...r2,
       targeting: parseJson(r2.targeting, {}),
@@ -94441,6 +94905,708 @@ var init_resume_import_service = __esm({
   }
 });
 
+// src/services/network.service.ts
+function normalizeProfession(input) {
+  const raw = String(input ?? "").toLowerCase().trim().replace(/[_/]+/g, " ").replace(/\s+/g, " ");
+  if (!raw) return "";
+  for (const key of PROFESSIONS) if (raw === key) return key;
+  for (const key of ["graphic design", "product design", "data & analytics", "customer success", "human resources", "media & communications", "engineering (hardware)"]) {
+    if (raw.includes(key) || ALIASES[key]?.some((a2) => raw.includes(a2))) return key;
+  }
+  for (const key of PROFESSIONS) {
+    if (ALIASES[key]?.some((a2) => raw.includes(a2))) return key;
+  }
+  return raw;
+}
+async function viewerContext(userId) {
+  const p2 = await getProfile(userId);
+  const id = p2.identity ?? {};
+  const prefs = p2.prefs ?? {};
+  const declared = prefs.profession ?? id.profession ?? id.career_field ?? prefs.career_category ?? "";
+  const profession = normalizeProfession(declared);
+  const city = String(id.location ?? prefs.location ?? "").split(",")[0].trim();
+  const skills = (p2.skills ?? []).map((s2) => String(s2.name).toLowerCase());
+  return {
+    name: String(id.name ?? id.full_name ?? "").trim(),
+    headline: String(id.headline ?? "").trim(),
+    profession,
+    profession_declared: !!profession,
+    city,
+    seniority: String(prefs.seniority ?? "").trim(),
+    skills,
+    links: id.links ?? {},
+    years: (p2.experiences ?? []).length
+  };
+}
+function skillHits(text, skills) {
+  const hay = ` ${text.toLowerCase()} `;
+  return skills.filter((s2) => s2.length > 2 && hay.includes(s2.toLowerCase()));
+}
+async function listPeople(userId, filters = {}) {
+  const viewer = await viewerContext(userId);
+  const rows = await all("SELECT * FROM public_profiles WHERE visible = 1 AND user_id <> ?", userId);
+  const mine = await get("SELECT * FROM public_profiles WHERE user_id = ?", userId);
+  const reviewRows = await all(
+    `SELECT cv_id, AVG(rating) AS avg, COUNT(*) AS n FROM cv_reviews GROUP BY cv_id`
+  );
+  const ratings = new Map(reviewRows.map((r2) => [r2.cv_id, { avg: Number(r2.avg), count: Number(r2.n) }]));
+  const publicCvs = await all("SELECT id, user_id, name, archetype, updated_at FROM cvs WHERE public = 1 ORDER BY updated_at DESC");
+  const cvOf = new Map(publicCvs.map((c2) => [c2.user_id, c2]));
+  const q2 = String(filters.q ?? "").toLowerCase().trim();
+  const profession = normalizeProfession(filters.profession);
+  const location = String(filters.location ?? "").toLowerCase().trim();
+  const openTo = String(filters.open_to ?? "").toLowerCase().trim();
+  const items = rows.map((r2) => {
+    const person = shapePerson(r2);
+    const cv = cvOf.get(r2.user_id) ?? null;
+    const rating = cv ? ratings.get(cv.id) ?? null : null;
+    const hay = [person.name, person.headline, person.profession, person.bio, person.offers.join(" "), person.looking_for, person.location].join(" ").toLowerCase();
+    const reasons = [];
+    let score = 0;
+    if (viewer.profession && person.profession === viewer.profession) {
+      score += 40;
+      reasons.push(`works in ${person.profession}, same as you`);
+    } else if (viewer.profession && ALIASES[person.profession]?.some((a2) => viewer.profession.includes(a2))) {
+      score += 20;
+      reasons.push("a neighbouring discipline");
+    }
+    const shared = skillHits(hay, viewer.skills);
+    if (shared.length) {
+      score += Math.min(25, shared.length * 8);
+      reasons.push(`shares ${shared.slice(0, 3).join(", ")}`);
+    }
+    if (viewer.city && person.location && person.location.toLowerCase().includes(viewer.city.toLowerCase())) {
+      score += 15;
+      reasons.push(`also in ${person.location}`);
+    }
+    if (person.open_to.length) {
+      score += 8;
+      reasons.push(`open to ${person.open_to.slice(0, 2).join(", ")}`);
+    }
+    const age = (Date.now() - +new Date(person.updated_at)) / 864e5;
+    if (age <= 14) {
+      score += 10;
+      reasons.push("updated this fortnight");
+    }
+    if (rating) score += Math.min(10, Math.round(rating.avg * 2));
+    return { ...person, cv: cv ? { ...cv, rating } : null, is_me: false, match: { score: Math.min(100, score), reasons } };
+  }).filter((p2) => {
+    if (q2 && !`${p2.name} ${p2.headline} ${p2.profession} ${p2.bio} ${p2.offers.join(" ")}`.toLowerCase().includes(q2)) return false;
+    if (profession && p2.profession !== profession) return false;
+    if (location && !p2.location.toLowerCase().includes(location)) return false;
+    if (openTo && !p2.open_to.map((o2) => o2.toLowerCase()).includes(openTo)) return false;
+    return true;
+  }).sort((a2, b2) => filters.sort === "new" ? +new Date(b2.updated_at) - +new Date(a2.updated_at) : b2.match.score - a2.match.score || b2.updated_at.localeCompare(a2.updated_at));
+  const facet = (key) => {
+    const out = {};
+    for (const p2 of items) {
+      const v2 = p2[key] || "\u2014";
+      out[v2] = (out[v2] ?? 0) + 1;
+    }
+    return out;
+  };
+  return {
+    items: items.slice(0, filters.limit ?? 40),
+    total: items.length,
+    facets: { profession: facet("profession"), location: facet("location") },
+    viewer: { ...viewer, has_profile: !!mine },
+    me: mine ? shapePerson(mine) : null,
+    questions: QUESTIONS
+  };
+}
+async function getPerson(userId, personId) {
+  const row = await get("SELECT * FROM public_profiles WHERE id = ? AND visible = 1", personId);
+  if (!row) throw notFound("Person");
+  const cvs = await all("SELECT id, name, archetype, updated_at, public, copyright FROM cvs WHERE user_id = ? AND public = 1", row.user_id);
+  const reviews = await all(
+    `SELECT r.*, c.name AS cv_name FROM cv_reviews r JOIN cvs c ON c.id = r.cv_id
+     WHERE r.cv_id IN (SELECT id FROM cvs WHERE user_id = ? AND public = 1) ORDER BY r.created_at DESC`,
+    row.user_id
+  );
+  const viewer = await viewerContext(userId);
+  return {
+    ...shapePerson(row),
+    is_me: row.user_id === userId,
+    cvs: cvs.map((c2) => {
+      const list = reviews.filter((r2) => r2.cv_id === c2.id);
+      return {
+        ...c2,
+        reviews: { count: list.length, avg: list.length ? Math.round(list.reduce((n2, r2) => n2 + r2.rating, 0) / list.length * 10) / 10 : null }
+      };
+    }),
+    reviews: reviews.map((r2) => ({
+      id: r2.id,
+      cv_id: r2.cv_id,
+      cv_name: r2.cv_name,
+      reviewer_name: r2.reviewer_name,
+      reviewer_role: r2.reviewer_role,
+      relationship: r2.relationship,
+      rating: r2.rating,
+      body: r2.body,
+      created_at: r2.created_at,
+      mine: r2.reviewer_id === userId
+    })),
+    viewer
+  };
+}
+async function upsertMyPerson(userId, input) {
+  const existing = await get("SELECT * FROM public_profiles WHERE user_id = ?", userId);
+  const viewer = await viewerContext(userId);
+  const profession = normalizeProfession(input.profession ?? existing?.profession ?? viewer.profession);
+  const name2 = String(input.name ?? existing?.display_name ?? viewer.name ?? "You").trim() || "You";
+  const now = nowIso();
+  if (profession) await updateProfile(userId, { prefs: { profession } });
+  if (existing) {
+    await run(
+      `UPDATE public_profiles SET display_name = ?, headline = ?, profession = ?, seniority = ?, location = ?, bio = ?,
+         links = ?, offers = ?, looking_for = ?, answers = ?, open_to = ?, visible = ?, updated_at = ? WHERE user_id = ?`,
+      name2,
+      input.headline ?? existing.headline ?? viewer.headline,
+      profession,
+      input.seniority ?? existing.seniority ?? viewer.seniority,
+      input.location ?? existing.location ?? viewer.city,
+      input.bio ?? existing.bio ?? "",
+      JSON.stringify(input.links ?? parseJson(existing.links, {})),
+      JSON.stringify(input.offers ?? parseJson(existing.offers, [])),
+      input.looking_for ?? existing.looking_for ?? "",
+      JSON.stringify(input.answers ?? parseJson(existing.answers, [])),
+      JSON.stringify(input.open_to ?? parseJson(existing.open_to, [])),
+      input.visible ?? !!existing.visible ? 1 : 0,
+      now,
+      userId
+    );
+  } else {
+    await run(
+      `INSERT INTO public_profiles (id, user_id, display_name, headline, profession, seniority, location, bio, links, offers, looking_for, answers, open_to, visible, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      newId(),
+      userId,
+      name2,
+      input.headline ?? viewer.headline,
+      profession,
+      input.seniority ?? viewer.seniority,
+      input.location ?? viewer.city,
+      input.bio ?? "",
+      JSON.stringify(input.links ?? viewer.links ?? {}),
+      JSON.stringify(input.offers ?? []),
+      input.looking_for ?? "",
+      JSON.stringify(input.answers ?? []),
+      JSON.stringify(input.open_to ?? []),
+      input.visible === false ? 0 : 1,
+      now,
+      now
+    );
+  }
+  return listPeople(userId);
+}
+async function seedJobs() {
+  const n2 = await get("SELECT COUNT(*) AS n FROM platform_jobs");
+  if (Number(n2?.n ?? 0) > 0) return;
+  for (const j2 of JOB_SEEDS) {
+    await run(
+      `INSERT INTO platform_jobs (id, posted_by, company, title, profession, seniority, location, remote, employment_type, salary_min, salary_max, currency, description, tags, status, demo, created_at)
+       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 'full-time', ?, ?, ?, ?, ?, 'open', 1, ?)`,
+      newId(),
+      j2.company,
+      j2.title,
+      j2.profession,
+      j2.seniority,
+      j2.location,
+      j2.remote,
+      j2.salary_min,
+      j2.salary_max,
+      j2.currency,
+      j2.description,
+      JSON.stringify(j2.tags),
+      nowIso()
+    );
+  }
+}
+async function listPlatformJobs(userId, filters = {}) {
+  await seedJobs();
+  const viewer = await viewerContext(userId);
+  const profession = normalizeProfession(filters.profession || viewer.profession);
+  const rows = await all("SELECT * FROM platform_jobs WHERE status = 'open'");
+  const q2 = String(filters.q ?? "").toLowerCase().trim();
+  const location = String(filters.location ?? "").toLowerCase().trim();
+  const remote = filters.remote === "true";
+  const seniority = String(filters.seniority ?? "").toLowerCase().trim();
+  const items = rows.map((r2) => {
+    const tags = parseJson(r2.tags, []);
+    const hay = [r2.title, r2.company, r2.description, tags.join(" "), r2.location].join(" ").toLowerCase();
+    const reasons = [];
+    let score = 0;
+    if (profession && r2.profession === profession) {
+      score += 55;
+      reasons.push(`posted for ${r2.profession}`);
+    } else if (profession && ALIASES[r2.profession]?.some((a2) => profession.includes(a2))) {
+      score += 20;
+      reasons.push("related discipline");
+    }
+    const shared = skillHits(hay, viewer.skills);
+    if (shared.length) {
+      score += Math.min(25, shared.length * 9);
+      reasons.push(`asks for ${shared.slice(0, 3).join(", ")}`);
+    }
+    if (viewer.city && r2.location?.toLowerCase().includes(viewer.city.toLowerCase())) {
+      score += 12;
+      reasons.push(`in ${r2.location}`);
+    }
+    if (seniority && r2.seniority === seniority) {
+      score += 8;
+      reasons.push(`${r2.seniority} level`);
+    }
+    if (r2.remote) score += 3;
+    if (!r2.demo) {
+      score += 6;
+      reasons.push("posted on JAMS");
+    }
+    return {
+      id: r2.id,
+      company: r2.company,
+      title: r2.title,
+      profession: r2.profession,
+      seniority: r2.seniority,
+      location: r2.location,
+      remote: !!r2.remote,
+      employment_type: r2.employment_type,
+      salary: r2.salary_min ? { min: r2.salary_min, max: r2.salary_max, currency: r2.currency } : null,
+      description: r2.description,
+      tags,
+      contact_email: r2.contact_email,
+      demo: !!r2.demo,
+      posted_at: r2.created_at,
+      mine: r2.posted_by === userId,
+      match: { score: Math.min(100, score), reasons }
+    };
+  }).filter((j2) => {
+    if (q2 && !`${j2.title} ${j2.company} ${j2.description} ${j2.tags.join(" ")}`.toLowerCase().includes(q2)) return false;
+    if (location && !String(j2.location ?? "").toLowerCase().includes(location)) return false;
+    if (remote && !j2.remote) return false;
+    if (seniority && j2.seniority !== seniority) return false;
+    return true;
+  }).sort((a2, b2) => b2.match.score - a2.match.score || b2.posted_at.localeCompare(a2.posted_at));
+  const facets = {
+    profession: items.reduce((acc, j2) => ({ ...acc, [j2.profession]: (acc[j2.profession] ?? 0) + 1 }), {}),
+    seniority: items.reduce((acc, j2) => ({ ...acc, [j2.seniority ?? "\u2014"]: (acc[j2.seniority ?? "\u2014"] ?? 0) + 1 }), {})
+  };
+  return {
+    items,
+    total: items.length,
+    facets,
+    viewer: { ...viewer, needs_profession: !viewer.profession },
+    /** the professions the form offers, aliases already folded in */
+    professions: PROFESSIONS,
+    demo: items.some((j2) => j2.demo)
+  };
+}
+async function setProfession(userId, profession) {
+  const normalized2 = normalizeProfession(profession);
+  if (!normalized2) throw validation("Pick or type a profession first");
+  await updateProfile(userId, { prefs: { profession: normalized2 } });
+  const person = await get("SELECT id FROM public_profiles WHERE user_id = ?", userId);
+  if (person) await run("UPDATE public_profiles SET profession = ?, updated_at = ? WHERE user_id = ?", normalized2, nowIso(), userId);
+  return { profession: normalized2 };
+}
+async function createPlatformJob(userId, input) {
+  const profession = normalizeProfession(input.profession);
+  if (!input.company?.trim() || !input.title?.trim()) throw validation("A company and a role title are required");
+  if (!profession) throw validation("Say which profession this role is for");
+  const id = newId();
+  await run(
+    `INSERT INTO platform_jobs (id, posted_by, company, title, profession, seniority, location, remote, employment_type, salary_min, salary_max, currency, description, tags, contact_email, status, demo, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', 0, ?)`,
+    id,
+    userId,
+    input.company.trim(),
+    input.title.trim(),
+    profession,
+    input.seniority ?? null,
+    input.location ?? null,
+    input.remote ? 1 : 0,
+    input.employment_type ?? "full-time",
+    input.salary_min ?? null,
+    input.salary_max ?? null,
+    input.currency ?? null,
+    input.description ?? null,
+    JSON.stringify((input.tags ?? []).map((t2) => String(t2).trim()).filter(Boolean)),
+    input.contact_email ?? null,
+    nowIso()
+  );
+  return { id, profession };
+}
+async function seedEvents() {
+  const n2 = await get("SELECT COUNT(*) AS n FROM event_listings");
+  if (Number(n2?.n ?? 0) > 0) return;
+  for (const e2 of EVENT_SEEDS) {
+    const start = new Date(Date.now() + e2.in_days * 864e5);
+    start.setHours(9, 0, 0, 0);
+    const end = new Date(start.getTime() + e2.hours * 36e5);
+    await run(
+      `INSERT INTO event_listings (id, title, kind, host, city, country, venue, format, starts_at, ends_at, description, tags, url, price, seats, featured, demo, created_at)
+       VALUES (?, ?, ?, ?, ?, 'Nigeria', ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, 1, ?)`,
+      newId(),
+      e2.title,
+      e2.kind,
+      e2.host,
+      e2.city,
+      e2.venue,
+      e2.format,
+      start.toISOString(),
+      end.toISOString(),
+      e2.description,
+      JSON.stringify(e2.tags),
+      e2.price,
+      e2.seats ?? null,
+      e2.featured ?? 0,
+      nowIso()
+    );
+  }
+}
+function expandEventQuery(q2) {
+  const low = q2.toLowerCase();
+  const words = tokenize2(q2);
+  const kinds = /* @__PURE__ */ new Set();
+  const terms = new Set(words);
+  for (const [kind, list] of Object.entries(EVENT_SYNONYMS)) {
+    if (list.some((phrase) => phrase.includes(low) || low.includes(phrase))) {
+      kinds.add(kind);
+      for (const w2 of list.flatMap(tokenize2)) terms.add(w2);
+    }
+  }
+  return { words, kinds, terms: [...terms] };
+}
+async function listEvents(userId, filters = {}) {
+  await seedEvents();
+  const viewer = await viewerContext(userId);
+  const rows = await all("SELECT * FROM event_listings");
+  const q2 = String(filters.q ?? "").toLowerCase().trim();
+  const expanded = q2 ? expandEventQuery(q2) : { words: [], kinds: /* @__PURE__ */ new Set(), terms: [] };
+  const city = String(filters.city ?? "").toLowerCase().trim();
+  const kind = String(filters.kind ?? "").toLowerCase().trim();
+  const format = String(filters.format ?? "").toLowerCase().trim();
+  const when = String(filters.when ?? "all");
+  const now = Date.now();
+  const horizon = when === "week" ? 7 : when === "month" ? 31 : Infinity;
+  const items = rows.map((r2) => {
+    const tags = parseJson(r2.tags, []);
+    const hay = [r2.title, r2.host, r2.description, tags.join(" "), r2.city, r2.venue].join(" ").toLowerCase();
+    const reasons = [];
+    let score = 0;
+    if (viewer.city && r2.city && r2.city.toLowerCase() === viewer.city.toLowerCase()) {
+      score += 40;
+      reasons.push(`in ${r2.city}, where you are`);
+    }
+    if (viewer.profession) {
+      const key = viewer.profession.split(" ")[0];
+      if (hay.includes(key) || tags.some((t2) => normalizeProfession(t2) === viewer.profession)) {
+        score += 25;
+        reasons.push(`relevant to ${viewer.profession}`);
+      }
+    }
+    if (q2) {
+      let hits = 0;
+      for (const t2 of expanded.terms) if (hay.includes(t2)) hits++;
+      score += Math.min(35, hits * 12);
+      if (hits) reasons.push(`mentions ${expanded.terms.filter((t2) => hay.includes(t2)).slice(0, 3).join(", ")}`);
+    }
+    if (r2.featured) {
+      score += 12;
+      reasons.push("featured");
+    }
+    if (!r2.demo) score += 5;
+    const days = Math.max(0, (new Date(r2.starts_at).getTime() - now) / 864e5);
+    score += Math.max(0, 10 - Math.round(days / 3));
+    return {
+      id: r2.id,
+      title: r2.title,
+      kind: r2.kind,
+      host: r2.host,
+      city: r2.city,
+      country: r2.country,
+      venue: r2.venue,
+      format: r2.format,
+      starts_at: r2.starts_at,
+      ends_at: r2.ends_at,
+      description: r2.description,
+      tags,
+      url: r2.url,
+      price: r2.price,
+      seats: r2.seats,
+      featured: !!r2.featured,
+      demo: !!r2.demo,
+      match: { score: Math.min(100, score), reasons },
+      /** searchable text, dropped before the response is serialised */
+      hay
+    };
+  }).filter((e2) => {
+    if (q2) {
+      const everyWord = expanded.words.every((w2) => e2.hay.includes(w2));
+      if (!everyWord && !expanded.kinds.has(e2.kind)) return false;
+    }
+    if (kind && e2.kind !== kind) return false;
+    if (city && !String(e2.city ?? "").toLowerCase().includes(city)) return false;
+    if (format && e2.format !== format) return false;
+    const start = new Date(e2.starts_at).getTime();
+    if (start + 864e5 < now) return false;
+    if (horizon !== Infinity && start - now > horizon * 864e5) return false;
+    return true;
+  }).sort((a2, b2) => b2.match.score - a2.match.score || a2.starts_at.localeCompare(b2.starts_at)).map(({ hay: _hay, ...event }) => event);
+  const facet = (key) => {
+    const out = {};
+    for (const e2 of items) {
+      const v2 = String(e2[key] ?? "\u2014");
+      out[v2] = (out[v2] ?? 0) + 1;
+    }
+    return out;
+  };
+  return {
+    items: items.slice(0, filters.limit ?? 60),
+    total: items.length,
+    facets: { kind: facet("kind"), city: facet("city"), format: facet("format") },
+    viewer: { city: viewer.city, profession: viewer.profession },
+    kinds: EVENT_KINDS,
+    demo: items.some((e2) => e2.demo)
+  };
+}
+async function listCvReviews(cvId) {
+  const rows = await all("SELECT * FROM cv_reviews WHERE cv_id = ? ORDER BY created_at DESC", cvId);
+  return summarizeReviews(rows);
+}
+function summarizeReviews(rows) {
+  const count = rows.length;
+  const avg = count ? Math.round(rows.reduce((n2, r2) => n2 + r2.rating, 0) / count * 10) / 10 : null;
+  const distribution = [5, 4, 3, 2, 1].map((star) => ({ star, count: rows.filter((r2) => r2.rating === star).length }));
+  return {
+    count,
+    avg,
+    distribution,
+    items: rows.map((r2) => ({
+      id: r2.id,
+      cv_id: r2.cv_id,
+      reviewer_name: r2.reviewer_name,
+      reviewer_role: r2.reviewer_role,
+      relationship: r2.relationship,
+      rating: r2.rating,
+      body: r2.body,
+      created_at: r2.created_at
+    }))
+  };
+}
+async function publishCv(userId, cvId, patch) {
+  const cv = await get("SELECT * FROM cvs WHERE id = ? AND user_id = ?", cvId, userId);
+  if (!cv) throw notFound("CV");
+  const sets = ["updated_at = ?"];
+  const args = [nowIso()];
+  if (patch.public !== void 0) {
+    sets.push("public = ?");
+    args.push(patch.public ? 1 : 0);
+  }
+  if (patch.copyright !== void 0) {
+    sets.push("copyright = ?");
+    args.push(patch.copyright ? String(patch.copyright).slice(0, 240) : null);
+  }
+  await run(`UPDATE cvs SET ${sets.join(", ")} WHERE id = ? AND user_id = ?`, ...args, cvId, userId);
+  return get("SELECT id, name, public, copyright FROM cvs WHERE id = ?", cvId);
+}
+async function addCvReview(userId, cvId, input) {
+  const cv = await get("SELECT id, user_id, public, name FROM cvs WHERE id = ?", cvId);
+  if (!cv) throw notFound("CV");
+  if (!cv.public) throw validation("This CV is private, its owner has not published it");
+  if (cv.user_id === userId) throw validation("Review someone else's CV, not your own");
+  const rating = Math.round(Number(input.rating));
+  if (!(rating >= 1 && rating <= 5)) throw validation("Rating must be between 1 and 5");
+  const body = String(input.body ?? "").trim();
+  if (body.length < 10) throw validation("Write at least a sentence \u2014 \u201Cnice\u201D does not help anyone");
+  const profile = await getProfile(userId);
+  const id = profile.identity ?? {};
+  const name2 = String(id.name ?? id.full_name ?? "A JAMS member").trim() || "A JAMS member";
+  const role = [id.headline, id.location].filter(Boolean).join(" \xB7 ") || null;
+  const relationship = ["hirer", "recruiter", "mentor", "peer"].includes(String(input.relationship)) ? String(input.relationship) : "peer";
+  const existing = await get("SELECT id FROM cv_reviews WHERE cv_id = ? AND reviewer_id = ?", cvId, userId);
+  if (existing) {
+    await run(
+      "UPDATE cv_reviews SET rating = ?, body = ?, relationship = ?, reviewer_name = ?, reviewer_role = ?, created_at = ? WHERE id = ?",
+      rating,
+      body,
+      relationship,
+      name2,
+      role,
+      nowIso(),
+      existing.id
+    );
+  } else {
+    await run(
+      `INSERT INTO cv_reviews (id, cv_id, owner_id, reviewer_id, reviewer_name, reviewer_role, relationship, rating, body, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      newId(),
+      cvId,
+      cv.user_id,
+      userId,
+      name2,
+      role,
+      relationship,
+      rating,
+      body,
+      nowIso()
+    );
+  }
+  return listCvReviews(cvId);
+}
+async function publicCvFeed(limit = 12) {
+  const rows = await all(
+    `SELECT c.id, c.name, c.archetype, c.updated_at, c.copyright, p.display_name, p.headline, p.profession
+     FROM cvs c JOIN public_profiles p ON p.user_id = c.user_id
+     WHERE c.public = 1 AND p.visible = 1 ORDER BY c.updated_at DESC LIMIT ${Math.max(1, Math.min(50, limit))}`
+  );
+  const allReviews = await all("SELECT cv_id, rating FROM cv_reviews");
+  return rows.map((r2) => {
+    const mine = allReviews.filter((x2) => x2.cv_id === r2.id);
+    return {
+      ...r2,
+      reviews: { count: mine.length, avg: mine.length ? Math.round(mine.reduce((n2, x2) => n2 + x2.rating, 0) / mine.length * 10) / 10 : null }
+    };
+  });
+}
+var PROFESSIONS, ALIASES, QUESTIONS, PEOPLE_QUESTIONS, shapePerson, tokenize2, JOB_SEEDS, EVENT_SEEDS, EVENT_KINDS, EVENT_SYNONYMS;
+var init_network_service = __esm({
+  "src/services/network.service.ts"() {
+    "use strict";
+    init_db();
+    init_errors2();
+    init_id();
+    init_profile_service();
+    PROFESSIONS = [
+      "software engineering",
+      "product design",
+      "graphic design",
+      "data & analytics",
+      "product management",
+      "marketing",
+      "finance",
+      "sales",
+      "customer success",
+      "human resources",
+      "operations",
+      "healthcare",
+      "education",
+      "legal",
+      "media & communications",
+      "engineering (hardware)",
+      "other"
+    ];
+    ALIASES = {
+      "software engineering": [
+        "software",
+        "engineer",
+        "developer",
+        "programmer",
+        "frontend",
+        "front-end",
+        "backend",
+        "back-end",
+        "full stack",
+        "fullstack",
+        "devops",
+        "sre",
+        "mobile",
+        "android",
+        "ios",
+        "qa",
+        "testing",
+        "react",
+        "node",
+        "python",
+        "java",
+        "golang",
+        "typescript",
+        "cloud",
+        "data engineer",
+        "machine learning"
+      ],
+      "product design": ["product design", "ux", "ui", "interaction design", "figma", "design systems", "user research", "designer"],
+      "graphic design": ["graphic", "brand design", "illustration", "visual design", "motion design"],
+      "data & analytics": ["data", "analyst", "analytics", "bi", "statistic", "data science", "sql"],
+      "product management": ["product manager", "product owner", "pm", "roadmap"],
+      marketing: ["marketing", "growth", "seo", "content", "brand", "social media", "communications"],
+      finance: ["finance", "account", "audit", "tax", "investment", "banking", "fintech"],
+      sales: ["sales", "business development", "account executive", "bd"],
+      "customer success": ["customer success", "support", "customer experience", "cx"],
+      "human resources": ["human resources", "hr", "recruit", "talent", "people ops"],
+      operations: ["operations", "ops", "logistics", "supply chain", "project manager"],
+      healthcare: ["health", "medical", "nurse", "doctor", "pharmac", "clinical"],
+      education: ["education", "teacher", "tutor", "lecturer", "curriculum"],
+      legal: ["legal", "lawyer", "counsel", "compliance", "paralegal"],
+      "media & communications": ["media", "journalis", "editor", "copywriter", "public relations", "pr"],
+      "engineering (hardware)": ["mechanical", "electrical", "civil", "hardware", "manufactur"]
+    };
+    QUESTIONS = [
+      { key: "work", q: "What do you actually do all day?", hint: "Not your title \u2014 the work. \u201CI turn messy spreadsheets into dashboards people trust.\u201D" },
+      { key: "proof", q: "What is one thing you built or shipped that you are proud of?", hint: "A project, a process, a team. One sentence with a number if you have one." },
+      { key: "offer", q: "What can someone hire or ask you for this month?", hint: "A service, a skill, a collaboration. This is what the Offers field shows." },
+      { key: "want", q: "What are you looking for right now?", hint: "A role, a co-founder, a mentor, clients \u2014 say it plainly." },
+      { key: "reach", q: "How should someone reach you?", hint: "Add the social links you actually answer: LinkedIn, X, GitHub, Instagram, a portfolio." }
+    ];
+    PEOPLE_QUESTIONS = QUESTIONS;
+    shapePerson = (r2) => ({
+      id: r2.id,
+      user_id: r2.user_id,
+      name: r2.display_name,
+      headline: r2.headline ?? "",
+      profession: r2.profession ?? "",
+      seniority: r2.seniority ?? "",
+      location: r2.location ?? "",
+      bio: r2.bio ?? "",
+      links: parseJson(r2.links, {}),
+      offers: parseJson(r2.offers, []),
+      looking_for: r2.looking_for ?? "",
+      answers: parseJson(r2.answers, []),
+      open_to: parseJson(r2.open_to, []),
+      visible: !!r2.visible,
+      updated_at: r2.updated_at
+    });
+    tokenize2 = (s2) => String(s2 ?? "").toLowerCase().split(/[^a-z0-9+#.]+/).filter((w2) => w2.length > 2);
+    JOB_SEEDS = [
+      { company: "Paystack", title: "Frontend Engineer (React, TypeScript)", profession: "software engineering", seniority: "mid", location: "Lagos, Nigeria", remote: 0, salary_min: 9e6, salary_max: 14e6, currency: "NGN", description: "Own the merchant dashboard: React 19, TypeScript, a design system used by every product team. You will ship weekly and review other people's UI.", tags: ["react", "typescript", "design systems", "testing"] },
+      { company: "Moniepoint", title: "Backend Engineer \u2014 Payments", profession: "software engineering", seniority: "senior", location: "Lagos, Nigeria", remote: 0, salary_min: 14e6, salary_max: 2e7, currency: "NGN", description: "Node and Go services moving money for 2m+ businesses. Strong on idempotency, ledgers and on-call discipline.", tags: ["node", "go", "postgres", "payments"] },
+      { company: "Andela", title: "DevOps Engineer (Remote, Africa)", profession: "software engineering", seniority: "mid", location: "Remote", remote: 1, salary_min: 12e6, salary_max: 18e6, currency: "NGN", description: "Kubernetes, Terraform, GitHub Actions. You will cut deploy time for client teams and keep the pager quiet.", tags: ["kubernetes", "terraform", "aws", "ci/cd"] },
+      { company: "Cowrywise", title: "Product Designer", profession: "product design", seniority: "mid", location: "Lagos, Nigeria", remote: 1, salary_min: 7e6, salary_max: 11e6, currency: "NGN", description: "End-to-end product design for savings and investment flows: research, prototypes, shipped UI. Figma and a design system you help shape.", tags: ["figma", "prototyping", "user research", "fintech"] },
+      { company: "Kuda", title: "Data Analyst, Growth", profession: "data & analytics", seniority: "mid", location: "Lagos, Nigeria", remote: 0, salary_min: 6e6, salary_max: 95e5, currency: "NGN", description: "SQL, dbt and a warehouse you can trust. Turn activation and retention questions into dashboards product can act on.", tags: ["sql", "dbt", "looker", "experimentation"] },
+      { company: "Bumpa", title: "Growth Marketing Manager", profession: "marketing", seniority: "senior", location: "Remote", remote: 1, salary_min: 8e6, salary_max: 12e6, currency: "NGN", description: "Own paid and lifecycle for a commerce app used by 50k+ merchants. You will run the experiments yourself, not just brief them.", tags: ["paid media", "lifecycle", "analytics", "seo"] },
+      { company: "Flutterwave", title: "Customer Success Lead", profession: "customer success", seniority: "mid", location: "Lagos, Nigeria", remote: 0, salary_min: 7e6, salary_max: 1e7, currency: "NGN", description: "Lead a pod of five supporting enterprise merchants across West Africa. Own escalation, renewal and the QBR story.", tags: ["enterprise", "retention", "crm", "payments"] },
+      { company: "Stears", title: "Content Strategist", profession: "media & communications", seniority: "mid", location: "Remote", remote: 1, salary_min: 5e6, salary_max: 8e6, currency: "NGN", description: "Shape the editorial calendar and write the analysis that gets quoted. Data-literate writing, not keyword filler.", tags: ["writing", "editorial", "data", "newsletters"] },
+      { company: "PwC Nigeria", title: "Financial Analyst, Deals", profession: "finance", seniority: "junior", location: "Lagos, Nigeria", remote: 0, salary_min: 48e5, salary_max: 65e5, currency: "NGN", description: "Modelling, diligence and client reporting for mid-market transactions. Excel and slide craft matter here.", tags: ["modelling", "excel", "valuation", "diligence"] },
+      { company: "MTN Nigeria", title: "HR Business Partner", profession: "human resources", seniority: "senior", location: "Lagos, Nigeria", remote: 0, salary_min: 9e6, salary_max: 13e6, currency: "NGN", description: "Partner with two technology divisions on org design, performance and hiring. Data-led people decisions.", tags: ["org design", "performance", "hiring", "hris"] }
+    ];
+    EVENT_SEEDS = [
+      { title: "Lagos Tech Hiring Fair \u2014 Q4", kind: "hiring", host: "Lagos State Employment Trust Fund", city: "Lagos", venue: "Landmark Event Centre, Victoria Island", format: "in-person", in_days: 12, hours: 6, description: "Forty companies hiring across engineering, design, data and support. Bring six printed CVs; on-the-spot screens for junior and mid roles.", tags: ["engineering", "design", "data", "graduate"], price: "Free", featured: 1 },
+      { title: "Frontend Systems Workshop", kind: "training", host: "React Lagos", city: "Lagos", venue: "Co-Creation Hub, Yaba", format: "hybrid", in_days: 6, hours: 4, description: "A hands-on day on React 19, server components and design systems. Laptops required; a working repo is provided.", tags: ["react", "typescript", "frontend"], price: "Free", seats: 60 },
+      { title: "Product Design Portfolio Clinic", kind: "seminar", host: "Design Lagos", city: "Lagos", venue: "Ventures Park, Ikoyi", format: "in-person", in_days: 18, hours: 3, description: "Bring two case studies. Six practising designers review them line by line, live. Twelve slots, observers welcome.", tags: ["product design", "portfolio", "career"], price: "\u20A65,000", seats: 40 },
+      { title: "Careers in Data: ask me anything", kind: "story", host: "Data Community Nigeria", city: "Lagos", venue: "Online", format: "virtual", in_days: 4, hours: 2, description: "Three analysts and a hiring manager answer the questions people are afraid to ask in interviews: salary, gaps, switching in.", tags: ["data", "career", "interviews"], price: "Free" },
+      { title: "Abuja Public Sector Career Expo", kind: "hiring", host: "Federal Civil Service Commission", city: "Abuja", venue: "International Conference Centre", format: "in-person", in_days: 25, hours: 8, description: "Ministries, agencies and state-owned enterprises with open graduate and experienced roles. Registration closes a week before.", tags: ["government", "graduate", "policy"], price: "Free" },
+      { title: "Cloud & DevOps Bootcamp", kind: "training", host: "AWS User Group Lagos", city: "Lagos", venue: "Online", format: "virtual", in_days: 9, hours: 12, description: "Three evenings: containers, CI/CD and cost control on AWS. Includes a lab account and a certificate.", tags: ["aws", "devops", "kubernetes"], price: "\u20A625,000" },
+      { title: "Startup Founders Hiring Night", kind: "meetup", host: "Ventures Park", city: "Lagos", venue: "Ventures Park, Ikoyi", format: "in-person", in_days: 15, hours: 3, description: "Founders pitch the roles they cannot fill, candidates pitch what they can do. Twenty startups, one room, no recruiters.", tags: ["startups", "hiring", "networking"], price: "Free", seats: 120 },
+      { title: "Remote Work Readiness Seminar", kind: "seminar", host: "JAMS", city: "Lagos", venue: "Online", format: "virtual", in_days: 2, hours: 2, description: "How remote teams actually screen: async writing tests, timezone questions and the tools they expect you to know.", tags: ["remote", "career", "interviews"], price: "Free", featured: 1 },
+      { title: "Women in Tech Mentorship Circle", kind: "meetup", host: "Women in Tech Nigeria", city: "Lagos", venue: "MTN House, Ikoyi", format: "in-person", in_days: 21, hours: 2, description: "Small-group mentoring with engineers, PMs and founders. Apply for a mentor slot or come as a peer.", tags: ["mentorship", "women", "career"], price: "Free", seats: 50 },
+      { title: "Graduate Trainee Programme \u2014 info session", kind: "ad", host: "Flutterwave", city: "Lagos", venue: "Online", format: "virtual", in_days: 8, hours: 1, description: "The 2027 graduate programme opens applications. Meet the team, hear the assessment stages, ask about relocation.", tags: ["graduate", "fintech", "hiring"], price: "Free" },
+      { title: "Customer Success Masterclass", kind: "training", host: "CS Collective", city: "Lagos", venue: "Zoom", format: "virtual", in_days: 30, hours: 3, description: "Retention maths, QBR storytelling and how to run an escalation. Built for people moving from support into success.", tags: ["customer success", "retention", "career"], price: "\u20A615,000" },
+      { title: "Build in Lagos Hack Weekend", kind: "meetup", host: "Co-Creation Hub", city: "Lagos", venue: "Co-Creation Hub, Yaba", format: "in-person", in_days: 11, hours: 30, description: "Two days, teams of four, a civic-tech brief. Hardware and API credits provided; demo night is open to the public.", tags: ["hackathon", "engineering", "design"], price: "Free", seats: 100 },
+      { title: "Finance Careers Evening", kind: "seminar", host: "Deloitte Nigeria", city: "Lagos", venue: "Deloitte HQ, Victoria Island", format: "in-person", in_days: 17, hours: 2, description: "Audit, tax and deals partners on what the graduate scheme looks for, and what the first three years actually involve.", tags: ["finance", "graduate", "career"], price: "Free", seats: 80 },
+      { title: "Healthcare Hiring Drive", kind: "hiring", host: "Lagoon Hospitals", city: "Lagos", venue: "Lagoon Hospital, Ikeja", format: "in-person", in_days: 20, hours: 5, description: "Nurses, lab scientists and administrators. Bring your licence and two references; interviews run the same day.", tags: ["healthcare", "nursing", "hiring"], price: "Free" },
+      { title: "Port Harcourt Energy Jobs Fair", kind: "hiring", host: "Rivers State Employment Bureau", city: "Port Harcourt", venue: "Alfred Diete-Spiff Centre", format: "in-person", in_days: 28, hours: 7, description: "Oil, gas and renewables operators hiring technicians, HSE officers and project engineers across the Niger Delta.", tags: ["engineering (hardware)", "hse", "energy"], price: "Free" }
+    ];
+    EVENT_KINDS = ["hiring", "training", "seminar", "story", "meetup", "ad"];
+    EVENT_SYNONYMS = {
+      hiring: ["hiring", "job fair", "jobs", "recruitment", "career fair", "vacancy"],
+      training: ["training", "bootcamp", "workshop", "course", "class", "boot camp"],
+      seminar: ["seminar", "talk", "panel", "clinic", "masterclass", "info session"],
+      story: ["story", "ama", "fireside", "experience", "journey"],
+      meetup: ["meetup", "networking", "community", "circle", "hackathon"],
+      ad: ["ad", "programme", "program", "opening", "cohort", "apply"]
+    };
+  }
+});
+
 // src/routes/core.ts
 var import_express2, profileRouter, profileSchema, cvRouter, designSchema, cvSchema, templateRouter, captureRouter, captureLimiter, autofillRouter, companyRouter;
 var init_core = __esm({
@@ -94456,7 +95622,11 @@ var init_core = __esm({
     init_autofill_service();
     init_resume_import_service();
     init_middleware();
+    init_network_service();
+    init_db();
+    init_errors2();
     init_cv_document();
+    init_cv_redline();
     profileRouter = (0, import_express2.Router)();
     profileRouter.use(requireAuth);
     profileRouter.get("/", async (req, res, next) => {
@@ -94584,6 +95754,32 @@ var init_core = __esm({
         next(e2);
       }
     });
+    cvRouter.put("/:id/publish", async (req, res, next) => {
+      try {
+        const body = external_exports.object({ public: external_exports.boolean().optional(), copyright: external_exports.string().max(240).nullish() }).parse(req.body ?? {});
+        ok(res, body.public ? "CV published" : "CV visibility updated", await publishCv(req.userId, String(req.params.id), body));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    cvRouter.get("/:id/reviews", async (req, res, next) => {
+      try {
+        const c2 = await get("SELECT id, user_id, public FROM cvs WHERE id = ?", String(req.params.id));
+        if (!c2) throw notFound("CV");
+        if (!c2.public && c2.user_id !== req.userId) throw notFound("CV");
+        ok(res, "Reviews retrieved", await listCvReviews(c2.id));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    cvRouter.post("/:id/reviews", async (req, res, next) => {
+      try {
+        const body = external_exports.object({ rating: external_exports.number().min(1).max(5), body: external_exports.string().min(10).max(2e3), relationship: external_exports.enum(["hirer", "recruiter", "mentor", "peer"]).optional() }).parse(req.body ?? {});
+        ok(res, "Review saved", await addCvReview(req.userId, String(req.params.id), body), 201);
+      } catch (e2) {
+        next(e2);
+      }
+    });
     cvRouter.get("/:id/suggest", async (req, res, next) => {
       try {
         ok(res, "CV suggestions", await suggestCVs(req.userId, req.query.posting_id));
@@ -94604,8 +95800,23 @@ var init_core = __esm({
             preview = void 0;
           }
         }
+        let redline;
+        if (q2.redline === "1") {
+          const design = preview ?? c2.design;
+          const doc = buildCvDoc(c2, p2, design);
+          const missing = String(q2.kw ?? "").split(",").map((s2) => s2.trim()).filter(Boolean).slice(0, 3);
+          redline = buildRedline({ doc, missingKeywords: missing }).markup;
+        }
         res.setHeader("Content-Type", "text/html; charset=utf-8");
-        res.send(renderCvHtml(c2, p2, { frame: q2.frame === "1", accent: q2.accent, design: preview ?? c2.design }));
+        res.send(
+          renderCvHtml(c2, p2, {
+            frame: q2.frame === "1",
+            accent: q2.accent,
+            design: preview ?? c2.design,
+            redline,
+            copyright: c2.copyright ?? void 0
+          })
+        );
       } catch (e2) {
         next(e2);
       }
@@ -95672,7 +96883,7 @@ async function portfolioSignals() {
   portfolioCache = { at: Date.now(), items: fallback };
   return fallback;
 }
-function polish(text) {
+function polish2(text) {
   const tokens = [];
   const masked = text.replace(/\{\{[^{}]+\}\}/g, (m2) => {
     tokens.push(m2);
@@ -95709,7 +96920,7 @@ function scorePitch(body, input) {
   checks.push({ label: "Personalised", pass: personalised, detail: personalised ? `mentions ${input.company}` : "company not named", weight: 16 });
   const youCount = (lower.match(/\byou\b|\byour\b/g) ?? []).length;
   checks.push({ label: "Reader-focused", pass: youCount >= 3, detail: `${youCount} \u201Cyou/your\u201D references`, weight: 12 });
-  const passive = (text.match(PASSIVE) ?? []).length;
+  const passive = (text.match(PASSIVE2) ?? []).length;
   checks.push({ label: "Active voice", pass: passive <= 2, detail: `${passive} passive constructions`, weight: 8 });
   const hasGreeting = /^(hi|hello|dear|hey|good (morning|afternoon))\b/i.test(text.trim());
   checks.push({ label: "Opens with a greeting", pass: hasGreeting, detail: hasGreeting ? "greeting present" : "missing greeting", weight: 8 });
@@ -95757,7 +96968,7 @@ async function composePitch(input) {
   const signoff = pick(rng, formal ? SIGNOFFS_FORMAL : SIGNOFFS_CASUAL);
   const subjectTemplate = input.kind === "application" ? pick(rng, SUBJECT_APPLICATION) : pick(rng, SUBJECT_PITCH);
   const subject = fill(subjectTemplate, vars).replace(/\s+—\s+$/g, "").slice(0, 120);
-  const body = polish(
+  const body = polish2(
     [
       greeting,
       "",
@@ -95780,7 +96991,7 @@ async function composePitch(input) {
   const { score, checks } = scorePitch(body, input);
   return { subject, body, score, checks, variant, category: key };
 }
-var hashSeed, pick, sample, PROFILES, CATEGORY_ALIASES, portfolioCache, PORTFOLIO_TTL, KNOWN_TECH, FILLERS, PASSIVE, CONSONANT_SOUND, VOWEL_SOUND, fixArticles, dedupeWords, capitalizeSentences, varyOpeners, GREETINGS_FORMAL, GREETINGS_CASUAL, SIGNOFFS_FORMAL, SIGNOFFS_CASUAL, CTAS, APPLICATION_CTAS, SUBJECT_PITCH, SUBJECT_APPLICATION, fill;
+var hashSeed, pick, sample, PROFILES, CATEGORY_ALIASES, portfolioCache, PORTFOLIO_TTL, KNOWN_TECH, FILLERS, PASSIVE2, CONSONANT_SOUND, VOWEL_SOUND, fixArticles, dedupeWords, capitalizeSentences, varyOpeners, GREETINGS_FORMAL, GREETINGS_CASUAL, SIGNOFFS_FORMAL, SIGNOFFS_CASUAL, CTAS, APPLICATION_CTAS, SUBJECT_PITCH, SUBJECT_APPLICATION, fill;
 var init_pitch_rewrite = __esm({
   "src/services/pitch-rewrite.ts"() {
     "use strict";
@@ -96208,7 +97419,7 @@ var init_pitch_rewrite = __esm({
       "resume"
     ];
     FILLERS = /\b(very|really|quite|basically|actually|literally|hopefully|maybe|just|simply|somewhat|rather|kind of|sort of)\s+/gi;
-    PASSIVE = /\b(is|are|was|were|be|been|being)\s+\w+ed\s+(by|to)\b/gi;
+    PASSIVE2 = /\b(is|are|was|were|be|been|being)\s+\w+ed\s+(by|to)\b/gi;
     CONSONANT_SOUND = /^(university|union|user|usage|unit|unique|uniform|one|once|european|useful|usual|unicorn|utility|eulogy)/i;
     VOWEL_SOUND = /^(hour|honest|honor|honour|heir|herb|historic)/i;
     fixArticles = (s2) => s2.replace(/\ban\s+([a-z]+)/gi, (m2, w2) => /^[bcdfgjklmnpqrstvwxyz]/i.test(w2) && !VOWEL_SOUND.test(w2) ? `a ${w2}` : m2).replace(
@@ -98584,12 +99795,162 @@ var init_analytics = __esm({
   }
 });
 
+// src/routes/network.ts
+var import_express8, str, peopleRouter, personSchema, hirersRouter, jobPostSchema, eventsRouter;
+var init_network = __esm({
+  "src/routes/network.ts"() {
+    "use strict";
+    import_express8 = __toESM(require_express2(), 1);
+    init_zod();
+    init_envelope();
+    init_security();
+    init_network_service();
+    str = (v2) => typeof v2 === "string" && v2.trim() ? v2.trim() : void 0;
+    peopleRouter = (0, import_express8.Router)();
+    peopleRouter.use(requireAuth);
+    peopleRouter.get("/", async (req, res, next) => {
+      try {
+        const q2 = req.query;
+        ok(
+          res,
+          "People retrieved",
+          await listPeople(req.userId, {
+            q: str(q2.q),
+            profession: str(q2.profession),
+            location: str(q2.location),
+            open_to: str(q2.open_to),
+            sort: str(q2.sort)
+          })
+        );
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    peopleRouter.get("/questions", (_req, res) => ok(res, "Profile questions", { items: PEOPLE_QUESTIONS }));
+    peopleRouter.get("/public-cvs", async (req, res, next) => {
+      try {
+        ok(res, "Public CVs", { items: await publicCvFeed(Number(req.query.limit) || 12) });
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    peopleRouter.get("/me", async (req, res, next) => {
+      try {
+        const list = await listPeople(req.userId, {});
+        ok(res, "Your public profile", { me: list.me, questions: list.questions });
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    personSchema = external_exports.object({
+      name: external_exports.string().max(120).optional(),
+      headline: external_exports.string().max(160).optional(),
+      profession: external_exports.string().max(80).optional(),
+      seniority: external_exports.string().max(40).optional(),
+      location: external_exports.string().max(120).optional(),
+      bio: external_exports.string().max(1200).optional(),
+      links: external_exports.record(external_exports.string().max(300)).optional(),
+      offers: external_exports.array(external_exports.string().max(160)).max(12).optional(),
+      looking_for: external_exports.string().max(300).optional(),
+      answers: external_exports.array(external_exports.object({ q: external_exports.string().max(200), a: external_exports.string().max(1200) })).max(10).optional(),
+      open_to: external_exports.array(external_exports.string().max(40)).max(10).optional(),
+      visible: external_exports.boolean().optional()
+    });
+    peopleRouter.put("/me", async (req, res, next) => {
+      try {
+        const body = personSchema.parse(req.body ?? {});
+        ok(res, "Public profile saved", await upsertMyPerson(req.userId, body));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    peopleRouter.get("/:id", async (req, res, next) => {
+      try {
+        ok(res, "Person retrieved", await getPerson(req.userId, String(req.params.id)));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    hirersRouter = (0, import_express8.Router)();
+    hirersRouter.use(requireAuth);
+    hirersRouter.get("/jobs", async (req, res, next) => {
+      try {
+        const q2 = req.query;
+        ok(
+          res,
+          "Platform jobs retrieved",
+          await listPlatformJobs(req.userId, {
+            q: str(q2.q),
+            location: str(q2.location),
+            remote: str(q2.remote),
+            seniority: str(q2.seniority),
+            profession: str(q2.profession)
+          })
+        );
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    hirersRouter.post("/profession", async (req, res, next) => {
+      try {
+        const body = external_exports.object({ profession: external_exports.string().min(1).max(80) }).parse(req.body);
+        ok(res, "Profession saved", await setProfession(req.userId, body.profession));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    jobPostSchema = external_exports.object({
+      company: external_exports.string().min(1).max(120),
+      title: external_exports.string().min(1).max(160),
+      profession: external_exports.string().min(1).max(80),
+      seniority: external_exports.string().max(40).optional(),
+      location: external_exports.string().max(120).optional(),
+      remote: external_exports.boolean().optional(),
+      employment_type: external_exports.enum(["full-time", "part-time", "contract", "internship"]).optional(),
+      salary_min: external_exports.number().int().nonnegative().optional(),
+      salary_max: external_exports.number().int().nonnegative().optional(),
+      currency: external_exports.string().max(8).optional(),
+      description: external_exports.string().max(4e3).optional(),
+      tags: external_exports.array(external_exports.string().max(40)).max(12).optional(),
+      contact_email: external_exports.string().email().optional()
+    });
+    hirersRouter.post("/jobs", async (req, res, next) => {
+      try {
+        const body = jobPostSchema.parse(req.body ?? {});
+        ok(res, "Job posted", await createPlatformJob(req.userId, body), 201);
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    eventsRouter = (0, import_express8.Router)();
+    eventsRouter.use(requireAuth);
+    eventsRouter.get("/", async (req, res, next) => {
+      try {
+        const q2 = req.query;
+        ok(
+          res,
+          "Events retrieved",
+          await listEvents(req.userId, {
+            q: str(q2.q),
+            kind: str(q2.kind),
+            city: str(q2.city),
+            format: str(q2.format),
+            when: str(q2.when)
+          })
+        );
+      } catch (e2) {
+        next(e2);
+      }
+    });
+  }
+});
+
 // src/routes/index.ts
-var import_express8, apiRouter, apiIndex;
+var import_express9, apiRouter, apiIndex;
 var init_routes = __esm({
   "src/routes/index.ts"() {
     "use strict";
-    import_express8 = __toESM(require_express2(), 1);
+    import_express9 = __toESM(require_express2(), 1);
     init_envelope();
     init_auth();
     init_core();
@@ -98598,6 +99959,7 @@ var init_routes = __esm({
     init_applications();
     init_outreach();
     init_analytics();
+    init_network();
     init_ingest();
     init_zod();
     init_security();
@@ -98605,18 +99967,21 @@ var init_routes = __esm({
     init_streak_service();
     init_db();
     init_config();
-    apiRouter = (0, import_express8.Router)();
+    apiRouter = (0, import_express9.Router)();
     apiRouter.get("/healthz", (_req, res) => ok(res, "ok", { status: "up", mode: process.env.MODE ?? "local", driver, time: (/* @__PURE__ */ new Date()).toISOString() }));
     apiIndex = () => ({
       name: "JAMS API",
       version: "0.1.0",
       mode: config.mode,
       base: "/api/v1",
-      endpoints: ["/auth", "/profile", "/cvs", "/templates", "/jobs", "/searches", "/applications", "/companies", "/pitch-targets", "/capture", "/autofill", "/outreach", "/mailboxes", "/inbox", "/analytics", "/streaks", "/goals", "/export", "/tracking", "/sources"]
+      endpoints: ["/auth", "/profile", "/people", "/hirers", "/events", "/cvs", "/templates", "/jobs", "/searches", "/applications", "/companies", "/pitch-targets", "/capture", "/autofill", "/outreach", "/mailboxes", "/inbox", "/analytics", "/streaks", "/goals", "/export", "/tracking", "/sources"]
     });
     apiRouter.get("/", (_req, res) => res.json(apiIndex()));
     apiRouter.use("/auth", authRouter);
     apiRouter.use("/profile", profileRouter);
+    apiRouter.use("/people", peopleRouter);
+    apiRouter.use("/hirers", hirersRouter);
+    apiRouter.use("/events", eventsRouter);
     apiRouter.use("/cvs", cvRouter);
     apiRouter.use("/templates", templateRouter);
     apiRouter.use("/jobs", jobRouter);
@@ -98668,7 +100033,7 @@ __export(app_exports, {
   createApp: () => createApp
 });
 function createApp() {
-  const app = (0, import_express9.default)();
+  const app = (0, import_express10.default)();
   app.disable("x-powered-by");
   if (process.env.VERCEL && config.jwtSecret === "dev-secret-change-me") {
     console.warn("[jams] JWT_SECRET is not set, falling back to the well-known dev secret. Set JWT_SECRET on the deployment.");
@@ -98681,7 +100046,7 @@ function createApp() {
       credentials: config.webOrigin !== "*"
     })
   );
-  app.use(import_express9.default.json({ limit: "8mb" }));
+  app.use(import_express10.default.json({ limit: "8mb" }));
   app.use(requestContext);
   startRateLimitSweeper();
   app.use("/api/v1", apiRouter);
@@ -98690,11 +100055,11 @@ function createApp() {
   app.use(errorHandler);
   return app;
 }
-var import_express9, import_cors;
+var import_express10, import_cors;
 var init_app = __esm({
   "src/app.ts"() {
     "use strict";
-    import_express9 = __toESM(require_express2(), 1);
+    import_express10 = __toESM(require_express2(), 1);
     import_cors = __toESM(require_lib3(), 1);
     init_routes();
     init_errors2();

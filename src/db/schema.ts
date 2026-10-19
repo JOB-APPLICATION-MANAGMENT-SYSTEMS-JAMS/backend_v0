@@ -360,6 +360,94 @@ CREATE TABLE IF NOT EXISTS pitch_attachments (
 -- the lca.logcluster.org contact-list catalog (slug → country + sector), discovered
 -- from the sitemap once and then served from here: a cold serverless start must not
 -- depend on fetching 4 x 500KB sitemap shards before it can list what it knows.
+-- ── the network: people, platform jobs, events, CV reviews ─────────────────
+-- These four tables are what turns the app from a private tracker into a place
+-- where the same people hire, get hired, teach and are reviewed.
+
+-- a public presence, written by its owner. The answers column is the guided
+-- interview (see PEOPLE_QUESTIONS) so Discover can show a person, not a form dump.
+CREATE TABLE IF NOT EXISTS public_profiles (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  display_name  TEXT NOT NULL,
+  headline      TEXT,
+  profession    TEXT,
+  seniority     TEXT,
+  location      TEXT,
+  bio           TEXT,
+  links         TEXT NOT NULL DEFAULT '{}',   -- JSON: github, linkedin, x, instagram, website, dribbble, behance
+  offers        TEXT NOT NULL DEFAULT '[]',   -- JSON array: what this person can do for someone
+  looking_for   TEXT,
+  answers       TEXT NOT NULL DEFAULT '[]',   -- JSON [{q, a}]
+  open_to       TEXT NOT NULL DEFAULT '[]',   -- JSON: full-time, contract, mentorship, collaboration, hiring
+  visible       INTEGER NOT NULL DEFAULT 1,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_people_prof ON public_profiles(profession, visible);
+
+-- jobs posted *on this platform*, as opposed to aggregated board listings.
+CREATE TABLE IF NOT EXISTS platform_jobs (
+  id              TEXT PRIMARY KEY,
+  posted_by       TEXT REFERENCES users(id) ON DELETE SET NULL,
+  company         TEXT NOT NULL,
+  title           TEXT NOT NULL,
+  profession      TEXT NOT NULL,
+  seniority       TEXT,
+  location        TEXT,
+  remote          INTEGER NOT NULL DEFAULT 0,
+  employment_type TEXT NOT NULL DEFAULT 'full-time',
+  salary_min      INTEGER,
+  salary_max      INTEGER,
+  currency        TEXT,
+  description     TEXT,
+  tags            TEXT NOT NULL DEFAULT '[]',
+  contact_email   TEXT,
+  status          TEXT NOT NULL DEFAULT 'open',
+  demo            INTEGER NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_hirer_jobs_prof ON platform_jobs(profession, status);
+
+-- events, trainings, seminars, hiring meetups, stories and program ads.
+CREATE TABLE IF NOT EXISTS event_listings (
+  id          TEXT PRIMARY KEY,
+  title       TEXT NOT NULL,
+  kind        TEXT NOT NULL,               -- hiring | training | seminar | story | meetup | ad
+  host        TEXT NOT NULL,
+  city        TEXT,
+  country     TEXT,
+  venue       TEXT,
+  format      TEXT NOT NULL DEFAULT 'in-person',   -- in-person | virtual | hybrid
+  starts_at   TEXT NOT NULL,
+  ends_at     TEXT,
+  description TEXT,
+  tags        TEXT NOT NULL DEFAULT '[]',
+  url         TEXT,
+  price       TEXT,
+  seats       INTEGER,
+  featured    INTEGER NOT NULL DEFAULT 0,
+  demo        INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_events_city ON event_listings(city, starts_at);
+
+-- reviews left on a CV its owner chose to publish. One per reviewer per CV.
+CREATE TABLE IF NOT EXISTS cv_reviews (
+  id            TEXT PRIMARY KEY,
+  cv_id         TEXT NOT NULL REFERENCES cvs(id) ON DELETE CASCADE,
+  owner_id      TEXT NOT NULL,
+  reviewer_id   TEXT NOT NULL,
+  reviewer_name TEXT NOT NULL,
+  reviewer_role TEXT,
+  relationship  TEXT NOT NULL DEFAULT 'peer',   -- hirer | recruiter | peer | mentor
+  rating        INTEGER NOT NULL,
+  body          TEXT NOT NULL,
+  created_at    TEXT NOT NULL,
+  UNIQUE (cv_id, reviewer_id)
+);
+CREATE INDEX IF NOT EXISTS ix_reviews_cv ON cv_reviews(cv_id, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS logcluster_pages (
   slug          TEXT PRIMARY KEY,
   country       TEXT NOT NULL,

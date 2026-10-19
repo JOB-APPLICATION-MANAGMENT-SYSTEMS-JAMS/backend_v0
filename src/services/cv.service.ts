@@ -6,6 +6,7 @@ import { tokenize, expand } from "../search/synonyms";
 import { profileSignals } from "./profile-signals";
 import { scorePosting } from "./scoring.service";
 import { buildCvDoc, estimateCvDoc, type CvDesign, type CvDoc, type CvLine } from "../lib/cv-document";
+import { buildRedline } from "../lib/cv-redline";
 
 export interface CVBlock {
   type: "summary" | "experience" | "skills" | "projects" | "education" | "awards" | "custom";
@@ -56,6 +57,10 @@ export interface CreateCVInput {
   design?: CvDesign;
   template_id?: string | null;
   profile_id?: string | null;
+  /** listed on Discover so other people can review it */
+  public?: boolean | number;
+  /** the ownership line printed at the foot of a published CV */
+  copyright?: string | null;
 }
 
 export async function createCV(userId: string, input: CreateCVInput) {
@@ -126,6 +131,14 @@ export async function updateCV(userId: string, id: string, patch: Partial<Create
   if (patch.template_id !== undefined) {
     sets.push("template_id = ?");
     args.push(patch.template_id);
+  }
+  if (patch.public !== undefined) {
+    sets.push("public = ?");
+    args.push(patch.public ? 1 : 0);
+  }
+  if (patch.copyright !== undefined) {
+    sets.push("copyright = ?");
+    args.push(patch.copyright ? String(patch.copyright).slice(0, 240) : null);
   }
   await run(`UPDATE cvs SET ${sets.join(", ")} WHERE id = ? AND user_id = ?`, ...args, id, userId);
   return getCV(userId, id);
@@ -437,6 +450,44 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
         ? "Nothing structural is in the way: this is ready to send."
         : "No blockers, the rest is polish.";
 
+  // The redline reads the same printed document: rule-based rewrites of weak
+  // lines, a figure where a bullet has none, and the JD keywords that never print.
+  const redline = buildRedline({ doc, missingKeywords: missing });
+  const failing = checks.filter((c) => !c.ok && c.key !== "content");
+  const potential = Math.min(100, Math.round(((weightEarned + failing.reduce((n, c) => n + WEIGHT[c.severity], 0)) / weightTotal) * 100));
+
+  // What to do *next*, ordered by what moves the score most. The panel shows this
+  // above the checklist: a weak score should come with a plan, not just a number.
+  const advice: { key: string; title: string; detail: string; gain: number }[] = [];
+  if (!hasContent) {
+    advice.push({ key: "start", title: "Give the page something to score", detail: "Add a summary, one role and five skills, then re-run this check.", gain: 100 });
+  }
+  const worst = [...failing].sort((a, b) => WEIGHT[b.severity] - WEIGHT[a.severity]);
+  for (const c of worst.slice(0, 4)) {
+    advice.push({
+      key: c.key,
+      title: c.label,
+      detail: c.fix,
+      gain: Math.round((WEIGHT[c.severity] / weightTotal) * 100),
+    });
+  }
+  if (redline.edits.length) {
+    advice.push({
+      key: "redline",
+      title: `Tighten ${redline.counts.replace} line${redline.counts.replace === 1 ? "" : "s"} and add ${redline.counts.add} detail${redline.counts.add === 1 ? "" : "s"}`,
+      detail: redline.summary,
+      gain: Math.min(12, redline.counts.important * 2),
+    });
+  }
+  if (missing.length) {
+    advice.push({
+      key: "keywords",
+      title: `Cover ${missing.length} job-description keyword${missing.length === 1 ? "" : "s"}`,
+      detail: `Missing: ${missing.slice(0, 6).join(", ")} — add only the ones that are true.`,
+      gain: 10,
+    });
+  }
+
   const signals = await profileSignals(userId);
   const jdScore = posting
     ? scorePosting(signals, { title: posting.title, description: posting.description, companyName: posting.company_name, seniority: posting.seniority, remote: !!posting.remote, location: posting.location, salaryMin: posting.salary_min, salaryMax: posting.salary_max, postedAt: posting.posted_at })
@@ -448,6 +499,10 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
     ats: { score, checks, pages, band, blockers, summary, weight_total: weightTotal, weight_earned: weightEarned },
     keywords: { matched, missing, coverage_pct: coverage, jd_total: jdKeywords.length },
     jd_match: jdScore ? { score: jdScore.score, explain: jdScore.explain } : null,
+    /** score if every failing row turns green — the ceiling, not a promise */
+    potential_score: potential,
+    advice,
+    redline,
     suggestions: [
       ...missing.slice(0, 6).map((k) => `Keyword from the JD not in your CV: “${k}” (only add if true)`),
       ...checks.filter((c) => !c.ok).sort((a, b) => WEIGHT[b.severity] - WEIGHT[a.severity]).map((c) => c.fix),

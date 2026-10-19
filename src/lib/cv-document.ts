@@ -519,6 +519,14 @@ export type CvDocOptions = {
   accent?: string;
   /** the CV's own document settings */
   design?: CvDesign;
+  /**
+   * The redline pass, keyed by the exact printed line. Present only while the
+   * editor is reviewing: strikethrough for what goes, green for what replaces it.
+   * Printing an annotated sheet prints the *accepted* text (see the print rules).
+   */
+  redline?: Record<string, { after: string; rule: string; note?: string }>;
+  /** the ownership line a published CV can carry */
+  copyright?: string;
 };
 
 export function renderCvHtml(c: any, p: any, opts: CvDocOptions = {}): string {
@@ -540,18 +548,28 @@ export function renderCvHtml(c: any, p: any, opts: CvDocOptions = {}): string {
   const dateRight = design.datePos === "right";
   const rule = m.rule > 0;
   const headColour = design.headTone === "ink" ? "var(--ink)" : "var(--mark)";
+  const redline = opts.redline ?? {};
+
+  /** A printed line, annotated when the redline pass has something to say about it. */
+  const marked = (text: string): string => {
+    const mark = redline[text];
+    if (!mark) return esc(text);
+    const body = mark.after ? `<del>${esc(text)}</del> <ins>${esc(mark.after)}</ins>` : esc(text);
+    const note = mark.note ? ` <ins class="rl-note">+ ${esc(mark.note)}</ins>` : "";
+    return body + note;
+  };
 
   const linesHtml = (body: CvLine[]): string =>
     body
       .map((line) => {
-        if (line.k === "prose") return `<p>${esc(line.text)}</p>`;
+        if (line.k === "prose") return `<p>${marked(line.text)}</p>`;
         if (line.k === "skills")
           return `<div class="skills">${line.items.map((x) => `<span>${esc(x)}</span>`).join("")}</div>`;
         const left = `${line.when ? `<div>${esc(line.when)}</div>` : ""}${line.loc ? `<div>${esc(line.loc)}</div>` : ""}`;
         const right =
           (line.title ? `<div class="t">${esc(line.title)}</div>` : "") +
           (line.org ? `<div class="org">${esc(line.org)}</div>` : "") +
-          line.body.map((t) => `<p>${esc(t)}</p>`).join("");
+          line.body.map((t) => `<p>${marked(t)}</p>`).join("");
         const when = `<div class="when">${left}</div>`;
         const what = `<div class="what">${right}</div>`;
         return `<div class="entry">${dateRight ? what + when : when + what}</div>`;
@@ -680,10 +698,29 @@ h2 + .entry { padding-top: ${px(m.entryTop)}px; }
   line-height: ${px(m.bodyLine)}px; break-inside: avoid; }
 .skills > span::before { content: ""; width: 4px; height: 4px; flex: 0 0 4px; background: var(--mark); }
 
+/* ── redline: what goes, and what replaces it ─────────────────────────── */
+/* Review marks, not document formatting: red says strike this line, green says
+   the rewrite (or the figure/claim the line is missing). */
+del { color: #9f1414; background: #fdecec; text-decoration: line-through; text-decoration-thickness: 1px; }
+ins { color: #0a6b3b; background: #e9f7ee; text-decoration: none; border-bottom: 1px solid rgb(10 107 59 / 0.5); }
+ins.rl-note { display: inline-block; background: transparent; border: 1px dashed rgb(10 107 59 / 0.55);
+  border-radius: 2px; padding: 0 3px; font-style: italic; font-size: 0.92em; }
+
+/* the ownership line a published CV carries */
+.copy { margin-top: ${px(m.sectionTop)}px; padding-top: 6px; border-top: 1px solid rgb(0 0 0 / 0.12);
+  font-size: 8pt; text-align: center; color: rgb(0 0 0 / 0.62); }
+
 /* On screen the sheet carries the 297mm floor and the top margin itself, so the
    preview shows a real page. On paper the page box supplies the vertical margin
    — which is what gives page 2 of a long CV the same inset as page 1. */
 @media print { .page { min-height: 0; margin: 0; padding-top: 0; } }
+/* Annotated sheets are a working copy. Printing accepts the edits: the struck
+   line disappears, the rewrite prints as plain text, and the note stays advice. */
+@media print {
+  del { display: none; }
+  ins { color: inherit; background: none; border: 0; text-decoration: none; }
+  ins.rl-note { display: none; }
+}
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -694,6 +731,7 @@ h2 + .entry { padding-top: ${px(m.entryTop)}px; }
   ${contactHtml}
 </header>
 ${sections}
+${opts.copyright ? `<footer class="copy">${esc(opts.copyright)}</footer>` : ""}
 </div>
 </body>
 </html>`;

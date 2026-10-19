@@ -33,6 +33,10 @@ const ENSURE_COLUMNS: { table: string; column: string; ddl: string }[] = [
   { table: "job_postings", column: "contact_email", ddl: "ALTER TABLE job_postings ADD COLUMN contact_email TEXT" },
   { table: "pitch_targets", column: "country", ddl: "ALTER TABLE pitch_targets ADD COLUMN country TEXT" },
   { table: "cvs", column: "design", ddl: "ALTER TABLE cvs ADD COLUMN design TEXT NOT NULL DEFAULT '{}'" },
+  // publishing: a CV is private until its owner says otherwise, and a published
+  // one can carry an ownership line at the foot of the page
+  { table: "cvs", column: "public", ddl: "ALTER TABLE cvs ADD COLUMN public INTEGER NOT NULL DEFAULT 0" },
+  { table: "cvs", column: "copyright", ddl: "ALTER TABLE cvs ADD COLUMN copyright TEXT" },
 ];
 
 /** Idempotent statements for databases created before they existed. */
