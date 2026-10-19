@@ -51,7 +51,7 @@ export interface ComposedPitch {
 
 /* --------------------------------- PRNG ----------------------------------- */
 
-/** mulberry32: tiny, fast, deterministic — same seed always yields same wording. */
+/** mulberry32: tiny, fast, deterministic - same seed always yields same wording. */
 export function mulberry32(seed: number) {
   let a = seed >>> 0;
   return () => {
@@ -716,7 +716,7 @@ export async function composePitch(input: PitchInput): Promise<ComposedPitch> {
   const signoff = pick(rng, formal ? SIGNOFFS_FORMAL : SIGNOFFS_CASUAL);
 
   const subjectTemplate = input.kind === "application" ? pick(rng, SUBJECT_APPLICATION) : pick(rng, SUBJECT_PITCH);
-  const subject = fill(subjectTemplate, vars).replace(/\s+—\s+$/g, "").slice(0, 120);
+  const subject = fill(subjectTemplate, vars).replace(/\s+-\s+$/g, "").slice(0, 120);
 
   const body = polish(
     [

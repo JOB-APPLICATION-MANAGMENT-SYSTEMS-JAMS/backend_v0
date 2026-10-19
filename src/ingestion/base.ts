@@ -54,7 +54,7 @@ export function inferSeniority(title: string, text = ""): string | null {
 export function normalize(raw: RawPosting, now = new Date()): Omit<RawPosting, "source" | "external_id"> & { dedupe_key: string; first_seen_at: string } {
   const text = raw.description ?? "";
   // feeds are loosely typed: Jobicy hands back objects where a string is declared,
-  // and SQLite refuses to bind an object — coerce every scalar before it hits SQL
+  // and SQLite refuses to bind an object - coerce every scalar before it hits SQL
   const asText = (v: any): string | null =>
     v == null ? null : typeof v === "string" ? v.trim() || null : typeof v === "number" || typeof v === "boolean" ? String(v) : JSON.stringify(v);
   const asNum = (v: any): number | null => {

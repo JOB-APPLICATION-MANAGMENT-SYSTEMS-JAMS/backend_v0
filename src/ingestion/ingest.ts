@@ -30,7 +30,7 @@ export async function ingestAll(userId: string, opts: { sources?: string[] } = {
   const t0 = Date.now();
   const signals = await profileSignals(userId);
   // enabled by default: a source with no row yet (first run, or one added in a new
-  // release) must not be silently skipped — only an explicit `enabled = 0` blocks it
+  // release) must not be silently skipped - only an explicit `enabled = 0` blocks it
   const disabled = new Set(
     (await all<{ name: string; enabled: number }>("SELECT name FROM sources WHERE enabled = 0")).map((s) => s.name)
   );

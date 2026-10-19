@@ -57,7 +57,7 @@ const BASE_ALIASES: Record<string, string[]> = {
   "identity.nationality": ["nationality"],
   "identity.religion": ["religion"],
   "identity.hobbies": ["hobbies", "hobby", "interests"],
-  // granular address — "Address" routes to street (falls back to location),
+  // granular address - "Address" routes to street (falls back to location),
   // "City" to city (same fallback), so older profiles keep filling as before
   "identity.street": ["street", "address line 1", "address"],
   "identity.city": ["city", "town"],
@@ -78,7 +78,7 @@ const BASE_ALIASES: Record<string, string[]> = {
   "identity.previous_job_role": ["previous job role", "prior job role", "last job role"],
   "identity.previous_responsibilities": ["job responsibilities (previous)", "responsibilities (previous)", "previous responsibilities"],
   "identity.current_salary": ["current salary", "current salary (per annum)", "present salary"],
-  // referees — numbered aliases win on numbered labels; key 1 also carries the
+  // referees - numbered aliases win on numbered labels; key 1 also carries the
   // unnumbered phrasings so a bare "Referee Name" defaults to referee 1
   "identity.referee1_name": ["referee name 1", "referee 1 name", "referee name", "referee"],
   "identity.referee1_email": ["referee email 1", "referee email"],
@@ -112,13 +112,13 @@ const AUTOCOMPLETE_MAP: Record<string, { key: string; confidence: number }> = {
 export async function autofillSchema(userId: string) {
   const p = await get<any>("SELECT * FROM profiles WHERE user_id = ?", userId);
   // reconcile first/last/full from whichever name key holds it, and fall back to
-  // the account email — an untouched profile should still fill its email field
+  // the account email - an untouched profile should still fill its email field
   const identity: any = p ? reconcileIdentity(parseJson(p.identity, {})) : {};
   const u = await get<any>("SELECT email FROM users WHERE id = ?", userId);
   if (u?.email && !identity.email) identity.email = u.email;
   const aliases: any = p ? parseJson(p.aliases, {}) : {};
   // education lives in its own table; the first row answers school/degree/discipline
-  // selects — but an answer edited on /autofill (saved into identity) wins, so the
+  // selects - but an answer edited on /autofill (saved into identity) wins, so the
   // candidate's explicit edit is never silently overridden by the seeded row
   const edu: any[] = p ? await all<any>("SELECT * FROM profile_education WHERE profile_id = ? ORDER BY sort_order LIMIT 1", p.id) : [];
   const e0 = edu[0];
@@ -182,7 +182,7 @@ export async function autofillSchema(userId: string) {
     "identity.twitter": identity.links?.twitter ?? "",
   };
   // Custom Q&A from the /autofill page: profile.autofill_answers =
-  // [{ match: "question snippet", answer: "your answer" }] — each becomes a
+  // [{ match: "question snippet", answer: "your answer" }] - each becomes a
   // matchable key so recurring exam questions answer themselves verbatim.
   const answers = Array.isArray(identity.autofill_answers) ? identity.autofill_answers : [];
   for (const [i, a] of answers.entries()) {
@@ -230,7 +230,7 @@ const isSelfIdentification = (label: string) =>
 
 /**
  * Sensitive self-ID keys: we never *infer* these (§35.2), but if the candidate
- * explicitly saved an answer in their own profile we fill exactly that — it is
+ * explicitly saved an answer in their own profile we fill exactly that - it is
  * their stated choice, same as any other answer. Word-boundary match only, so
  * "transgender" never receives the gender value.
  */
@@ -255,7 +255,7 @@ const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").rep
 export async function matchFields(userId: string, host: string, fields: DetectedField[]): Promise<{ mappings: Mapping[]; skipped: string[]; skip_reasons: { field: string; reason: string }[] }> {
   const schema = await autofillSchema(userId);
   const values = new Map(schema.fields.map((f) => [f.key, f.value ?? ""]));
-  // merged alias map (base + profile-edited aliases + custom answers) — the
+  // merged alias map (base + profile-edited aliases + custom answers) - the
   // profile page's alias editor used to be decorative; matching now reads it
   const aliasMap = new Map<string, string[]>(schema.fields.map((f) => [f.key, f.aliases ?? []]));
   const isCustom = (key: string) => key.startsWith("custom.");
@@ -273,16 +273,16 @@ export async function matchFields(userId: string, host: string, fields: Detected
 
   for (const [index, f] of fields.entries()) {
     if (isPassword(f)) {
-      skip(f.name ?? f.id ?? "password", "sensitive — never filled");
+      skip(f.name ?? f.id ?? "password", "sensitive - never filled");
       continue; // guardrail: never fill password fields (§35.2)
     }
     if (f.label && isSelfIdentification(f.label)) {
       const explicit = sensitiveAnswer(f.label, aliasMap, values);
       if (explicit) {
-        // the candidate saved this answer themselves — fill it, never infer one
+        // the candidate saved this answer themselves - fill it, never infer one
         mappings.push({ key: explicit.key, value: explicit.value, confidence: 0.9, method: "explicit", field_index: index });
       } else {
-        skip(f.label, "voluntary self-identification — your answer, not ours");
+        skip(f.label, "voluntary self-identification - your answer, not ours");
       }
       continue; // guardrail: EEOC self-ID questions are the candidate's call, not ours
     }
@@ -299,7 +299,7 @@ export async function matchFields(userId: string, host: string, fields: Detected
       best = { key: m.key, confidence: m.confidence, method: "autocomplete" };
     }
 
-    // 3. name/id token match — token SETS (not substrings), and the most
+    // 3. name/id token match - token SETS (not substrings), and the most
     // specific alias wins so "first_name" maps to first_name, not full_name
     if (!best && (f.name || f.id)) {
       const tokens = new Set(
@@ -341,7 +341,7 @@ export async function matchFields(userId: string, host: string, fields: Detected
       }
     }
 
-    // 3.6. exact label match — normalized label equals an alias verbatim. Must run
+    // 3.6. exact label match - normalized label equals an alias verbatim. Must run
     // before the fuzzy step: dice can score a *shorter* alias at 1.0 too
     // ("Referee Name 2" bigrams contain all of "referee name"'s), and first-seen
     // would then keep referee1 for a referee-2 field. Exact wins deterministically.
@@ -371,11 +371,11 @@ export async function matchFields(userId: string, host: string, fields: Detected
 
     // 4b. label containment: long exam-style questions ("Will you now or in the future
     // require sponsorship for employment visa status (e.g., H-1B, TN, etc.)?") never reach
-    // 0.55 against a short alias — if the question *contains* an alias phrase, match it.
+    // 0.55 against a short alias - if the question *contains* an alias phrase, match it.
     // Also runs when step 4 fired: a phrase present verbatim beats bigram similarity,
     // correcting stem-misses ("Highest Qualification / Degree" fuzzy-matches
     // "other qualifications" via the shared stem but truly contains "degree").
-    // Never overrides history/autocomplete/name/custom — those keep priority.
+    // Never overrides history/autocomplete/name/custom - those keep priority.
     if (f.label && (!best || best.method === "label")) {
       const L = normalize(f.label);
       let hit: { key: string; aliasLen: number } | null = null;
@@ -395,11 +395,11 @@ export async function matchFields(userId: string, host: string, fields: Detected
     }
 
     if (!best) {
-      skip(f.label ?? f.name ?? "unknown", "no confident match — left empty rather than guessed");
+      skip(f.label ?? f.name ?? "unknown", "no confident match - left empty rather than guessed");
       continue;
     }
     if (!values.get(best.key)) {
-      skip(f.label ?? f.name ?? best.key, `no profile data for ${best.key} — add it in your profile`);
+      skip(f.label ?? f.name ?? best.key, `no profile data for ${best.key} - add it in your profile`);
       continue;
     }
     mappings.push({ key: best.key, value: values.get(best.key)!, confidence: Math.min(1, best.confidence), method: best.method, field_index: index });

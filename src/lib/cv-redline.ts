@@ -2,7 +2,7 @@
  * The redline pass: what a recruiter would strike out, and what they would write
  * in its place.
  *
- * A CV is read by two audiences — a parser that looks for structure and keywords,
+ * A CV is read by two audiences - a parser that looks for structure and keywords,
  * and a person who decides in seven seconds. Most weak bullets fail both for the
  * same reasons: a weak opener ("Responsible for…"), the passive voice, first
  * person, filler words, a missing figure. Those are mechanical enough to detect
@@ -10,7 +10,7 @@
  * behind a model call: the same CV always produces the same redlines, they print
  * no differently on two machines, and the editor can show them instantly.
  *
- * Every rewrite is a *suggestion*. Nothing is applied automatically — the editor
+ * Every rewrite is a *suggestion*. Nothing is applied automatically - the editor
  * renders `del`/`ins` and the user keeps what is true.
  */
 import type { CvDoc, CvLine } from "./cv-document";
@@ -203,7 +203,7 @@ export function polish(line: string): { text: string; reasons: { rule: RedlineRu
   // first person at the start: "I built X" → "Built X"
   if (FIRST_PERSON.test(text)) {
     text = capitalise(text.replace(FIRST_PERSON, ""));
-    reasons.push({ rule: "first-person", why: "A CV is already about you — drop “I/we”" });
+    reasons.push({ rule: "first-person", why: "A CV is already about you - drop “I/we”" });
   }
 
   // repeated word: "the the"
@@ -354,7 +354,7 @@ export function buildRedline({ doc, missingKeywords = [], max = 14 }: RedlineInp
             section: section.head,
             kind: "add",
             before: text,
-            after: "split at the second clause — two bullets scan faster than one",
+            after: "split at the second clause - two bullets scan faster than one",
             reason: "Over 210 characters; recruiters scan, they do not read",
             rule: "too-long",
             severity: "polish",
@@ -402,13 +402,13 @@ export function buildRedline({ doc, missingKeywords = [], max = 14 }: RedlineInp
     },
     hygiene,
     summary: edits.length
-      ? `${edits.length} line${edits.length === 1 ? "" : "s"} to tighten — ${important} change${important === 1 ? "" : "s"} the wording, ${polishCount} add a figure or split a run-on.`
+      ? `${edits.length} line${edits.length === 1 ? "" : "s"} to tighten - ${important} change${important === 1 ? "" : "s"} the wording, ${polishCount} add a figure or split a run-on.`
       : "Nothing mechanical to strike: the wording is already tight.",
     by_rule,
   };
 }
 
-/** Flatten a doc's printable lines — used by the editor's outline and by tests. */
+/** Flatten a doc's printable lines - used by the editor's outline and by tests. */
 export function docLines(doc: CvDoc): string[] {
   return doc.sections.flatMap((s) =>
     s.lines.flatMap((l: CvLine) => (l.k === "prose" ? [l.text] : l.k === "entry" ? l.body : l.items))

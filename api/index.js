@@ -39715,7 +39715,13 @@ var init_db = __esm({
       "DROP INDEX IF EXISTS ux_postings_src_ext",
       "CREATE UNIQUE INDEX IF NOT EXISTS ux_postings_user_src_ext ON job_postings(user_id, source, external_id)",
       "CREATE INDEX IF NOT EXISTS ix_postings_email ON job_postings(contact_email)",
-      "CREATE INDEX IF NOT EXISTS ix_pitch_sector ON pitch_targets(sector, email_derived)"
+      "CREATE INDEX IF NOT EXISTS ix_pitch_sector ON pitch_targets(sector, email_derived)",
+      // Demo copy used to be set with em dashes. The product voice is plain hyphens
+      // now, and a database seeded before that change would keep rendering the old
+      // titles, so normalise the demo rows once at boot (user-authored rows are left
+      // exactly as their owner typed them).
+      "UPDATE platform_jobs SET title = REPLACE(title, '\u2014', '-'), company = REPLACE(company, '\u2014', '-'), description = REPLACE(description, '\u2014', '-') WHERE demo = 1 AND (title LIKE '%\u2014%' OR company LIKE '%\u2014%' OR description LIKE '%\u2014%')",
+      "UPDATE event_listings SET title = REPLACE(title, '\u2014', '-'), host = REPLACE(host, '\u2014', '-'), venue = REPLACE(venue, '\u2014', '-'), description = REPLACE(description, '\u2014', '-') WHERE demo = 1 AND (title LIKE '%\u2014%' OR host LIKE '%\u2014%' OR venue LIKE '%\u2014%' OR description LIKE '%\u2014%')"
     ];
     OID_INT8 = 20;
     OID_NUMERIC = 1700;
@@ -52732,7 +52738,7 @@ function renderCvHtml(c2, p2, opts = {}) {
 <title>${esc(doc.name)} \u2014 CV</title>
 <style>
 /* Amiri is the face the reference document embeds (ascent 1.124em / descent
-   0.634em, upem 1000 \u2014 identical to the file the PDF carries). Bundled rather
+   0.634em, upem 1000 - identical to the file the PDF carries). Bundled rather
    than fetched so a CV prints the same on every machine, and \`block\` so nothing
    is laid out in a fallback face and re-flowed once the real one arrives. */
 @font-face { font-family: Amiri; font-style: normal; font-weight: 400; font-display: block;
@@ -52813,7 +52819,7 @@ p { margin: 0; }
   margin-bottom: ${px(m2.entryGap)}px; }
 .entry:last-child { margin-bottom: 0; }
 /* The reference starts an entry's first line 31px below its heading but prose
-   lines at 30px \u2014 one pixel of its own box model, kept so every later section
+   lines at 30px - one pixel of its own box model, kept so every later section
    lands on the measured baseline instead of drifting. Padding, not margin:
    a margin here would collapse into the heading's own margin-bottom. */
 h2 + .entry { padding-top: ${px(m2.entryTop)}px; }
@@ -52842,7 +52848,7 @@ ins.rl-note { display: inline-block; background: transparent; border: 1px dashed
 
 /* On screen the sheet carries the 297mm floor and the top margin itself, so the
    preview shows a real page. On paper the page box supplies the vertical margin
-   \u2014 which is what gives page 2 of a long CV the same inset as page 1. */
+   - which is what gives page 2 of a long CV the same inset as page 1. */
 @media print { .page { min-height: 0; margin: 0; padding-top: 0; } }
 /* Annotated sheets are a working copy. Printing accepts the edits: the struck
    line disappears, the rewrite prints as plain text, and the note stays advice. */
@@ -52926,7 +52932,7 @@ var init_cv_document = __esm({
     CV_ACCENTS = {
       /** the reference document: pure paper black */
       ink: "#000000",
-      /** the app's brand hue, one step down — #ff9933 only clears 2:1 as text on paper */
+      /** the app's brand hue, one step down - #ff9933 only clears 2:1 as text on paper */
       ember: "#b35f00",
       graphite: "#5b564f"
     };
@@ -52991,7 +52997,7 @@ function polish(line) {
   }
   if (FIRST_PERSON.test(text)) {
     text = capitalise(text.replace(FIRST_PERSON, ""));
-    reasons.push({ rule: "first-person", why: "A CV is already about you \u2014 drop \u201CI/we\u201D" });
+    reasons.push({ rule: "first-person", why: "A CV is already about you - drop \u201CI/we\u201D" });
   }
   const dup = text.match(/\b(\w+)\s+\1\b/i);
   if (dup) {
@@ -53099,7 +53105,7 @@ function buildRedline({ doc, missingKeywords = [], max = 14 }) {
             section: section2.head,
             kind: "add",
             before: text,
-            after: "split at the second clause \u2014 two bullets scan faster than one",
+            after: "split at the second clause - two bullets scan faster than one",
             reason: "Over 210 characters; recruiters scan, they do not read",
             rule: "too-long",
             severity: "polish"
@@ -53142,7 +53148,7 @@ function buildRedline({ doc, missingKeywords = [], max = 14 }) {
       polish: polishCount
     },
     hygiene,
-    summary: edits.length ? `${edits.length} line${edits.length === 1 ? "" : "s"} to tighten \u2014 ${important} change${important === 1 ? "" : "s"} the wording, ${polishCount} add a figure or split a run-on.` : "Nothing mechanical to strike: the wording is already tight.",
+    summary: edits.length ? `${edits.length} line${edits.length === 1 ? "" : "s"} to tighten - ${important} change${important === 1 ? "" : "s"} the wording, ${polishCount} add a figure or split a run-on.` : "Nothing mechanical to strike: the wording is already tight.",
     by_rule
   };
 }
@@ -53469,8 +53475,8 @@ async function matchCV(userId, cvId, postingId) {
       label: "The page has content to send",
       severity: "critical",
       ok: hasContent,
-      evidence: hasContent ? `${doc.sections.length} section${doc.sections.length === 1 ? " prints" : "s print"} \u2014 ${printedEntries.length} role${printedEntries.length === 1 ? "" : "s"}, ${summaryLines.length} summary line${summaryLines.length === 1 ? "" : "s"}, ${skillItems.length} skill${skillItems.length === 1 ? "" : "s"}` : "nothing prints below the contact row",
-      fix: "Add a summary, a role and a few skills \u2014 an empty page cannot be parsed or ranked"
+      evidence: hasContent ? `${doc.sections.length} section${doc.sections.length === 1 ? " prints" : "s print"} - ${printedEntries.length} role${printedEntries.length === 1 ? "" : "s"}, ${summaryLines.length} summary line${summaryLines.length === 1 ? "" : "s"}, ${skillItems.length} skill${skillItems.length === 1 ? "" : "s"}` : "nothing prints below the contact row",
+      fix: "Add a summary, a role and a few skills - an empty page cannot be parsed or ranked"
     },
     {
       key: "email",
@@ -53478,7 +53484,7 @@ async function matchCV(userId, cvId, postingId) {
       severity: "critical",
       ok: !!mail,
       evidence: mail ? `${mail.label} prints in the header` : "the header has no email address",
-      fix: "Add your email on the Profile page \u2014 every parser looks for it first"
+      fix: "Add your email on the Profile page - every parser looks for it first"
     },
     {
       key: "phone",
@@ -53501,15 +53507,15 @@ async function matchCV(userId, cvId, postingId) {
       label: "Experience section prints at least one role",
       severity: "important",
       ok: expEntries.length > 0,
-      evidence: expEntries.length ? `${expEntries.length} role${expEntries.length === 1 ? "" : "s"} print on the page` : sourced("experience") ? "the experience block prints no roles \u2014 your profile has no roles to pull in" : "the experience block prints no roles",
-      fix: "Add a role on the Profile page, or write one in the block \u2014 parsers read what prints"
+      evidence: expEntries.length ? `${expEntries.length} role${expEntries.length === 1 ? "" : "s"} print on the page` : sourced("experience") ? "the experience block prints no roles - your profile has no roles to pull in" : "the experience block prints no roles",
+      fix: "Add a role on the Profile page, or write one in the block - parsers read what prints"
     },
     {
       key: "education",
       label: "Education section prints at least one entry",
       severity: "important",
       ok: eduEntries.length > 0,
-      evidence: eduEntries.length ? `${eduEntries.length} entr${eduEntries.length === 1 ? "y" : "ies"} print on the page` : sourced("education") ? "the education block prints no entries \u2014 your profile has no schools to pull in" : "the education block prints no entries",
+      evidence: eduEntries.length ? `${eduEntries.length} entr${eduEntries.length === 1 ? "y" : "ies"} print on the page` : sourced("education") ? "the education block prints no entries - your profile has no schools to pull in" : "the education block prints no entries",
       fix: "Add a school on the Profile page, or write the entry in the block"
     },
     {
@@ -53517,8 +53523,8 @@ async function matchCV(userId, cvId, postingId) {
       label: "Skills print as a list (keyword-friendly)",
       severity: "important",
       ok: skillItems.length > 0,
-      evidence: skillItems.length ? `${skillItems.length} skill${skillItems.length === 1 ? "" : "s"} print as keywords` : sourced("skills") ? "the skills block prints no names \u2014 your profile has no skills to pull in" : "the skills block prints no names",
-      fix: "Add skills on the Profile page \u2014 it is the cheapest place to match a job description"
+      evidence: skillItems.length ? `${skillItems.length} skill${skillItems.length === 1 ? "" : "s"} print as keywords` : sourced("skills") ? "the skills block prints no names - your profile has no skills to pull in" : "the skills block prints no names",
+      fix: "Add skills on the Profile page - it is the cheapest place to match a job description"
     },
     {
       key: "summary",
@@ -53534,7 +53540,7 @@ async function matchCV(userId, cvId, postingId) {
       severity: "important",
       ok: printedEntries.length > 0 && datedEntries === printedEntries.length,
       evidence: printedEntries.length === 0 ? "nothing dated prints yet" : datedEntries === printedEntries.length ? `all ${printedEntries.length} printed entries are dated` : `${printedEntries.length - datedEntries} of ${printedEntries.length} printed entries have no start date`,
-      fix: "Add start dates \u2014 tenure maths and gap detection both need them"
+      fix: "Add start dates - tenure maths and gap detection both need them"
     },
     {
       key: "length",
@@ -53579,7 +53585,7 @@ async function matchCV(userId, cvId, postingId) {
   const score = Math.round(weightEarned / weightTotal * 100);
   const blockers = checks.filter((c2) => !c2.ok && c2.severity === "critical").length;
   const band = score >= 85 ? "strong" : score >= 65 ? "decent" : "weak";
-  const summary2 = !hasContent ? "Nothing prints on this CV yet \u2014 add a summary, a role or a skill before sending." : blockers ? `${blockers} thing${blockers > 1 ? "s" : ""} a parser or a recruiter will hit before anything else.` : band === "strong" ? "Nothing structural is in the way: this is ready to send." : "No blockers, the rest is polish.";
+  const summary2 = !hasContent ? "Nothing prints on this CV yet - add a summary, a role or a skill before sending." : blockers ? `${blockers} thing${blockers > 1 ? "s" : ""} a parser or a recruiter will hit before anything else.` : band === "strong" ? "Nothing structural is in the way: this is ready to send." : "No blockers, the rest is polish.";
   const redline = buildRedline({ doc, missingKeywords: missing });
   const failing = checks.filter((c2) => !c2.ok && c2.key !== "content");
   const potential = Math.min(100, Math.round((weightEarned + failing.reduce((n2, c2) => n2 + WEIGHT[c2.severity], 0)) / weightTotal * 100));
@@ -53608,7 +53614,7 @@ async function matchCV(userId, cvId, postingId) {
     advice.push({
       key: "keywords",
       title: `Cover ${missing.length} job-description keyword${missing.length === 1 ? "" : "s"}`,
-      detail: `Missing: ${missing.slice(0, 6).join(", ")} \u2014 add only the ones that are true.`,
+      detail: `Missing: ${missing.slice(0, 6).join(", ")} - add only the ones that are true.`,
       gain: 10
     });
   }
@@ -53620,7 +53626,7 @@ async function matchCV(userId, cvId, postingId) {
     ats: { score, checks, pages, band, blockers, summary: summary2, weight_total: weightTotal, weight_earned: weightEarned },
     keywords: { matched, missing, coverage_pct: coverage, jd_total: jdKeywords.length },
     jd_match: jdScore ? { score: jdScore.score, explain: jdScore.explain } : null,
-    /** score if every failing row turns green — the ceiling, not a promise */
+    /** score if every failing row turns green - the ceiling, not a promise */
     potential_score: potential,
     advice,
     redline,
@@ -54705,7 +54711,7 @@ async function matchFields(userId, host, fields) {
   };
   for (const [index, f2] of fields.entries()) {
     if (isPassword(f2)) {
-      skip(f2.name ?? f2.id ?? "password", "sensitive \u2014 never filled");
+      skip(f2.name ?? f2.id ?? "password", "sensitive - never filled");
       continue;
     }
     if (f2.label && isSelfIdentification(f2.label)) {
@@ -54713,7 +54719,7 @@ async function matchFields(userId, host, fields) {
       if (explicit) {
         mappings.push({ key: explicit.key, value: explicit.value, confidence: 0.9, method: "explicit", field_index: index });
       } else {
-        skip(f2.label, "voluntary self-identification \u2014 your answer, not ours");
+        skip(f2.label, "voluntary self-identification - your answer, not ours");
       }
       continue;
     }
@@ -54795,11 +54801,11 @@ async function matchFields(userId, host, fields) {
       }
     }
     if (!best) {
-      skip(f2.label ?? f2.name ?? "unknown", "no confident match \u2014 left empty rather than guessed");
+      skip(f2.label ?? f2.name ?? "unknown", "no confident match - left empty rather than guessed");
       continue;
     }
     if (!values.get(best.key)) {
-      skip(f2.label ?? f2.name ?? best.key, `no profile data for ${best.key} \u2014 add it in your profile`);
+      skip(f2.label ?? f2.name ?? best.key, `no profile data for ${best.key} - add it in your profile`);
       continue;
     }
     mappings.push({ key: best.key, value: values.get(best.key), confidence: Math.min(1, best.confidence), method: best.method, field_index: index });
@@ -54855,7 +54861,7 @@ var init_autofill_service = __esm({
       "identity.nationality": ["nationality"],
       "identity.religion": ["religion"],
       "identity.hobbies": ["hobbies", "hobby", "interests"],
-      // granular address — "Address" routes to street (falls back to location),
+      // granular address - "Address" routes to street (falls back to location),
       // "City" to city (same fallback), so older profiles keep filling as before
       "identity.street": ["street", "address line 1", "address"],
       "identity.city": ["city", "town"],
@@ -54876,7 +54882,7 @@ var init_autofill_service = __esm({
       "identity.previous_job_role": ["previous job role", "prior job role", "last job role"],
       "identity.previous_responsibilities": ["job responsibilities (previous)", "responsibilities (previous)", "previous responsibilities"],
       "identity.current_salary": ["current salary", "current salary (per annum)", "present salary"],
-      // referees — numbered aliases win on numbered labels; key 1 also carries the
+      // referees - numbered aliases win on numbered labels; key 1 also carries the
       // unnumbered phrasings so a bare "Referee Name" defaults to referee 1
       "identity.referee1_name": ["referee name 1", "referee 1 name", "referee name", "referee"],
       "identity.referee1_email": ["referee email 1", "referee email"],
@@ -94817,10 +94823,10 @@ var init_dist = __esm({
 async function parseResume(buf, filename) {
   const lower = filename.toLowerCase();
   if (!SUPPORTED.some((ext) => lower.endsWith(ext))) {
-    throw new AppError("UNSUPPORTED_FILE", 415, "That file type isn\u2019t supported yet \u2014 export your resume as PDF or .txt and try again.", null);
+    throw new AppError("UNSUPPORTED_FILE", 415, "That file type isn\u2019t supported yet - export your resume as PDF or .txt and try again.", null);
   }
-  if (!buf.length) throw new AppError("EMPTY_UPLOAD", 400, "That file came through empty \u2014 try again.", null);
-  if (buf.length > MAX_BYTES) throw new AppError("FILE_TOO_LARGE", 413, "That resume is over 4 MB \u2014 export a smaller PDF and try again.", null);
+  if (!buf.length) throw new AppError("EMPTY_UPLOAD", 400, "That file came through empty - try again.", null);
+  if (buf.length > MAX_BYTES) throw new AppError("FILE_TOO_LARGE", 413, "That resume is over 4 MB - export a smaller PDF and try again.", null);
   let text = "";
   if (lower.endsWith(".pdf")) {
     try {
@@ -94829,15 +94835,15 @@ async function parseResume(buf, filename) {
       const out = await extractText2(doc, { mergePages: true });
       text = out.text ?? "";
     } catch {
-      throw new AppError("UNREADABLE_PDF", 422, "Couldn\u2019t read that PDF \u2014 it may be a scan (image-only). Copy the text into a .txt file instead.", null);
+      throw new AppError("UNREADABLE_PDF", 422, "Couldn\u2019t read that PDF - it may be a scan (image-only). Copy the text into a .txt file instead.", null);
     }
   } else {
     text = buf.toString("utf8");
   }
   text = text.replace(/\u0000/g, "").trim();
-  if (!text) throw new AppError("EMPTY_RESUME", 422, "Couldn\u2019t find any text in that file \u2014 if it\u2019s a scan, paste the text into a .txt file.", null);
+  if (!text) throw new AppError("EMPTY_RESUME", 422, "Couldn\u2019t find any text in that file - if it\u2019s a scan, paste the text into a .txt file.", null);
   const { identity, warnings } = extractIdentity(text);
-  if (Object.keys(identity).length === 0) warnings.push("No contact details spotted \u2014 add them manually below.");
+  if (Object.keys(identity).length === 0) warnings.push("No contact details spotted - add them manually below.");
   return { text: text.slice(0, 4e3), identity, warnings };
 }
 function extractIdentity(raw) {
@@ -94865,7 +94871,7 @@ function extractIdentity(raw) {
     if (parts.length > 2) id.middle_name = parts.slice(1, -1).join(" ");
     id.name = parts.join(" ");
   } else {
-    warnings.push("Couldn\u2019t spot a name \u2014 add it manually below.");
+    warnings.push("Couldn\u2019t spot a name - add it manually below.");
   }
   const citySt = /\b([A-Z][a-zA-Z.' -]{2,29},\s[A-Z]{2})\b/;
   const contactLine = email ? lines2.find((l2) => l2.includes(email[0])) : void 0;
@@ -95000,7 +95006,7 @@ async function listPeople(userId, filters = {}) {
   const facet = (key) => {
     const out = {};
     for (const p2 of items) {
-      const v2 = p2[key] || "\u2014";
+      const v2 = p2[key] || "-";
       out[v2] = (out[v2] ?? 0) + 1;
     }
     return out;
@@ -95188,7 +95194,7 @@ async function listPlatformJobs(userId, filters = {}) {
   }).sort((a2, b2) => b2.match.score - a2.match.score || b2.posted_at.localeCompare(a2.posted_at));
   const facets = {
     profession: items.reduce((acc, j2) => ({ ...acc, [j2.profession]: (acc[j2.profession] ?? 0) + 1 }), {}),
-    seniority: items.reduce((acc, j2) => ({ ...acc, [j2.seniority ?? "\u2014"]: (acc[j2.seniority ?? "\u2014"] ?? 0) + 1 }), {})
+    seniority: items.reduce((acc, j2) => ({ ...acc, [j2.seniority ?? "-"]: (acc[j2.seniority ?? "-"] ?? 0) + 1 }), {})
   };
   return {
     items,
@@ -95355,7 +95361,7 @@ async function listEvents(userId, filters = {}) {
   const facet = (key) => {
     const out = {};
     for (const e2 of items) {
-      const v2 = String(e2[key] ?? "\u2014");
+      const v2 = String(e2[key] ?? "-");
       out[v2] = (out[v2] ?? 0) + 1;
     }
     return out;
@@ -95417,7 +95423,7 @@ async function addCvReview(userId, cvId, input) {
   const rating = Math.round(Number(input.rating));
   if (!(rating >= 1 && rating <= 5)) throw validation("Rating must be between 1 and 5");
   const body = String(input.body ?? "").trim();
-  if (body.length < 10) throw validation("Write at least a sentence \u2014 \u201Cnice\u201D does not help anyone");
+  if (body.length < 10) throw validation("Write at least a sentence - \u201Cnice\u201D does not help anyone");
   const profile = await getProfile(userId);
   const id = profile.identity ?? {};
   const name2 = String(id.name ?? id.full_name ?? "A JAMS member").trim() || "A JAMS member";
@@ -95541,10 +95547,10 @@ var init_network_service = __esm({
       "engineering (hardware)": ["mechanical", "electrical", "civil", "hardware", "manufactur"]
     };
     QUESTIONS = [
-      { key: "work", q: "What do you actually do all day?", hint: "Not your title \u2014 the work. \u201CI turn messy spreadsheets into dashboards people trust.\u201D" },
+      { key: "work", q: "What do you actually do all day?", hint: "Not your title - the work. \u201CI turn messy spreadsheets into dashboards people trust.\u201D" },
       { key: "proof", q: "What is one thing you built or shipped that you are proud of?", hint: "A project, a process, a team. One sentence with a number if you have one." },
       { key: "offer", q: "What can someone hire or ask you for this month?", hint: "A service, a skill, a collaboration. This is what the Offers field shows." },
-      { key: "want", q: "What are you looking for right now?", hint: "A role, a co-founder, a mentor, clients \u2014 say it plainly." },
+      { key: "want", q: "What are you looking for right now?", hint: "A role, a co-founder, a mentor, clients - say it plainly." },
       { key: "reach", q: "How should someone reach you?", hint: "Add the social links you actually answer: LinkedIn, X, GitHub, Instagram, a portfolio." }
     ];
     PEOPLE_QUESTIONS = QUESTIONS;
@@ -95568,7 +95574,7 @@ var init_network_service = __esm({
     tokenize2 = (s2) => String(s2 ?? "").toLowerCase().split(/[^a-z0-9+#.]+/).filter((w2) => w2.length > 2);
     JOB_SEEDS = [
       { company: "Paystack", title: "Frontend Engineer (React, TypeScript)", profession: "software engineering", seniority: "mid", location: "Lagos, Nigeria", remote: 0, salary_min: 9e6, salary_max: 14e6, currency: "NGN", description: "Own the merchant dashboard: React 19, TypeScript, a design system used by every product team. You will ship weekly and review other people's UI.", tags: ["react", "typescript", "design systems", "testing"] },
-      { company: "Moniepoint", title: "Backend Engineer \u2014 Payments", profession: "software engineering", seniority: "senior", location: "Lagos, Nigeria", remote: 0, salary_min: 14e6, salary_max: 2e7, currency: "NGN", description: "Node and Go services moving money for 2m+ businesses. Strong on idempotency, ledgers and on-call discipline.", tags: ["node", "go", "postgres", "payments"] },
+      { company: "Moniepoint", title: "Backend Engineer - Payments", profession: "software engineering", seniority: "senior", location: "Lagos, Nigeria", remote: 0, salary_min: 14e6, salary_max: 2e7, currency: "NGN", description: "Node and Go services moving money for 2m+ businesses. Strong on idempotency, ledgers and on-call discipline.", tags: ["node", "go", "postgres", "payments"] },
       { company: "Andela", title: "DevOps Engineer (Remote, Africa)", profession: "software engineering", seniority: "mid", location: "Remote", remote: 1, salary_min: 12e6, salary_max: 18e6, currency: "NGN", description: "Kubernetes, Terraform, GitHub Actions. You will cut deploy time for client teams and keep the pager quiet.", tags: ["kubernetes", "terraform", "aws", "ci/cd"] },
       { company: "Cowrywise", title: "Product Designer", profession: "product design", seniority: "mid", location: "Lagos, Nigeria", remote: 1, salary_min: 7e6, salary_max: 11e6, currency: "NGN", description: "End-to-end product design for savings and investment flows: research, prototypes, shipped UI. Figma and a design system you help shape.", tags: ["figma", "prototyping", "user research", "fintech"] },
       { company: "Kuda", title: "Data Analyst, Growth", profession: "data & analytics", seniority: "mid", location: "Lagos, Nigeria", remote: 0, salary_min: 6e6, salary_max: 95e5, currency: "NGN", description: "SQL, dbt and a warehouse you can trust. Turn activation and retention questions into dashboards product can act on.", tags: ["sql", "dbt", "looker", "experimentation"] },
@@ -95579,7 +95585,7 @@ var init_network_service = __esm({
       { company: "MTN Nigeria", title: "HR Business Partner", profession: "human resources", seniority: "senior", location: "Lagos, Nigeria", remote: 0, salary_min: 9e6, salary_max: 13e6, currency: "NGN", description: "Partner with two technology divisions on org design, performance and hiring. Data-led people decisions.", tags: ["org design", "performance", "hiring", "hris"] }
     ];
     EVENT_SEEDS = [
-      { title: "Lagos Tech Hiring Fair \u2014 Q4", kind: "hiring", host: "Lagos State Employment Trust Fund", city: "Lagos", venue: "Landmark Event Centre, Victoria Island", format: "in-person", in_days: 12, hours: 6, description: "Forty companies hiring across engineering, design, data and support. Bring six printed CVs; on-the-spot screens for junior and mid roles.", tags: ["engineering", "design", "data", "graduate"], price: "Free", featured: 1 },
+      { title: "Lagos Tech Hiring Fair - Q4", kind: "hiring", host: "Lagos State Employment Trust Fund", city: "Lagos", venue: "Landmark Event Centre, Victoria Island", format: "in-person", in_days: 12, hours: 6, description: "Forty companies hiring across engineering, design, data and support. Bring six printed CVs; on-the-spot screens for junior and mid roles.", tags: ["engineering", "design", "data", "graduate"], price: "Free", featured: 1 },
       { title: "Frontend Systems Workshop", kind: "training", host: "React Lagos", city: "Lagos", venue: "Co-Creation Hub, Yaba", format: "hybrid", in_days: 6, hours: 4, description: "A hands-on day on React 19, server components and design systems. Laptops required; a working repo is provided.", tags: ["react", "typescript", "frontend"], price: "Free", seats: 60 },
       { title: "Product Design Portfolio Clinic", kind: "seminar", host: "Design Lagos", city: "Lagos", venue: "Ventures Park, Ikoyi", format: "in-person", in_days: 18, hours: 3, description: "Bring two case studies. Six practising designers review them line by line, live. Twelve slots, observers welcome.", tags: ["product design", "portfolio", "career"], price: "\u20A65,000", seats: 40 },
       { title: "Careers in Data: ask me anything", kind: "story", host: "Data Community Nigeria", city: "Lagos", venue: "Online", format: "virtual", in_days: 4, hours: 2, description: "Three analysts and a hiring manager answer the questions people are afraid to ask in interviews: salary, gaps, switching in.", tags: ["data", "career", "interviews"], price: "Free" },
@@ -95588,7 +95594,7 @@ var init_network_service = __esm({
       { title: "Startup Founders Hiring Night", kind: "meetup", host: "Ventures Park", city: "Lagos", venue: "Ventures Park, Ikoyi", format: "in-person", in_days: 15, hours: 3, description: "Founders pitch the roles they cannot fill, candidates pitch what they can do. Twenty startups, one room, no recruiters.", tags: ["startups", "hiring", "networking"], price: "Free", seats: 120 },
       { title: "Remote Work Readiness Seminar", kind: "seminar", host: "JAMS", city: "Lagos", venue: "Online", format: "virtual", in_days: 2, hours: 2, description: "How remote teams actually screen: async writing tests, timezone questions and the tools they expect you to know.", tags: ["remote", "career", "interviews"], price: "Free", featured: 1 },
       { title: "Women in Tech Mentorship Circle", kind: "meetup", host: "Women in Tech Nigeria", city: "Lagos", venue: "MTN House, Ikoyi", format: "in-person", in_days: 21, hours: 2, description: "Small-group mentoring with engineers, PMs and founders. Apply for a mentor slot or come as a peer.", tags: ["mentorship", "women", "career"], price: "Free", seats: 50 },
-      { title: "Graduate Trainee Programme \u2014 info session", kind: "ad", host: "Flutterwave", city: "Lagos", venue: "Online", format: "virtual", in_days: 8, hours: 1, description: "The 2027 graduate programme opens applications. Meet the team, hear the assessment stages, ask about relocation.", tags: ["graduate", "fintech", "hiring"], price: "Free" },
+      { title: "Graduate Trainee Programme - info session", kind: "ad", host: "Flutterwave", city: "Lagos", venue: "Online", format: "virtual", in_days: 8, hours: 1, description: "The 2027 graduate programme opens applications. Meet the team, hear the assessment stages, ask about relocation.", tags: ["graduate", "fintech", "hiring"], price: "Free" },
       { title: "Customer Success Masterclass", kind: "training", host: "CS Collective", city: "Lagos", venue: "Zoom", format: "virtual", in_days: 30, hours: 3, description: "Retention maths, QBR storytelling and how to run an escalation. Built for people moving from support into success.", tags: ["customer success", "retention", "career"], price: "\u20A615,000" },
       { title: "Build in Lagos Hack Weekend", kind: "meetup", host: "Co-Creation Hub", city: "Lagos", venue: "Co-Creation Hub, Yaba", format: "in-person", in_days: 11, hours: 30, description: "Two days, teams of four, a civic-tech brief. Hardware and API credits provided; demo night is open to the public.", tags: ["hackathon", "engineering", "design"], price: "Free", seats: 100 },
       { title: "Finance Careers Evening", kind: "seminar", host: "Deloitte Nigeria", city: "Lagos", venue: "Deloitte HQ, Victoria Island", format: "in-person", in_days: 17, hours: 2, description: "Audit, tax and deals partners on what the graduate scheme looks for, and what the first three years actually involve.", tags: ["finance", "graduate", "career"], price: "Free", seats: 80 },
@@ -96404,7 +96410,7 @@ var init_sources = __esm({
           const tag = (name2) => (block.match(new RegExp(`<${name2}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${name2}>`)) ?? [])[1]?.trim() ?? "";
           const title = stripTags2(tag("title"));
           const link = tag("link");
-          const company = title.split(/\s+[–—|]\s+/).slice(-1)[0]?.trim() || "Unknown";
+          const company = title.split(/\s+[–|\-]\s+/).slice(-1)[0]?.trim() || "Unknown";
           return {
             source: "wwr",
             external_id: link || `wwr-${i2}`,
@@ -96967,7 +96973,7 @@ async function composePitch(input) {
   const bullets = chosenProps.map((p2) => `- ${p2}`);
   const signoff = pick(rng, formal ? SIGNOFFS_FORMAL : SIGNOFFS_CASUAL);
   const subjectTemplate = input.kind === "application" ? pick(rng, SUBJECT_APPLICATION) : pick(rng, SUBJECT_PITCH);
-  const subject = fill(subjectTemplate, vars).replace(/\s+—\s+$/g, "").slice(0, 120);
+  const subject = fill(subjectTemplate, vars).replace(/\s+-\s+$/g, "").slice(0, 120);
   const body = polish2(
     [
       greeting,

@@ -3,7 +3,7 @@
  * preview, or a CV from CV Studio rendered to a self-contained HTML document.
  *
  * Stored base64 in TEXT so sqlite and Postgres share one code path; the row id is
- * unguessable, which is what lets the download link below be public — the recipient
+ * unguessable, which is what lets the download link below be public - the recipient
  * of a pitch has no JAMS account and must still be able to open the CV.
  */
 import { all, get, run, parseJson } from "../core/db";

@@ -5,7 +5,7 @@
  * insertion order is a database browser; a directory that puts the person in the
  * same profession, the same city, or with the skill you share at the top is a
  * network. Each row therefore carries `match: { score, reasons }` computed against
- * the signed-in user — the UI shows the reasons, so a ranking is never a black box.
+ * the signed-in user - the UI shows the reasons, so a ranking is never a black box.
  *
  * Seeds: events and platform jobs ship with `demo = 1` rows so the two new pages
  * are reviewable before anyone has posted. They are inserted once, they are marked
@@ -102,10 +102,10 @@ export async function viewerContext(userId: string) {
 /* ─────────────────────────────── people ──────────────────────────────── */
 
 const QUESTIONS = [
-  { key: "work", q: "What do you actually do all day?", hint: "Not your title — the work. “I turn messy spreadsheets into dashboards people trust.”" },
+  { key: "work", q: "What do you actually do all day?", hint: "Not your title - the work. “I turn messy spreadsheets into dashboards people trust.”" },
   { key: "proof", q: "What is one thing you built or shipped that you are proud of?", hint: "A project, a process, a team. One sentence with a number if you have one." },
   { key: "offer", q: "What can someone hire or ask you for this month?", hint: "A service, a skill, a collaboration. This is what the Offers field shows." },
-  { key: "want", q: "What are you looking for right now?", hint: "A role, a co-founder, a mentor, clients — say it plainly." },
+  { key: "want", q: "What are you looking for right now?", hint: "A role, a co-founder, a mentor, clients - say it plainly." },
   { key: "reach", q: "How should someone reach you?", hint: "Add the social links you actually answer: LinkedIn, X, GitHub, Instagram, a portfolio." },
 ];
 
@@ -214,7 +214,7 @@ export async function listPeople(
   const facet = (key: "profession" | "location") => {
     const out: Record<string, number> = {};
     for (const p of items) {
-      const v = p[key] || "—";
+      const v = p[key] || "-";
       out[v] = (out[v] ?? 0) + 1;
     }
     return out;
@@ -353,7 +353,7 @@ const JOB_SEEDS: {
   tags: string[];
 }[] = [
   { company: "Paystack", title: "Frontend Engineer (React, TypeScript)", profession: "software engineering", seniority: "mid", location: "Lagos, Nigeria", remote: 0, salary_min: 9_000_000, salary_max: 14_000_000, currency: "NGN", description: "Own the merchant dashboard: React 19, TypeScript, a design system used by every product team. You will ship weekly and review other people's UI.", tags: ["react", "typescript", "design systems", "testing"] },
-  { company: "Moniepoint", title: "Backend Engineer — Payments", profession: "software engineering", seniority: "senior", location: "Lagos, Nigeria", remote: 0, salary_min: 14_000_000, salary_max: 20_000_000, currency: "NGN", description: "Node and Go services moving money for 2m+ businesses. Strong on idempotency, ledgers and on-call discipline.", tags: ["node", "go", "postgres", "payments"] },
+  { company: "Moniepoint", title: "Backend Engineer - Payments", profession: "software engineering", seniority: "senior", location: "Lagos, Nigeria", remote: 0, salary_min: 14_000_000, salary_max: 20_000_000, currency: "NGN", description: "Node and Go services moving money for 2m+ businesses. Strong on idempotency, ledgers and on-call discipline.", tags: ["node", "go", "postgres", "payments"] },
   { company: "Andela", title: "DevOps Engineer (Remote, Africa)", profession: "software engineering", seniority: "mid", location: "Remote", remote: 1, salary_min: 12_000_000, salary_max: 18_000_000, currency: "NGN", description: "Kubernetes, Terraform, GitHub Actions. You will cut deploy time for client teams and keep the pager quiet.", tags: ["kubernetes", "terraform", "aws", "ci/cd"] },
   { company: "Cowrywise", title: "Product Designer", profession: "product design", seniority: "mid", location: "Lagos, Nigeria", remote: 1, salary_min: 7_000_000, salary_max: 11_000_000, currency: "NGN", description: "End-to-end product design for savings and investment flows: research, prototypes, shipped UI. Figma and a design system you help shape.", tags: ["figma", "prototyping", "user research", "fintech"] },
   { company: "Kuda", title: "Data Analyst, Growth", profession: "data & analytics", seniority: "mid", location: "Lagos, Nigeria", remote: 0, salary_min: 6_000_000, salary_max: 9_500_000, currency: "NGN", description: "SQL, dbt and a warehouse you can trust. Turn activation and retention questions into dashboards product can act on.", tags: ["sql", "dbt", "looker", "experimentation"] },
@@ -464,7 +464,7 @@ export async function listPlatformJobs(
 
   const facets = {
     profession: items.reduce<Record<string, number>>((acc, j) => ({ ...acc, [j.profession]: (acc[j.profession] ?? 0) + 1 }), {}),
-    seniority: items.reduce<Record<string, number>>((acc, j) => ({ ...acc, [j.seniority ?? "—"]: (acc[j.seniority ?? "—"] ?? 0) + 1 }), {}),
+    seniority: items.reduce<Record<string, number>>((acc, j) => ({ ...acc, [j.seniority ?? "-"]: (acc[j.seniority ?? "-"] ?? 0) + 1 }), {}),
   };
 
   return {
@@ -549,7 +549,7 @@ const EVENT_SEEDS: {
   seats?: number;
   featured?: number;
 }[] = [
-  { title: "Lagos Tech Hiring Fair — Q4", kind: "hiring", host: "Lagos State Employment Trust Fund", city: "Lagos", venue: "Landmark Event Centre, Victoria Island", format: "in-person", in_days: 12, hours: 6, description: "Forty companies hiring across engineering, design, data and support. Bring six printed CVs; on-the-spot screens for junior and mid roles.", tags: ["engineering", "design", "data", "graduate"], price: "Free", featured: 1 },
+  { title: "Lagos Tech Hiring Fair - Q4", kind: "hiring", host: "Lagos State Employment Trust Fund", city: "Lagos", venue: "Landmark Event Centre, Victoria Island", format: "in-person", in_days: 12, hours: 6, description: "Forty companies hiring across engineering, design, data and support. Bring six printed CVs; on-the-spot screens for junior and mid roles.", tags: ["engineering", "design", "data", "graduate"], price: "Free", featured: 1 },
   { title: "Frontend Systems Workshop", kind: "training", host: "React Lagos", city: "Lagos", venue: "Co-Creation Hub, Yaba", format: "hybrid", in_days: 6, hours: 4, description: "A hands-on day on React 19, server components and design systems. Laptops required; a working repo is provided.", tags: ["react", "typescript", "frontend"], price: "Free", seats: 60 },
   { title: "Product Design Portfolio Clinic", kind: "seminar", host: "Design Lagos", city: "Lagos", venue: "Ventures Park, Ikoyi", format: "in-person", in_days: 18, hours: 3, description: "Bring two case studies. Six practising designers review them line by line, live. Twelve slots, observers welcome.", tags: ["product design", "portfolio", "career"], price: "₦5,000", seats: 40 },
   { title: "Careers in Data: ask me anything", kind: "story", host: "Data Community Nigeria", city: "Lagos", venue: "Online", format: "virtual", in_days: 4, hours: 2, description: "Three analysts and a hiring manager answer the questions people are afraid to ask in interviews: salary, gaps, switching in.", tags: ["data", "career", "interviews"], price: "Free" },
@@ -558,7 +558,7 @@ const EVENT_SEEDS: {
   { title: "Startup Founders Hiring Night", kind: "meetup", host: "Ventures Park", city: "Lagos", venue: "Ventures Park, Ikoyi", format: "in-person", in_days: 15, hours: 3, description: "Founders pitch the roles they cannot fill, candidates pitch what they can do. Twenty startups, one room, no recruiters.", tags: ["startups", "hiring", "networking"], price: "Free", seats: 120 },
   { title: "Remote Work Readiness Seminar", kind: "seminar", host: "JAMS", city: "Lagos", venue: "Online", format: "virtual", in_days: 2, hours: 2, description: "How remote teams actually screen: async writing tests, timezone questions and the tools they expect you to know.", tags: ["remote", "career", "interviews"], price: "Free", featured: 1 },
   { title: "Women in Tech Mentorship Circle", kind: "meetup", host: "Women in Tech Nigeria", city: "Lagos", venue: "MTN House, Ikoyi", format: "in-person", in_days: 21, hours: 2, description: "Small-group mentoring with engineers, PMs and founders. Apply for a mentor slot or come as a peer.", tags: ["mentorship", "women", "career"], price: "Free", seats: 50 },
-  { title: "Graduate Trainee Programme — info session", kind: "ad", host: "Flutterwave", city: "Lagos", venue: "Online", format: "virtual", in_days: 8, hours: 1, description: "The 2027 graduate programme opens applications. Meet the team, hear the assessment stages, ask about relocation.", tags: ["graduate", "fintech", "hiring"], price: "Free" },
+  { title: "Graduate Trainee Programme - info session", kind: "ad", host: "Flutterwave", city: "Lagos", venue: "Online", format: "virtual", in_days: 8, hours: 1, description: "The 2027 graduate programme opens applications. Meet the team, hear the assessment stages, ask about relocation.", tags: ["graduate", "fintech", "hiring"], price: "Free" },
   { title: "Customer Success Masterclass", kind: "training", host: "CS Collective", city: "Lagos", venue: "Zoom", format: "virtual", in_days: 30, hours: 3, description: "Retention maths, QBR storytelling and how to run an escalation. Built for people moving from support into success.", tags: ["customer success", "retention", "career"], price: "₦15,000" },
   { title: "Build in Lagos Hack Weekend", kind: "meetup", host: "Co-Creation Hub", city: "Lagos", venue: "Co-Creation Hub, Yaba", format: "in-person", in_days: 11, hours: 30, description: "Two days, teams of four, a civic-tech brief. Hardware and API credits provided; demo night is open to the public.", tags: ["hackathon", "engineering", "design"], price: "Free", seats: 100 },
   { title: "Finance Careers Evening", kind: "seminar", host: "Deloitte Nigeria", city: "Lagos", venue: "Deloitte HQ, Victoria Island", format: "in-person", in_days: 17, hours: 2, description: "Audit, tax and deals partners on what the graduate scheme looks for, and what the first three years actually involve.", tags: ["finance", "graduate", "career"], price: "Free", seats: 80 },
@@ -611,8 +611,8 @@ const EVENT_SYNONYMS: Record<string, string[]> = {
  * Query expansion, separated from query matching.
  *
  * `words` must all appear for an event to match; `kinds` is the category the
- * query names, and every event of that kind matches. Mixing the two — putting
- * “career” into the same term list as “job fair” — made a search for fairs
+ * query names, and every event of that kind matches. Mixing the two - putting
+ * “career” into the same term list as “job fair” - made a search for fairs
  * return every event whose tags happened to say career.
  */
 function expandEventQuery(q: string) {
@@ -722,7 +722,7 @@ export async function listEvents(
   const facet = (key: "kind" | "city" | "format") => {
     const out: Record<string, number> = {};
     for (const e of items) {
-      const v = String(e[key] ?? "—");
+      const v = String(e[key] ?? "-");
       out[v] = (out[v] ?? 0) + 1;
     }
     return out;
@@ -795,7 +795,7 @@ export async function addCvReview(
   const rating = Math.round(Number(input.rating));
   if (!(rating >= 1 && rating <= 5)) throw validation("Rating must be between 1 and 5");
   const body = String(input.body ?? "").trim();
-  if (body.length < 10) throw validation("Write at least a sentence — “nice” does not help anyone");
+  if (body.length < 10) throw validation("Write at least a sentence - “nice” does not help anyone");
 
   const profile = await getProfile(userId);
   const id: any = profile.identity ?? {};
@@ -834,7 +834,7 @@ export async function addCvReview(
   return listCvReviews(cvId);
 }
 
-/** Public CVs on the network, newest first — the pool Discover's review modal draws from. */
+/** Public CVs on the network, newest first - the pool Discover's review modal draws from. */
 export async function publicCvFeed(limit = 12) {
   const rows = await all<any>(
     `SELECT c.id, c.name, c.archetype, c.updated_at, c.copyright, p.display_name, p.headline, p.profession

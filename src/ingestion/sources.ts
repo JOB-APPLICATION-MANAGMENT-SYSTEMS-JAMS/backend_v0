@@ -4,7 +4,7 @@ const UA = { "User-Agent": "JAMS-Ingest/0.1 (personal job tracker)", Accept: "ap
 const BROWSER_UA = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36", Accept: "*/*" };
 
 // 20s: serverless egress to Algolia/Arbeitnow often needs longer than a local fetch.
-// A timed-out attempt is retried — egress from the functions region is flaky, not the
+// A timed-out attempt is retried - egress from the functions region is flaky, not the
 // sources themselves, and one retry turns most of those failures into successes.
 async function getJson(url: string, timeout = 20_000, headers: Record<string, string> = UA): Promise<any> {
   let lastErr: unknown;
@@ -110,7 +110,7 @@ async function whoIsHiringStoryIds(): Promise<string[]> {
   );
   const hits = (data.hits ?? []).filter((h: any) => /^Ask HN:\s*Who is hiring/i.test(h.title ?? "") && !/freelance/i.test(h.title ?? ""));
   // early in the month the new thread has a handful of comments while the previous
-  // one still carries most of the listings — take both
+  // one still carries most of the listings - take both
   return hits.filter((h: any) => Date.now() - Date.parse(h.created_at) < 75 * 86_400_000).slice(0, 2).map((h: any) => String(h.objectID));
 }
 
@@ -171,7 +171,7 @@ const wwr: JobSource = {
       const tag = (name: string) => (block.match(new RegExp(`<${name}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${name}>`)) ?? [])[1]?.trim() ?? "";
       const title = stripTags(tag("title"));
       const link = tag("link");
-      const company = title.split(/\s+[–—|]\s+/).slice(-1)[0]?.trim() || "Unknown";
+      const company = title.split(/\s+[–|\-]\s+/).slice(-1)[0]?.trim() || "Unknown";
       return {
         source: "wwr",
         external_id: link || `wwr-${i}`,

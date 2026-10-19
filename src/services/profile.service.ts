@@ -40,7 +40,7 @@ async function ensureProfile(userId: string) {
  * signup seeds first_name/last_name/full_name, onboarding writes full_name, the
  * profile form writes name, autofill writes full_name again. Readers each picked
  * one or two of them, so an account could hold its name under one key while the
- * pitch signer, profile page and completeness check looked at another — and
+ * pitch signer, profile page and completeness check looked at another - and
  * signed emails with a blank line after "Best,". Reconcile on read so any one
  * key satisfies every reader.
  */

@@ -67,7 +67,7 @@ jobRouter.get("/ingest/status", async (req: AuthedRequest, res, next) => {
 });
 
 /**
- * GET /jobs/social?q=… — prepared social-platform searches (software engineering × Nigeria).
+ * GET /jobs/social?q=… - prepared social-platform searches (software engineering × Nigeria).
  * Feeds have no API, so we ship the exact query + URL per platform instead of scraping.
  */
 jobRouter.get("/social", searchLimiter, (req: AuthedRequest, res, next) => {

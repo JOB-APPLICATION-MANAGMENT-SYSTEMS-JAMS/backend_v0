@@ -14,7 +14,7 @@ import { saveAttachment, saveCvAttachment } from "../services/attachments";
 export const pitchRouter = Router();
 pitchRouter.use(requireAuth);
 
-/** GET /pitch-targets?sector=supermarket&city=lagos&q=… — live Nigerian company search for pitching. */
+/** GET /pitch-targets?sector=supermarket&city=lagos&q=… - live Nigerian company search for pitching. */
 pitchRouter.get("/", async (req: AuthedRequest, res, next) => {
   try {
     const q = req.query as any;
@@ -61,7 +61,7 @@ pitchRouter.get("/meta", async (_req, res, next) => {
 });
 
 /**
- * POST /pitch-targets/prepare {external_id} — company + contact + pitch application +
+ * POST /pitch-targets/prepare {external_id} - company + contact + pitch application +
  * outreach draft in one step, returning the merged subject/body for preview/edit.
  * The body carries the id because ids contain a slash (node/123) and the Next.js
  * proxy splits decoded %2F into two path segments, breaking path params.
@@ -87,7 +87,7 @@ pitchRouter.post("/:externalId/prepare", async (req: AuthedRequest, res, next) =
 });
 
 /**
- * POST /pitch-targets/rewrite {external_id | company, seed} — regenerate the wording.
+ * POST /pitch-targets/rewrite {external_id | company, seed} - regenerate the wording.
  * Same pipeline as prepare (category hooks + seeded selection + grammar passes), a
  * different seed: this is the Refresh button. Text is returned, not saved, so the
  * preview can be cycled without touching the stored draft until the user keeps it.
@@ -131,7 +131,7 @@ pitchRouter.post("/rewrite", async (req: AuthedRequest, res, next) => {
 });
 
 /**
- * POST /pitch-targets/rescan {scope, categories?, limit?, force?, enrich?} — walk the
+ * POST /pitch-targets/rescan {scope, categories?, limit?, force?, enrich?} - walk the
  * worldwide contact-list catalog (or just Nigeria) in the background; poll
  * GET /pitch-targets/rescan for progress. This is where the ~10,000 companies come from.
  */
@@ -172,7 +172,7 @@ pitchRouter.get("/rescan", async (_req, res, next) => {
 });
 
 /**
- * POST /pitch-targets/catalog {pages} — push a discovered catalog. The sitemap is
+ * POST /pitch-targets/catalog {pages} - push a discovered catalog. The sitemap is
  * not reachable from every network (serverless egress included), so the catalog can
  * also be seeded from a machine that can read it; later runs load it from the table.
  */
@@ -204,7 +204,7 @@ pitchRouter.post("/catalog", async (req: AuthedRequest, res, next) => {
 });
 
 /**
- * POST /pitch-targets/import {rows} — bulk upsert of crawled contact-list rows.
+ * POST /pitch-targets/import {rows} - bulk upsert of crawled contact-list rows.
  * Mirrors refreshContactList's shape, so a machine with a friendlier network can do
  * the walking (696 pages) and push the companies here in chunks.
  */
@@ -254,7 +254,7 @@ pitchRouter.post("/import", async (req: AuthedRequest, res, next) => {
   }
 });
 
-/** POST /pitch-targets/enrich {limit} — visit company sites and pick up published inboxes. */
+/** POST /pitch-targets/enrich {limit} - visit company sites and pick up published inboxes. */
 pitchRouter.post("/enrich", async (req: AuthedRequest, res, next) => {
   try {
     const body = z.object({ limit: z.number().int().positive().max(5000).optional() }).default({}).parse(req.body ?? {});
@@ -266,7 +266,7 @@ pitchRouter.post("/enrich", async (req: AuthedRequest, res, next) => {
 });
 
 /**
- * POST /pitch-targets/attach — either a file (base64) or a CV Studio document
+ * POST /pitch-targets/attach - either a file (base64) or a CV Studio document
  * (`cv_id`), which is rendered to a self-contained HTML file. The answer's `url` is
  * the public link that goes into the email body.
  */

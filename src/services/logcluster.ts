@@ -5,9 +5,9 @@
  * emails are the whole point: the pitch cannot be sent without one.
  *
  * Two layers:
- *  1. `LIST_SOURCES` — the hand-picked Nigeria lists behind each pitch sector,
+ *  1. `LIST_SOURCES` - the hand-picked Nigeria lists behind each pitch sector,
  *     fetched on demand and cached for 24h (what the sector picker uses).
- *  2. the *catalog* — every contact-list page in the site's sitemap (~1,200 pages,
+ *  2. the *catalog* - every contact-list page in the site's sitemap (~1,200 pages,
  *     188 countries). `rescanAll` walks it with bounded concurrency, resumes from
  *     pages already fetched in the last 7 days, and reports progress so the UI can
  *     show a live counter. This is where the ~10,000 companies come from.

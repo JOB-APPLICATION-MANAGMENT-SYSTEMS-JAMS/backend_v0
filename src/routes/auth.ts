@@ -83,7 +83,7 @@ authRouter.post("/resend-verification", limiter, async (req, res, next) => {
 
 /**
  * Local-mode convenience: read the latest verification token (dev console equivalent of MailPit).
- * Gated to non-online modes — in online mode this endpoint would hand any caller the ability to
+ * Gated to non-online modes - in online mode this endpoint would hand any caller the ability to
  * verify (and therefore activate) an account they do not own, so it 404s there.
  */
 authRouter.get("/dev-token", async (req, res, next) => {

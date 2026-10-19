@@ -101,7 +101,7 @@ applicationRouter.delete("/:id", async (req: AuthedRequest, res, next) => {
 });
 
 /**
- * POST /applications/:id/auto-apply — direct send when SMTP is configured, Gmail
+ * POST /applications/:id/auto-apply - direct send when SMTP is configured, Gmail
  * hand-off compose otherwise, and the plain open-link fallback when no email is
  * known. Everything is still recorded as an application (or pitch) either way.
  */

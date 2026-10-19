@@ -181,7 +181,7 @@ export async function duplicateCV(userId: string, id: string, name?: string) {
  * Real-world ATS behaviour, not a checklist of headings: the things that actually
  * cost someone an interview are a missing contact field a parser cannot find, a
  * section it cannot segment, an undated role that breaks tenure maths, a
- * description with no figures in it, and — when there is a job description —
+ * description with no figures in it, and - when there is a job description -
  * keywords that never appear. Each check says what was looked at and what it
  * found, so the panel can be specific instead of showing a bare percentage.
  *
@@ -226,8 +226,8 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
 
   /**
    * Score what prints, not what is configured. A block can exist and render
-   * nothing — an experience block sourced from a profile with no roles leaves the
-   * section out of the document entirely — so counting block types is how an empty
+   * nothing - an experience block sourced from a profile with no roles leaves the
+   * section out of the document entirely - so counting block types is how an empty
    * CV ends up claiming "0 dated roles" and still scoring 89%. Each check below
    * reads `doc.sections`, the same model the printer and the page count use.
    */
@@ -286,7 +286,7 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
 
   // What the CV is aimed at: the posting it is tailored to, the keywords the user
   // pinned to it, or their own headline. `career_category` is deliberately not
-  // used — it is a taxonomy tag that defaults to a value nobody chose, and asking
+  // used - it is a taxonomy tag that defaults to a value nobody chose, and asking
   // a document to contain "software_engineering" would be noise, not advice.
   const pinned: string = Array.isArray(cv.targeting?.keywords) ? String(cv.targeting.keywords.join(" ")).trim() : "";
   const target: string = String(posting?.title ?? "").trim() || pinned || String(id.headline ?? "").trim();
@@ -307,12 +307,12 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
       severity: "critical",
       ok: hasContent,
       evidence: hasContent
-        ? `${doc.sections.length} section${doc.sections.length === 1 ? " prints" : "s print"} — ` +
+        ? `${doc.sections.length} section${doc.sections.length === 1 ? " prints" : "s print"} - ` +
           `${printedEntries.length} role${printedEntries.length === 1 ? "" : "s"}, ` +
           `${summaryLines.length} summary line${summaryLines.length === 1 ? "" : "s"}, ` +
           `${skillItems.length} skill${skillItems.length === 1 ? "" : "s"}`
         : "nothing prints below the contact row",
-      fix: "Add a summary, a role and a few skills — an empty page cannot be parsed or ranked",
+      fix: "Add a summary, a role and a few skills - an empty page cannot be parsed or ranked",
     },
     {
       key: "email",
@@ -320,7 +320,7 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
       severity: "critical",
       ok: !!mail,
       evidence: mail ? `${mail.label} prints in the header` : "the header has no email address",
-      fix: "Add your email on the Profile page — every parser looks for it first",
+      fix: "Add your email on the Profile page - every parser looks for it first",
     },
     {
       key: "phone",
@@ -346,9 +346,9 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
       evidence: expEntries.length
         ? `${expEntries.length} role${expEntries.length === 1 ? "" : "s"} print on the page`
         : sourced("experience")
-          ? "the experience block prints no roles — your profile has no roles to pull in"
+          ? "the experience block prints no roles - your profile has no roles to pull in"
           : "the experience block prints no roles",
-      fix: "Add a role on the Profile page, or write one in the block — parsers read what prints",
+      fix: "Add a role on the Profile page, or write one in the block - parsers read what prints",
     },
     {
       key: "education",
@@ -358,7 +358,7 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
       evidence: eduEntries.length
         ? `${eduEntries.length} entr${eduEntries.length === 1 ? "y" : "ies"} print on the page`
         : sourced("education")
-          ? "the education block prints no entries — your profile has no schools to pull in"
+          ? "the education block prints no entries - your profile has no schools to pull in"
           : "the education block prints no entries",
       fix: "Add a school on the Profile page, or write the entry in the block",
     },
@@ -370,9 +370,9 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
       evidence: skillItems.length
         ? `${skillItems.length} skill${skillItems.length === 1 ? "" : "s"} print as keywords`
         : sourced("skills")
-          ? "the skills block prints no names — your profile has no skills to pull in"
+          ? "the skills block prints no names - your profile has no skills to pull in"
           : "the skills block prints no names",
-      fix: "Add skills on the Profile page — it is the cheapest place to match a job description",
+      fix: "Add skills on the Profile page - it is the cheapest place to match a job description",
     },
     {
       key: "summary",
@@ -395,7 +395,7 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
           : datedEntries === printedEntries.length
             ? `all ${printedEntries.length} printed entries are dated`
             : `${printedEntries.length - datedEntries} of ${printedEntries.length} printed entries have no start date`,
-      fix: "Add start dates — tenure maths and gap detection both need them",
+      fix: "Add start dates - tenure maths and gap detection both need them",
     },
     {
       key: "length",
@@ -443,7 +443,7 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
   const blockers = checks.filter((c) => !c.ok && c.severity === "critical").length;
   const band: "strong" | "decent" | "weak" = score >= 85 ? "strong" : score >= 65 ? "decent" : "weak";
   const summary = !hasContent
-    ? "Nothing prints on this CV yet — add a summary, a role or a skill before sending."
+    ? "Nothing prints on this CV yet - add a summary, a role or a skill before sending."
     : blockers
       ? `${blockers} thing${blockers > 1 ? "s" : ""} a parser or a recruiter will hit before anything else.`
       : band === "strong"
@@ -483,7 +483,7 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
     advice.push({
       key: "keywords",
       title: `Cover ${missing.length} job-description keyword${missing.length === 1 ? "" : "s"}`,
-      detail: `Missing: ${missing.slice(0, 6).join(", ")} — add only the ones that are true.`,
+      detail: `Missing: ${missing.slice(0, 6).join(", ")} - add only the ones that are true.`,
       gain: 10,
     });
   }
@@ -499,7 +499,7 @@ export async function matchCV(userId: string, cvId: string, postingId?: string) 
     ats: { score, checks, pages, band, blockers, summary, weight_total: weightTotal, weight_earned: weightEarned },
     keywords: { matched, missing, coverage_pct: coverage, jd_total: jdKeywords.length },
     jd_match: jdScore ? { score: jdScore.score, explain: jdScore.explain } : null,
-    /** score if every failing row turns green — the ceiling, not a promise */
+    /** score if every failing row turns green - the ceiling, not a promise */
     potential_score: potential,
     advice,
     redline,
@@ -588,7 +588,7 @@ export const extractVars = (body: string) => [...new Set([...body.matchAll(/\{\{
 
 /** Merge variables (§24.2): {{a.b}} plus {{var | default: "x"}} fallbacks.
  *  Drafts saved before the composer masked its tokens may hold the polished form
- *  `{{profile. First_name}}` (space after the dot, capitalised) — normalise those
+ *  `{{profile. First_name}}` (space after the dot, capitalised) - normalise those
  *  first, otherwise the merge skips them and the literal token reaches the email. */
 export function mergeTemplate(body: string, vars: Record<string, any>): string {
   const normalised = body.replace(/\{\{\s*([A-Za-z][\w]*)\.\s*([A-Za-z_][\w]*)\s*\}\}/g, (_m, a: string, b: string) => `{{${a.toLowerCase()}.${b.toLowerCase()}}}`);

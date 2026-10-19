@@ -1,9 +1,9 @@
 /**
- * The CV document — the printable sheet, and the only thing the preview shows.
+ * The CV document - the printable sheet, and the only thing the preview shows.
  *
  * The geometry here is not invented. It was measured off a real FlowCV export
  * (`IRAOYA_ISRAEL_OMOKHAGBO_FlowCV_Resume_2026-09-30.pdf`, itself a Chrome print
- * of FlowCV's HTML — same pipeline this app uses, so the two can be compared
+ * of FlowCV's HTML - same pipeline this app uses, so the two can be compared
  * number for number). The export is a tagged Skia/PDF at 1 unit = 1 CSS px on a
  * 794 × 1126 px sheet:
  *
@@ -19,7 +19,7 @@
  * sections and lines, `renderCvHtml` turns that model into markup and
  * `estimateCvDoc` measures the same model with the same metrics. That is the
  * only way the page count the ATS panel reports can be trusted to describe the
- * page the printer produces — two independent code paths would drift, and a
+ * page the printer produces - two independent code paths would drift, and a
  * length check that drifts is worse than no length check.
  *
  * Two deliberate consequences of copying the reference exactly: the document is
@@ -94,7 +94,7 @@ const wrapLines = (text: string, colWidth: number): number =>
  * Every field is optional and an absent field means **the measured default**, so
  * `{}` renders the reference document exactly and a CV saved before this panel
  * existed cannot shift by a pixel. Settings that change the geometry are folded
- * into `resolveMetrics`, which both the renderer and the page estimate read —
+ * into `resolveMetrics`, which both the renderer and the page estimate read -
  * that is what keeps the reported page count true after a setting changes.
  */
 export type CvDesign = {
@@ -253,7 +253,7 @@ const YM = /^(\d{4})[-/](\d{1,2})$/;
 
 /**
  * Rewrite a `YYYY-MM` / `YYYY/MM` value per the design. Free text ("Summer 2024",
- * "2019") is passed through untouched — guessing at prose would mangle it.
+ * "2019") is passed through untouched - guessing at prose would mangle it.
  */
 export function formatDate(value: unknown, mode: CvDesign["dates"] = "keep"): string {
   const s = String(value ?? "").trim();
@@ -277,7 +277,7 @@ const applyCaps = (s: string, caps: CvDesign["caps"]): string =>
 export const CV_ACCENTS: Record<string, string> = {
   /** the reference document: pure paper black */
   ink: "#000000",
-  /** the app's brand hue, one step down — #ff9933 only clears 2:1 as text on paper */
+  /** the app's brand hue, one step down - #ff9933 only clears 2:1 as text on paper */
   ember: "#b35f00",
   graphite: "#5b564f",
 };
@@ -332,7 +332,7 @@ const href = (v: unknown): string => {
   return /@/.test(s) ? `mailto:${s}` : `https://${s}`;
 };
 
-/** one paragraph per non-empty line — the reference's prose unit */
+/** one paragraph per non-empty line - the reference's prose unit */
 export const lines = (t: unknown): string[] =>
   String(t ?? "")
     .split("\n")
@@ -602,7 +602,7 @@ export function renderCvHtml(c: any, p: any, opts: CvDocOptions = {}): string {
 <title>${esc(doc.name)} \u2014 CV</title>
 <style>
 /* Amiri is the face the reference document embeds (ascent 1.124em / descent
-   0.634em, upem 1000 — identical to the file the PDF carries). Bundled rather
+   0.634em, upem 1000 - identical to the file the PDF carries). Bundled rather
    than fetched so a CV prints the same on every machine, and \`block\` so nothing
    is laid out in a fallback face and re-flowed once the real one arrives. */
 @font-face { font-family: Amiri; font-style: normal; font-weight: 400; font-display: block;
@@ -683,7 +683,7 @@ p { margin: 0; }
   margin-bottom: ${px(m.entryGap)}px; }
 .entry:last-child { margin-bottom: 0; }
 /* The reference starts an entry's first line 31px below its heading but prose
-   lines at 30px — one pixel of its own box model, kept so every later section
+   lines at 30px - one pixel of its own box model, kept so every later section
    lands on the measured baseline instead of drifting. Padding, not margin:
    a margin here would collapse into the heading's own margin-bottom. */
 h2 + .entry { padding-top: ${px(m.entryTop)}px; }
@@ -712,7 +712,7 @@ ins.rl-note { display: inline-block; background: transparent; border: 1px dashed
 
 /* On screen the sheet carries the 297mm floor and the top margin itself, so the
    preview shows a real page. On paper the page box supplies the vertical margin
-   — which is what gives page 2 of a long CV the same inset as page 1. */
+   - which is what gives page 2 of a long CV the same inset as page 1. */
 @media print { .page { min-height: 0; margin: 0; padding-top: 0; } }
 /* Annotated sheets are a working copy. Printing accepts the edits: the struck
    line disappears, the rewrite prints as plain text, and the note stays advice. */

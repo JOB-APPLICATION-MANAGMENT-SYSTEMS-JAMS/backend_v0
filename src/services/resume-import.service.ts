@@ -4,7 +4,7 @@ import { AppError } from "../core/errors";
  * Resume import (§35 autofill): turn an uploaded CV into profile answers so a
  * first-time user doesn't have to retype what their resume already says.
  * PDF text comes from unpdf (serverless-safe); txt/md/rtf are read directly.
- * Heuristics stay conservative — extract only what a resume states plainly;
+ * Heuristics stay conservative - extract only what a resume states plainly;
  * the /autofill page shows everything for review before the human saves.
  */
 
@@ -20,10 +20,10 @@ const MAX_BYTES = 4 * 1024 * 1024;
 export async function parseResume(buf: Buffer, filename: string): Promise<ResumeParse> {
   const lower = filename.toLowerCase();
   if (!SUPPORTED.some((ext) => lower.endsWith(ext))) {
-    throw new AppError("UNSUPPORTED_FILE", 415, "That file type isn’t supported yet — export your resume as PDF or .txt and try again.", null);
+    throw new AppError("UNSUPPORTED_FILE", 415, "That file type isn’t supported yet - export your resume as PDF or .txt and try again.", null);
   }
-  if (!buf.length) throw new AppError("EMPTY_UPLOAD", 400, "That file came through empty — try again.", null);
-  if (buf.length > MAX_BYTES) throw new AppError("FILE_TOO_LARGE", 413, "That resume is over 4 MB — export a smaller PDF and try again.", null);
+  if (!buf.length) throw new AppError("EMPTY_UPLOAD", 400, "That file came through empty - try again.", null);
+  if (buf.length > MAX_BYTES) throw new AppError("FILE_TOO_LARGE", 413, "That resume is over 4 MB - export a smaller PDF and try again.", null);
 
   let text = "";
   if (lower.endsWith(".pdf")) {
@@ -33,17 +33,17 @@ export async function parseResume(buf: Buffer, filename: string): Promise<Resume
       const out = await extractText(doc, { mergePages: true });
       text = out.text ?? "";
     } catch {
-      throw new AppError("UNREADABLE_PDF", 422, "Couldn’t read that PDF — it may be a scan (image-only). Copy the text into a .txt file instead.", null);
+      throw new AppError("UNREADABLE_PDF", 422, "Couldn’t read that PDF - it may be a scan (image-only). Copy the text into a .txt file instead.", null);
     }
   } else {
     text = buf.toString("utf8");
   }
 
   text = text.replace(/\u0000/g, "").trim();
-  if (!text) throw new AppError("EMPTY_RESUME", 422, "Couldn’t find any text in that file — if it’s a scan, paste the text into a .txt file.", null);
+  if (!text) throw new AppError("EMPTY_RESUME", 422, "Couldn’t find any text in that file - if it’s a scan, paste the text into a .txt file.", null);
 
   const { identity, warnings } = extractIdentity(text);
-  if (Object.keys(identity).length === 0) warnings.push("No contact details spotted — add them manually below.");
+  if (Object.keys(identity).length === 0) warnings.push("No contact details spotted - add them manually below.");
   return { text: text.slice(0, 4000), identity, warnings };
 }
 
@@ -89,7 +89,7 @@ export function extractIdentity(raw: string): { identity: Record<string, any>; w
     if (parts.length > 2) id.middle_name = parts.slice(1, -1).join(" ");
     id.name = parts.join(" ");
   } else {
-    warnings.push("Couldn’t spot a name — add it manually below.");
+    warnings.push("Couldn’t spot a name - add it manually below.");
   }
 
   // location: prefer "City, ST" on the contact line that carries the email

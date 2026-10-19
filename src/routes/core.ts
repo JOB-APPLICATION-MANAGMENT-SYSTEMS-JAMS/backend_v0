@@ -212,7 +212,7 @@ cvRouter.get("/:id/suggest", async (req: AuthedRequest, res, next) => {
 /**
  * Print-ready A4 HTML. Chromium's own print pipeline turns it into the PDF, so the
  * editor's preview and the printed page are the same document, at the same
- * geometry — see `../lib/cv-document` for the measured layout it implements.
+ * geometry - see `../lib/cv-document` for the measured layout it implements.
  *
  * `?frame=1` is kept for the editor's URL contract; the document is always a real
  * 210×297mm sheet now, so the flag no longer changes the output. `?accent=` picks

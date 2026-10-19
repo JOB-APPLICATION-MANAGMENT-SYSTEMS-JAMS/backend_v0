@@ -44,11 +44,11 @@ export interface CreateOutreachInput {
 
 /** Build the merge context from profile + company + application (§24.2 variables).
  *  Identity starts empty until the profile form is saved, but the users row already
- *  has the name and email from signup — fall back to it so `{{profile.first_name}}`
+ *  has the name and email from signup - fall back to it so `{{profile.first_name}}`
  *  never renders blank in a sent email. */
 async function mergeContext(userId: string, appId?: string | null, contactId?: string | null) {
   const p = await get<any>("SELECT * FROM profiles WHERE user_id = ?", userId);
-  // users carries only email — names live in identity under whichever key the
+  // users carries only email - names live in identity under whichever key the
   // flow that wrote it used (signup first_name, onboarding full_name, form name);
   // reconcile picks whatever exists so the signature is never blank
   const u = await get<any>("SELECT email FROM users WHERE id = ?", userId);

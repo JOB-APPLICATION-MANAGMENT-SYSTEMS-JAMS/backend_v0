@@ -47,6 +47,14 @@ const BOOT_SQL = [
   "CREATE UNIQUE INDEX IF NOT EXISTS ux_postings_user_src_ext ON job_postings(user_id, source, external_id)",
   "CREATE INDEX IF NOT EXISTS ix_postings_email ON job_postings(contact_email)",
   "CREATE INDEX IF NOT EXISTS ix_pitch_sector ON pitch_targets(sector, email_derived)",
+  // Demo copy used to be set with em dashes. The product voice is plain hyphens
+  // now, and a database seeded before that change would keep rendering the old
+  // titles, so normalise the demo rows once at boot (user-authored rows are left
+  // exactly as their owner typed them).
+  "UPDATE platform_jobs SET title = REPLACE(title, '—', '-'), company = REPLACE(company, '—', '-'), description = REPLACE(description, '—', '-')"
+    + " WHERE demo = 1 AND (title LIKE '%—%' OR company LIKE '%—%' OR description LIKE '%—%')",
+  "UPDATE event_listings SET title = REPLACE(title, '—', '-'), host = REPLACE(host, '—', '-'), venue = REPLACE(venue, '—', '-'), description = REPLACE(description, '—', '-')"
+    + " WHERE demo = 1 AND (title LIKE '%—%' OR host LIKE '%—%' OR venue LIKE '%—%' OR description LIKE '%—%')",
 ];
 
 function getPool(): Promise<pg.Pool> {

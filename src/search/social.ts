@@ -35,7 +35,7 @@ export function baseQuery(q?: string): string {
 
 const enc = encodeURIComponent;
 
-/** Google site: search — the reliable fallback for platforms without public search. */
+/** Google site: search - the reliable fallback for platforms without public search. */
 const siteSearch = (site: string, query: string) => `https://www.google.com/search?q=${enc(`site:${site} ${query}`)}`;
 
 /** Per-platform prepared searches for a given free-text query. */

@@ -32,7 +32,7 @@ export function issueTokens(userId: string) {
 /**
  * Deliver a verification token (§4.3).
  *  - non-online (local/test): print the link and hand the token straight back, so the UI
- *    can verify instantly with no SMTP — the MailPit equivalent.
+ *    can verify instantly with no SMTP - the MailPit equivalent.
  *  - online: email the link through the deployment SMTP_* account and NEVER return the
  *    token; echoing it would let anyone register with an address they do not own and
  *    verify it themselves, defeating email verification entirely.
