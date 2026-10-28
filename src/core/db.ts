@@ -37,6 +37,8 @@ const ENSURE_COLUMNS: { table: string; column: string; ddl: string }[] = [
   // one can carry an ownership line at the foot of the page
   { table: "cvs", column: "public", ddl: "ALTER TABLE cvs ADD COLUMN public INTEGER NOT NULL DEFAULT 0" },
   { table: "cvs", column: "copyright", ddl: "ALTER TABLE cvs ADD COLUMN copyright TEXT" },
+  // Higher As: credential review needs a scoped role, not a second account system
+  { table: "users", column: "role", ddl: "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'member'" },
 ];
 
 /** Idempotent statements for databases created before they existed. */

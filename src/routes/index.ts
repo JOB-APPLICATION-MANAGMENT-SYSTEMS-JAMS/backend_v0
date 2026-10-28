@@ -8,6 +8,7 @@ import { applicationRouter } from "./applications";
 import { outreachRouter, mailboxRouter, inboxRouter, trackingRouter } from "./outreach";
 import { analyticsRouter, streakRouter, exportRouter } from "./analytics";
 import { peopleRouter, hirersRouter, eventsRouter } from "./network";
+import { higherAsRouter } from "./higher-as";
 import { sourceHealth } from "../ingestion/ingest";
 import { z } from "zod";
 import { requireAuth, type AuthedRequest } from "../core/security";
@@ -32,7 +33,7 @@ export const apiIndex = () => ({
   version: "0.1.0",
   mode: config.mode,
   base: "/api/v1",
-  endpoints: ["/auth", "/profile", "/people", "/hirers", "/events", "/cvs", "/templates", "/jobs", "/searches", "/applications", "/companies", "/pitch-targets", "/capture", "/autofill", "/outreach", "/mailboxes", "/inbox", "/analytics", "/streaks", "/goals", "/export", "/tracking", "/sources"],
+  endpoints: ["/auth", "/profile", "/people", "/hirers", "/higher-as", "/events", "/cvs", "/templates", "/jobs", "/searches", "/applications", "/companies", "/pitch-targets", "/capture", "/autofill", "/outreach", "/mailboxes", "/inbox", "/analytics", "/streaks", "/goals", "/export", "/tracking", "/sources"],
 });
 apiRouter.get("/", (_req, res) => res.json(apiIndex()));
 
@@ -40,6 +41,7 @@ apiRouter.use("/auth", authRouter);
 apiRouter.use("/profile", profileRouter);
 apiRouter.use("/people", peopleRouter);
 apiRouter.use("/hirers", hirersRouter);
+apiRouter.use("/higher-as", higherAsRouter);
 apiRouter.use("/events", eventsRouter);
 apiRouter.use("/cvs", cvRouter);
 apiRouter.use("/templates", templateRouter);

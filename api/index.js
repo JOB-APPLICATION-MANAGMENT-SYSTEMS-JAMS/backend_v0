@@ -68,13 +68,13 @@ var require_ms = __commonJS({
         "val is not a non-empty string or a valid number. val=" + JSON.stringify(val)
       );
     };
-    function parse2(str2) {
-      str2 = String(str2);
-      if (str2.length > 100) {
+    function parse2(str3) {
+      str3 = String(str3);
+      if (str3.length > 100) {
         return;
       }
       var match = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
-        str2
+        str3
       );
       if (!match) {
         return;
@@ -675,7 +675,7 @@ var require_node = __commonJS({
     var { formatters } = module.exports;
     formatters.o = function(v2) {
       this.inspectOpts.colors = this.useColors;
-      return util4.inspect(v2, this.inspectOpts).split("\n").map((str2) => str2.trim()).join(" ");
+      return util4.inspect(v2, this.inspectOpts).split("\n").map((str3) => str3.trim()).join(" ");
     };
     formatters.O = function(v2) {
       this.inspectOpts.colors = this.useColors;
@@ -701,8 +701,8 @@ var require_depd = __commonJS({
     var relative = __require("path").relative;
     module.exports = depd;
     var basePath = process.cwd();
-    function containsNamespace(str2, namespace) {
-      var vals = str2.split(/[ ,]+/);
+    function containsNamespace(str3, namespace) {
+      var vals = str3.split(/[ ,]+/);
       var ns2 = String(namespace).toLowerCase();
       for (var i2 = 0; i2 < vals.length; i2++) {
         var val = vals[i2];
@@ -729,21 +729,21 @@ var require_depd = __commonJS({
       return descriptor;
     }
     function createArgumentsString(arity) {
-      var str2 = "";
+      var str3 = "";
       for (var i2 = 0; i2 < arity; i2++) {
-        str2 += ", arg" + i2;
+        str3 += ", arg" + i2;
       }
-      return str2.substr(2);
+      return str3.substr(2);
     }
     function createStackString(stack) {
-      var str2 = this.name + ": " + this.namespace;
+      var str3 = this.name + ": " + this.namespace;
       if (this.message) {
-        str2 += " deprecated " + this.message;
+        str3 += " deprecated " + this.message;
       }
       for (var i2 = 0; i2 < stack.length; i2++) {
-        str2 += "\n    at " + stack[i2].toString();
+        str3 += "\n    at " + stack[i2].toString();
       }
-      return str2;
+      return str3;
     }
     function depd(namespace) {
       if (!namespace) {
@@ -772,15 +772,15 @@ var require_depd = __commonJS({
       if (process.noDeprecation) {
         return true;
       }
-      var str2 = process.env.NO_DEPRECATION || "";
-      return containsNamespace(str2, namespace);
+      var str3 = process.env.NO_DEPRECATION || "";
+      return containsNamespace(str3, namespace);
     }
     function istraced(namespace) {
       if (process.traceDeprecation) {
         return true;
       }
-      var str2 = process.env.TRACE_DEPRECATION || "";
-      return containsNamespace(str2, namespace);
+      var str3 = process.env.TRACE_DEPRECATION || "";
+      return containsNamespace(str3, namespace);
     }
     function log(message, site) {
       var haslisteners = eehaslisteners(process, "deprecation");
@@ -1214,8 +1214,8 @@ var require_toidentifier = __commonJS({
   "node_modules/.pnpm/toidentifier@1.0.1/node_modules/toidentifier/index.js"(exports, module) {
     "use strict";
     module.exports = toIdentifier;
-    function toIdentifier(str2) {
-      return str2.split(" ").map(function(token) {
+    function toIdentifier(str3) {
+      return str3.split(" ").map(function(token) {
         return token.slice(0, 1).toUpperCase() + token.slice(1);
       }).join("").replace(/[^ _0-9a-z]/gi, "");
     }
@@ -1439,16 +1439,16 @@ var require_bytes = __commonJS({
         }
       }
       var val = value / map2[unit.toLowerCase()];
-      var str2 = val.toFixed(decimalPlaces);
+      var str3 = val.toFixed(decimalPlaces);
       if (!fixedDecimals) {
-        str2 = str2.replace(formatDecimalsRegExp, "$1");
+        str3 = str3.replace(formatDecimalsRegExp, "$1");
       }
       if (thousandsSeparator) {
-        str2 = str2.split(".").map(function(s2, i2) {
+        str3 = str3.split(".").map(function(s2, i2) {
           return i2 === 0 ? s2.replace(formatThousandsRegExp, thousandsSeparator) : s2;
         }).join(".");
       }
-      return str2 + unitSeparator + unit;
+      return str3 + unitSeparator + unit;
     }
     function parse2(val) {
       if (typeof val === "number" && !isNaN(val)) {
@@ -1553,12 +1553,12 @@ var require_bom_handling = __commonJS({
       this.encoder = encoder;
       this.addBOM = true;
     }
-    PrependBOMWrapper.prototype.write = function(str2) {
+    PrependBOMWrapper.prototype.write = function(str3) {
       if (this.addBOM) {
-        str2 = BOMChar + str2;
+        str3 = BOMChar + str3;
         this.addBOM = false;
       }
-      return this.encoder.write(str2);
+      return this.encoder.write(str3);
     };
     PrependBOMWrapper.prototype.end = function() {
       return this.encoder.end();
@@ -1657,31 +1657,31 @@ var require_internal = __commonJS({
     function InternalEncoder(options, codec) {
       this.enc = codec.enc;
     }
-    InternalEncoder.prototype.write = function(str2) {
-      return Buffer2.from(str2, this.enc);
+    InternalEncoder.prototype.write = function(str3) {
+      return Buffer2.from(str3, this.enc);
     };
     InternalEncoder.prototype.end = function() {
     };
     function InternalEncoderBase64(options, codec) {
       this.prevStr = "";
     }
-    InternalEncoderBase64.prototype.write = function(str2) {
-      str2 = this.prevStr + str2;
-      var completeQuads = str2.length - str2.length % 4;
-      this.prevStr = str2.slice(completeQuads);
-      str2 = str2.slice(0, completeQuads);
-      return Buffer2.from(str2, "base64");
+    InternalEncoderBase64.prototype.write = function(str3) {
+      str3 = this.prevStr + str3;
+      var completeQuads = str3.length - str3.length % 4;
+      this.prevStr = str3.slice(completeQuads);
+      str3 = str3.slice(0, completeQuads);
+      return Buffer2.from(str3, "base64");
     };
     InternalEncoderBase64.prototype.end = function() {
       return Buffer2.from(this.prevStr, "base64");
     };
     function InternalEncoderCesu8(options, codec) {
     }
-    InternalEncoderCesu8.prototype.write = function(str2) {
-      var buf = Buffer2.alloc(str2.length * 3);
+    InternalEncoderCesu8.prototype.write = function(str3) {
+      var buf = Buffer2.alloc(str3.length * 3);
       var bufIdx = 0;
-      for (var i2 = 0; i2 < str2.length; i2++) {
-        var charCode = str2.charCodeAt(i2);
+      for (var i2 = 0; i2 < str3.length; i2++) {
+        var charCode = str3.charCodeAt(i2);
         if (charCode < 128) {
           buf[bufIdx++] = charCode;
         } else if (charCode < 2048) {
@@ -1762,25 +1762,25 @@ var require_internal = __commonJS({
     function InternalEncoderUtf8(options, codec) {
       this.highSurrogate = "";
     }
-    InternalEncoderUtf8.prototype.write = function(str2) {
+    InternalEncoderUtf8.prototype.write = function(str3) {
       if (this.highSurrogate) {
-        str2 = this.highSurrogate + str2;
+        str3 = this.highSurrogate + str3;
         this.highSurrogate = "";
       }
-      if (str2.length > 0) {
-        var charCode = str2.charCodeAt(str2.length - 1);
+      if (str3.length > 0) {
+        var charCode = str3.charCodeAt(str3.length - 1);
         if (charCode >= 55296 && charCode < 56320) {
-          this.highSurrogate = str2[str2.length - 1];
-          str2 = str2.slice(0, str2.length - 1);
+          this.highSurrogate = str3[str3.length - 1];
+          str3 = str3.slice(0, str3.length - 1);
         }
       }
-      return Buffer2.from(str2, this.enc);
+      return Buffer2.from(str3, this.enc);
     };
     InternalEncoderUtf8.prototype.end = function() {
       if (this.highSurrogate) {
-        var str2 = this.highSurrogate;
+        var str3 = this.highSurrogate;
         this.highSurrogate = "";
-        return Buffer2.from(str2, this.enc);
+        return Buffer2.from(str3, this.enc);
       }
     };
   }
@@ -1807,8 +1807,8 @@ var require_utf32 = __commonJS({
       this.isLE = codec.isLE;
       this.highSurrogate = 0;
     }
-    Utf32Encoder.prototype.write = function(str2) {
-      var src = Buffer2.from(str2, "ucs2");
+    Utf32Encoder.prototype.write = function(str3) {
+      var src = Buffer2.from(str3, "ucs2");
       var dst = Buffer2.alloc(src.length * 2 + 4);
       var write32 = this.isLE ? dst.writeUInt32LE : dst.writeUInt32BE;
       var offset = 0;
@@ -1933,8 +1933,8 @@ var require_utf32 = __commonJS({
       }
       this.encoder = codec.iconv.getEncoder(options.defaultEncoding || "utf-32le", options);
     }
-    Utf32AutoEncoder.prototype.write = function(str2) {
-      return this.encoder.write(str2);
+    Utf32AutoEncoder.prototype.write = function(str3) {
+      return this.encoder.write(str3);
     };
     Utf32AutoEncoder.prototype.end = function() {
       return this.encoder.end();
@@ -2034,8 +2034,8 @@ var require_utf16 = __commonJS({
     Utf16BECodec.prototype.bomAware = true;
     function Utf16BEEncoder() {
     }
-    Utf16BEEncoder.prototype.write = function(str2) {
-      var buf = Buffer2.from(str2, "ucs2");
+    Utf16BEEncoder.prototype.write = function(str3) {
+      var buf = Buffer2.from(str3, "ucs2");
       for (var i2 = 0; i2 < buf.length; i2 += 2) {
         var tmp = buf[i2];
         buf[i2] = buf[i2 + 1];
@@ -2084,8 +2084,8 @@ var require_utf16 = __commonJS({
       }
       this.encoder = codec.iconv.getEncoder("utf-16le", options);
     }
-    Utf16Encoder.prototype.write = function(str2) {
-      return this.encoder.write(str2);
+    Utf16Encoder.prototype.write = function(str3) {
+      return this.encoder.write(str3);
     };
     Utf16Encoder.prototype.end = function() {
       return this.encoder.end();
@@ -2181,8 +2181,8 @@ var require_utf7 = __commonJS({
     function Utf7Encoder(options, codec) {
       this.iconv = codec.iconv;
     }
-    Utf7Encoder.prototype.write = function(str2) {
-      return Buffer2.from(str2.replace(nonDirectChars, function(chunk) {
+    Utf7Encoder.prototype.write = function(str3) {
+      return Buffer2.from(str3.replace(nonDirectChars, function(chunk) {
         return "+" + (chunk === "+" ? "" : this.iconv.encode(chunk, "utf16-be").toString("base64").replace(/=+$/, "")) + "-";
       }.bind(this)));
     };
@@ -2266,14 +2266,14 @@ var require_utf7 = __commonJS({
       this.base64Accum = Buffer2.alloc(6);
       this.base64AccumIdx = 0;
     }
-    Utf7IMAPEncoder.prototype.write = function(str2) {
+    Utf7IMAPEncoder.prototype.write = function(str3) {
       var inBase64 = this.inBase64;
       var base64Accum = this.base64Accum;
       var base64AccumIdx = this.base64AccumIdx;
-      var buf = Buffer2.alloc(str2.length * 5 + 10);
+      var buf = Buffer2.alloc(str3.length * 5 + 10);
       var bufIdx = 0;
-      for (var i3 = 0; i3 < str2.length; i3++) {
-        var uChar = str2.charCodeAt(i3);
+      for (var i3 = 0; i3 < str3.length; i3++) {
+        var uChar = str3.charCodeAt(i3);
         if (uChar >= 32 && uChar <= 126) {
           if (inBase64) {
             if (base64AccumIdx > 0) {
@@ -2414,10 +2414,10 @@ var require_sbcs_codec = __commonJS({
     function SBCSEncoder(options, codec) {
       this.encodeBuf = codec.encodeBuf;
     }
-    SBCSEncoder.prototype.write = function(str2) {
-      var buf = Buffer2.alloc(str2.length);
-      for (var i2 = 0; i2 < str2.length; i2++) {
-        buf[i2] = this.encodeBuf[str2.charCodeAt(i2)];
+    SBCSEncoder.prototype.write = function(str3) {
+      var buf = Buffer2.alloc(str3.length);
+      for (var i2 = 0; i2 < str3.length; i2++) {
+        buf[i2] = this.encodeBuf[str3.charCodeAt(i2)];
       }
       return buf;
     };
@@ -3293,8 +3293,8 @@ var require_dbcs_codec = __commonJS({
       this.defaultCharSingleByte = codec.defCharSB;
       this.gb18030 = codec.gb18030;
     }
-    DBCSEncoder.prototype.write = function(str2) {
-      var newBuf = Buffer2.alloc(str2.length * (this.gb18030 ? 4 : 3));
+    DBCSEncoder.prototype.write = function(str3) {
+      var newBuf = Buffer2.alloc(str3.length * (this.gb18030 ? 4 : 3));
       var leadSurrogate = this.leadSurrogate;
       var seqObj = this.seqObj;
       var nextChar = -1;
@@ -3302,8 +3302,8 @@ var require_dbcs_codec = __commonJS({
       var j2 = 0;
       while (true) {
         if (nextChar === -1) {
-          if (i3 == str2.length) break;
-          var uCode = str2.charCodeAt(i3++);
+          if (i3 == str3.length) break;
+          var uCode = str3.charCodeAt(i3++);
         } else {
           var uCode = nextChar;
           nextChar = -1;
@@ -5141,10 +5141,10 @@ var require_lib = __commonJS({
     module.exports.encodings = null;
     module.exports.defaultCharUnicode = "\uFFFD";
     module.exports.defaultCharSingleByte = "?";
-    module.exports.encode = function encode4(str2, encoding, options) {
-      str2 = "" + (str2 || "");
+    module.exports.encode = function encode4(str3, encoding, options) {
+      str3 = "" + (str3 || "");
       var encoder = module.exports.getEncoder(encoding, options);
-      var res = encoder.write(str2);
+      var res = encoder.write(str3);
       var trail = encoder.end();
       return trail && trail.length > 0 ? Buffer2.concat([res, trail]) : res;
     };
@@ -5752,9 +5752,9 @@ var require_dist = __commonJS({
       }
       return { type, index, parameters };
     }
-    function skipValue(str2, index, len, stopChar) {
+    function skipValue(str3, index, len, stopChar) {
       while (index < len) {
-        const code = str2.charCodeAt(index);
+        const code = str3.charCodeAt(index);
         if (code === SEMI || code === stopChar)
           break;
         index++;
@@ -5779,12 +5779,12 @@ var require_dist = __commonJS({
       }
       return end;
     }
-    function qstring(str2) {
-      if (TOKEN_REGEXP.test(str2))
-        return str2;
-      if (TEXT_REGEXP.test(str2))
-        return `"${str2.replace(QUOTE_REGEXP, "\\$&")}"`;
-      throw new TypeError(`Invalid parameter value: ${str2}`);
+    function qstring(str3) {
+      if (TOKEN_REGEXP.test(str3))
+        return str3;
+      if (TEXT_REGEXP.test(str3))
+        return `"${str3.replace(QUOTE_REGEXP, "\\$&")}"`;
+      throw new TypeError(`Invalid parameter value: ${str3}`);
     }
   }
 });
@@ -15220,11 +15220,11 @@ var require_mime_types = __commonJS({
       }
       return false;
     }
-    function contentType(str2) {
-      if (!str2 || typeof str2 !== "string") {
+    function contentType(str3) {
+      if (!str3 || typeof str3 !== "string") {
         return false;
       }
-      var mime = str2.indexOf("/") === -1 ? exports.lookup(str2) : str2;
+      var mime = str3.indexOf("/") === -1 ? exports.lookup(str3) : str3;
       if (!mime) {
         return false;
       }
@@ -15597,14 +15597,14 @@ var require_read = __commonJS({
             return;
           }
         }
-        let str2 = body;
+        let str3 = body;
         try {
           debug("parse body");
-          str2 = typeof body !== "string" && encoding !== null ? iconv.decode(body, encoding) : body;
-          req.body = parse2(str2, encoding);
+          str3 = typeof body !== "string" && encoding !== null ? iconv.decode(body, encoding) : body;
+          req.body = parse2(str3, encoding);
         } catch (err) {
           next(createError(400, err, {
-            body: str2,
+            body: str3,
             type: err.type || "entity.parse.failed"
           }));
           return;
@@ -15721,11 +15721,11 @@ var require_json = __commonJS({
         }
       };
     }
-    function createStrictSyntaxError(str2, char) {
-      const index = str2.indexOf(char);
+    function createStrictSyntaxError(str3, char) {
+      const index = str3.indexOf(char);
       let partial = "";
       if (index !== -1) {
-        partial = str2.substring(0, index) + JSON_SYNTAX_CHAR.repeat(str2.length - index);
+        partial = str3.substring(0, index) + JSON_SYNTAX_CHAR.repeat(str3.length - index);
       }
       try {
         JSON.parse(partial);
@@ -15733,14 +15733,14 @@ var require_json = __commonJS({
       } catch (e2) {
         return normalizeJsonSyntaxError(e2, {
           message: e2.message.replace(JSON_SYNTAX_REGEXP, function(placeholder) {
-            return str2.substring(index, index + placeholder.length);
+            return str3.substring(index, index + placeholder.length);
           }),
           stack: e2.stack
         });
       }
     }
-    function firstchar(str2) {
-      const match = FIRST_CHAR_REGEXP.exec(str2);
+    function firstchar(str3) {
+      const match = FIRST_CHAR_REGEXP.exec(str3);
       return match ? match[1] : void 0;
     }
     function normalizeJsonSyntaxError(error2, obj) {
@@ -15851,20 +15851,20 @@ var require_object_inspect = __commonJS({
     var gPO = (typeof Reflect === "function" ? Reflect.getPrototypeOf : Object.getPrototypeOf) || ([].__proto__ === Array.prototype ? function(O2) {
       return O2.__proto__;
     } : null);
-    function addNumericSeparator(num2, str2) {
-      if (num2 === Infinity || num2 === -Infinity || num2 !== num2 || num2 && num2 > -1e3 && num2 < 1e3 || $test.call(/e/, str2)) {
-        return str2;
+    function addNumericSeparator(num2, str3) {
+      if (num2 === Infinity || num2 === -Infinity || num2 !== num2 || num2 && num2 > -1e3 && num2 < 1e3 || $test.call(/e/, str3)) {
+        return str3;
       }
       var sepRegex = /[0-9](?=(?:[0-9]{3})+(?![0-9]))/g;
       if (typeof num2 === "number") {
         var int = num2 < 0 ? -$floor(-num2) : $floor(num2);
         if (int !== num2) {
           var intStr = String(int);
-          var dec = $slice.call(str2, intStr.length + 1);
+          var dec = $slice.call(str3, intStr.length + 1);
           return $replace.call(intStr, sepRegex, "$&_") + "." + $replace.call($replace.call(dec, /([0-9]{3})/g, "$&_"), /_$/, "");
         }
       }
-      return $replace.call(str2, sepRegex, "$&_");
+      return $replace.call(str3, sepRegex, "$&_");
     }
     var utilInspect = require_util_inspect();
     var inspectCustom = utilInspect.custom;
@@ -15914,8 +15914,8 @@ var require_object_inspect = __commonJS({
         if (obj === 0) {
           return Infinity / obj > 0 ? "0" : "-0";
         }
-        var str2 = String(obj);
-        return numericSeparator ? addNumericSeparator(obj, str2) : str2;
+        var str3 = String(obj);
+        return numericSeparator ? addNumericSeparator(obj, str3) : str3;
       }
       if (typeof obj === "bigint") {
         var bigIntStr = String(obj) + "n";
@@ -16235,15 +16235,15 @@ var require_object_inspect = __commonJS({
       }
       return typeof x2.nodeName === "string" && typeof x2.getAttribute === "function";
     }
-    function inspectString(str2, opts) {
-      if (str2.length > opts.maxStringLength) {
-        var remaining = str2.length - opts.maxStringLength;
+    function inspectString(str3, opts) {
+      if (str3.length > opts.maxStringLength) {
+        var remaining = str3.length - opts.maxStringLength;
         var trailer = "... " + remaining + " more character" + (remaining > 1 ? "s" : "");
-        return inspectString($slice.call(str2, 0, opts.maxStringLength), opts) + trailer;
+        return inspectString($slice.call(str3, 0, opts.maxStringLength), opts) + trailer;
       }
       var quoteRE = quoteREs[opts.quoteStyle || "single"];
       quoteRE.lastIndex = 0;
-      var s2 = $replace.call($replace.call(str2, quoteRE, "\\$1"), /[\x00-\x1f]/g, lowbyte);
+      var s2 = $replace.call($replace.call(str3, quoteRE, "\\$1"), /[\x00-\x1f]/g, lowbyte);
       return wrapQuotes(s2, "single", opts);
     }
     function lowbyte(c2) {
@@ -16260,8 +16260,8 @@ var require_object_inspect = __commonJS({
       }
       return "\\x" + (n2 < 16 ? "0" : "") + $toUpperCase.call(n2.toString(16));
     }
-    function markBoxed(str2) {
-      return "Object(" + str2 + ")";
+    function markBoxed(str3) {
+      return "Object(" + str3 + ")";
     }
     function weakCollectionOf(type) {
       return type + " { ? }";
@@ -16726,14 +16726,14 @@ var require_implementation = __commonJS({
       return arr;
     };
     var joiny = function(arr, joiner) {
-      var str2 = "";
+      var str3 = "";
       for (var i2 = 0; i2 < arr.length; i2 += 1) {
-        str2 += arr[i2];
+        str3 += arr[i2];
         if (i2 + 1 < arr.length) {
-          str2 += joiner;
+          str3 += joiner;
         }
       }
-      return str2;
+      return str3;
     };
     module.exports = function bind(that) {
       var target = this;
@@ -17613,8 +17613,8 @@ var require_utils2 = __commonJS({
         return acc;
       }, target);
     };
-    var decode3 = function(str2, defaultDecoder, charset) {
-      var strWithoutPlus = str2.replace(/\+/g, " ");
+    var decode3 = function(str3, defaultDecoder, charset) {
+      var strWithoutPlus = str3.replace(/\+/g, " ");
       if (charset === "iso-8859-1") {
         return strWithoutPlus.replace(/%[0-9a-f]{2}/gi, unescape);
       }
@@ -17625,15 +17625,15 @@ var require_utils2 = __commonJS({
       }
     };
     var limit = 1024;
-    var encode4 = function encode5(str2, defaultEncoder, charset, kind, format) {
-      if (str2.length === 0) {
-        return str2;
+    var encode4 = function encode5(str3, defaultEncoder, charset, kind, format) {
+      if (str3.length === 0) {
+        return str3;
       }
-      var string = str2;
-      if (typeof str2 === "symbol") {
-        string = Symbol.prototype.toString.call(str2);
-      } else if (typeof str2 !== "string") {
-        string = String(str2);
+      var string = str3;
+      if (typeof str3 === "symbol") {
+        string = Symbol.prototype.toString.call(str3);
+      } else if (typeof str3 !== "string") {
+        string = String(str3);
       }
       if (charset === "iso-8859-1") {
         return escape(string).replace(/%u[0-9a-f]{4}/gi, function($0) {
@@ -18083,8 +18083,8 @@ var require_parse = __commonJS({
       strictNullHandling: false,
       throwOnLimitExceeded: false
     };
-    var interpretNumericEntities = function(str2) {
-      return str2.replace(/&#(\d+);/g, function($0, numberStr) {
+    var interpretNumericEntities = function(str3) {
+      return str3.replace(/&#(\d+);/g, function($0, numberStr) {
         return String.fromCharCode(parseInt(numberStr, 10));
       });
     };
@@ -18110,9 +18110,9 @@ var require_parse = __commonJS({
     };
     var isoSentinel = "utf8=%26%2310003%3B";
     var charsetSentinel = "utf8=%E2%9C%93";
-    var parseValues = function parseQueryStringValues(str2, options) {
+    var parseValues = function parseQueryStringValues(str3, options) {
       var obj = { __proto__: null };
-      var cleanStr = options.ignoreQueryPrefix ? str2.replace(/^\?/, "") : str2;
+      var cleanStr = options.ignoreQueryPrefix ? str3.replace(/^\?/, "") : str3;
       cleanStr = cleanStr.replace(/%5B/gi, "[").replace(/%5D/gi, "]");
       var limit = options.parameterLimit === Infinity ? void 0 : options.parameterLimit;
       var parts = cleanStr.split(
@@ -18359,17 +18359,17 @@ var require_parse = __commonJS({
         throwOnLimitExceeded: typeof opts.throwOnLimitExceeded === "boolean" ? opts.throwOnLimitExceeded : false
       };
     };
-    module.exports = function(str2, opts) {
+    module.exports = function(str3, opts) {
       var options = normalizeParseOptions(opts);
-      if (str2 === "" || str2 === null || typeof str2 === "undefined") {
+      if (str3 === "" || str3 === null || typeof str3 === "undefined") {
         return options.plainObjects ? { __proto__: null } : {};
       }
-      var tempObj = typeof str2 === "string" ? parseValues(str2, options) : str2;
+      var tempObj = typeof str3 === "string" ? parseValues(str3, options) : str3;
       var obj = options.plainObjects ? { __proto__: null } : {};
       var keys = Object.keys(tempObj);
       for (var i2 = 0; i2 < keys.length; ++i2) {
         var key = keys[i2];
-        var newObj = parseKeys(key, tempObj[key], options, typeof str2 === "string");
+        var newObj = parseKeys(key, tempObj[key], options, typeof str3 === "string");
         obj = utils.merge(obj, newObj, options);
       }
       if (options.allowSparse === true) {
@@ -18541,17 +18541,17 @@ var require_escape_html = __commonJS({
     var matchHtmlRegExp = /["'&<>]/;
     module.exports = escapeHtml;
     function escapeHtml(string) {
-      var str2 = "" + string;
-      var match = matchHtmlRegExp.exec(str2);
+      var str3 = "" + string;
+      var match = matchHtmlRegExp.exec(str3);
       if (!match) {
-        return str2;
+        return str3;
       }
       var escape2;
       var html = "";
       var index = 0;
       var lastIndex = 0;
-      for (index = match.index; index < str2.length; index++) {
-        switch (str2.charCodeAt(index)) {
+      for (index = match.index; index < str3.length; index++) {
+        switch (str3.charCodeAt(index)) {
           case 34:
             escape2 = "&quot;";
             break;
@@ -18571,12 +18571,12 @@ var require_escape_html = __commonJS({
             continue;
         }
         if (lastIndex !== index) {
-          html += str2.substring(lastIndex, index);
+          html += str3.substring(lastIndex, index);
         }
         lastIndex = index + 1;
         html += escape2;
       }
-      return lastIndex !== index ? html + str2.substring(lastIndex, index) : html;
+      return lastIndex !== index ? html + str3.substring(lastIndex, index) : html;
     }
   }
 });
@@ -18616,20 +18616,20 @@ var require_parseurl = __commonJS({
       parsed._raw = url2;
       return req._parsedOriginalUrl = parsed;
     }
-    function fastparse(str2) {
-      if (typeof str2 !== "string" || str2.charCodeAt(0) !== 47) {
-        return parse2(str2);
+    function fastparse(str3) {
+      if (typeof str3 !== "string" || str3.charCodeAt(0) !== 47) {
+        return parse2(str3);
       }
-      var pathname = str2;
+      var pathname = str3;
       var query = null;
       var search = null;
-      for (var i2 = 1; i2 < str2.length; i2++) {
-        switch (str2.charCodeAt(i2)) {
+      for (var i2 = 1; i2 < str3.length; i2++) {
+        switch (str3.charCodeAt(i2)) {
           case 63:
             if (search === null) {
-              pathname = str2.substring(0, i2);
-              query = str2.substring(i2 + 1);
-              search = str2.substring(i2);
+              pathname = str3.substring(0, i2);
+              query = str3.substring(i2 + 1);
+              search = str3.substring(i2);
             }
             break;
           case 9:
@@ -18646,12 +18646,12 @@ var require_parseurl = __commonJS({
           /* #  */
           case 160:
           case 65279:
-            return parse2(str2);
+            return parse2(str3);
         }
       }
       var url2 = Url !== void 0 ? new Url() : {};
-      url2.path = str2;
-      url2.href = str2;
+      url2.path = str3;
+      url2.href = str3;
       url2.pathname = pathname;
       if (search !== null) {
         url2.query = query;
@@ -18974,14 +18974,14 @@ var require_content_type = __commonJS({
       return header;
     }
     function qstring(val) {
-      var str2 = String(val);
-      if (TOKEN_REGEXP.test(str2)) {
-        return str2;
+      var str3 = String(val);
+      if (TOKEN_REGEXP.test(str3)) {
+        return str3;
       }
-      if (str2.length > 0 && !TEXT_REGEXP.test(str2)) {
+      if (str3.length > 0 && !TEXT_REGEXP.test(str3)) {
         throw new TypeError("invalid parameter value");
       }
-      return '"' + str2.replace(QUOTE_REGEXP, "\\$1") + '"';
+      return '"' + str3.replace(QUOTE_REGEXP, "\\$1") + '"';
     }
     function ContentType(type) {
       this.parameters = /* @__PURE__ */ Object.create(null);
@@ -19768,11 +19768,11 @@ var require_proxy_addr = __commonJS({
     }
     function parseipNotation(note) {
       var pos = note.lastIndexOf("/");
-      var str2 = pos !== -1 ? note.substring(0, pos) : note;
-      if (!isip(str2)) {
-        throw new TypeError("invalid IP address: " + str2);
+      var str3 = pos !== -1 ? note.substring(0, pos) : note;
+      if (!isip(str3)) {
+        throw new TypeError("invalid IP address: " + str3);
       }
-      var ip = parseip(str2);
+      var ip = parseip(str3);
       if (pos === -1 && ip.kind() === "ipv6" && ip.isIPv4MappedAddress()) {
         ip = ip.toIPv4Address();
       }
@@ -19897,22 +19897,22 @@ var require_utils3 = __commonJS({
     exports.normalizeTypes = function(types2) {
       return types2.map(exports.normalizeType);
     };
-    function acceptParams(str2) {
-      var length = str2.length;
-      var colonIndex = str2.indexOf(";");
+    function acceptParams(str3) {
+      var length = str3.length;
+      var colonIndex = str3.indexOf(";");
       var index = colonIndex === -1 ? length : colonIndex;
-      var ret = { value: str2.slice(0, index).trim(), quality: 1, params: {} };
+      var ret = { value: str3.slice(0, index).trim(), quality: 1, params: {} };
       while (index < length) {
-        var splitIndex = str2.indexOf("=", index);
+        var splitIndex = str3.indexOf("=", index);
         if (splitIndex === -1) break;
-        var colonIndex = str2.indexOf(";", index);
+        var colonIndex = str3.indexOf(";", index);
         var endIndex = colonIndex === -1 ? length : colonIndex;
         if (splitIndex > endIndex) {
-          index = str2.lastIndexOf(";", splitIndex - 1) + 1;
+          index = str3.lastIndexOf(";", splitIndex - 1) + 1;
           continue;
         }
-        var key = str2.slice(index, splitIndex).trim();
-        var value = str2.slice(splitIndex + 1, endIndex).trim();
+        var key = str3.slice(index, splitIndex).trim();
+        var value = str3.slice(splitIndex + 1, endIndex).trim();
         if (key === "q") {
           ret.quality = parseFloat(value);
         } else {
@@ -19995,8 +19995,8 @@ var require_utils3 = __commonJS({
         return etag(buf, options);
       };
     }
-    function parseExtendedQueryString(str2) {
-      return qs2.parse(str2, {
+    function parseExtendedQueryString(str3) {
+      return qs2.parse(str3, {
         allowPrototypes: true
       });
     }
@@ -20104,11 +20104,11 @@ var require_dist2 = __commonJS({
     var ID_START = /^[$_\p{ID_Start}]$/u;
     var ID_CONTINUE = /^[$\u200c\u200d\p{ID_Continue}]$/u;
     var ID = /^[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*$/u;
-    function escapeText(str2) {
-      return str2.replace(/[{}()\[\]+?!:*\\]/g, "\\$&");
+    function escapeText(str3) {
+      return str3.replace(/[{}()\[\]+?!:*\\]/g, "\\$&");
     }
-    function escape2(str2) {
-      return str2.replace(/[.+*?^${}()[\]|/\\]/g, "\\$&");
+    function escape2(str3) {
+      return str3.replace(/[.+*?^${}()[\]|/\\]/g, "\\$&");
     }
     var TokenData = class {
       constructor(tokens, originalPath) {
@@ -20128,9 +20128,9 @@ var require_dist2 = __commonJS({
       }
     };
     exports.PathError = PathError;
-    function parse2(str2, options = {}) {
+    function parse2(str3, options = {}) {
       const { encodePath = NOOP_VALUE } = options;
-      const chars = [...str2];
+      const chars = [...str3];
       let index = 0;
       function consumeUntil(end) {
         const output = [];
@@ -20152,7 +20152,7 @@ var require_dist2 = __commonJS({
           }
           if (value === "\\") {
             if (index === chars.length) {
-              throw new PathError(`Unexpected end after \\ at index ${index}`, str2);
+              throw new PathError(`Unexpected end after \\ at index ${index}`, str3);
             }
             path5 += chars[index++];
             continue;
@@ -20177,11 +20177,11 @@ var require_dist2 = __commonJS({
                 name2 += chars[index];
               }
               if (quoteStart) {
-                throw new PathError(`Unterminated quote at index ${quoteStart}`, str2);
+                throw new PathError(`Unterminated quote at index ${quoteStart}`, str3);
               }
             }
             if (!name2) {
-              throw new PathError(`Missing parameter name at index ${index}`, str2);
+              throw new PathError(`Missing parameter name at index ${index}`, str3);
             }
             writePath();
             output.push({ type, name: name2 });
@@ -20196,17 +20196,17 @@ var require_dist2 = __commonJS({
             continue;
           }
           if (value === "}" || value === "(" || value === ")" || value === "[" || value === "]" || value === "+" || value === "?" || value === "!") {
-            throw new PathError(`Unexpected ${value} at index ${index - 1}`, str2);
+            throw new PathError(`Unexpected ${value} at index ${index - 1}`, str3);
           }
           path5 += value;
         }
         if (end) {
-          throw new PathError(`Unexpected end at index ${index}, expected ${end}`, str2);
+          throw new PathError(`Unexpected end at index ${index}, expected ${end}`, str3);
         }
         writePath();
         return output;
       }
-      return new TokenData(consumeUntil(""), str2);
+      return new TokenData(consumeUntil(""), str3);
     }
     function compile(path5, options = {}) {
       const { encode: encode4 = encodeURIComponent, delimiter: delimiter2 = DEFAULT_DELIMITER } = options;
@@ -20741,11 +20741,11 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router10;
+    module.exports = Router11;
     module.exports.Route = Route;
-    function Router10(options) {
-      if (!(this instanceof Router10)) {
-        return new Router10(options);
+    function Router11(options) {
+      if (!(this instanceof Router11)) {
+        return new Router11(options);
       }
       const opts = options || {};
       function router(req, res, next) {
@@ -20759,9 +20759,9 @@ var require_router = __commonJS({
       router.stack = [];
       return router;
     }
-    Router10.prototype = function() {
+    Router11.prototype = function() {
     };
-    Router10.prototype.param = function param(name2, fn2) {
+    Router11.prototype.param = function param(name2, fn2) {
       if (!name2) {
         throw new TypeError("argument name is required");
       }
@@ -20781,7 +20781,7 @@ var require_router = __commonJS({
       params.push(fn2);
       return this;
     };
-    Router10.prototype.handle = function handle(req, res, callback) {
+    Router11.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20908,7 +20908,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router10.prototype.use = function use(handler2) {
+    Router11.prototype.use = function use(handler2) {
       let offset = 0;
       let path5 = "/";
       if (typeof handler2 !== "function") {
@@ -20941,7 +20941,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router10.prototype.route = function route(path5) {
+    Router11.prototype.route = function route(path5) {
       const route2 = new Route(path5);
       const layer = new Layer(path5, {
         sensitive: this.caseSensitive,
@@ -20956,7 +20956,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router10.prototype[method] = function(path5) {
+      Router11.prototype[method] = function(path5) {
         const route = this.route(path5);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -21139,7 +21139,7 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve3 = __require("node:path").resolve;
     var once = require_once();
-    var Router10 = require_router();
+    var Router11 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app = exports = module.exports = {};
@@ -21155,7 +21155,7 @@ var require_application = __commonJS({
         enumerable: true,
         get: function getrouter() {
           if (router === null) {
-            router = new Router10({
+            router = new Router11({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
@@ -21950,19 +21950,19 @@ var require_fresh = __commonJS({
       var timestamp = date && Date.parse(date);
       return typeof timestamp === "number" ? timestamp : NaN;
     }
-    function parseTokenList(str2) {
+    function parseTokenList(str3) {
       var end = 0;
       var list = [];
       var start = 0;
-      for (var i2 = 0, len = str2.length; i2 < len; i2++) {
-        switch (str2.charCodeAt(i2)) {
+      for (var i2 = 0, len = str3.length; i2 < len; i2++) {
+        switch (str3.charCodeAt(i2)) {
           case 32:
             if (start === end) {
               start = end = i2 + 1;
             }
             break;
           case 44:
-            list.push(str2.substring(start, end));
+            list.push(str3.substring(start, end));
             start = end = i2 + 1;
             break;
           default:
@@ -21970,7 +21970,7 @@ var require_fresh = __commonJS({
             break;
         }
       }
-      list.push(str2.substring(start, end));
+      list.push(str3.substring(start, end));
       return list;
     }
   }
@@ -21981,17 +21981,17 @@ var require_range_parser = __commonJS({
   "node_modules/.pnpm/range-parser@1.3.0/node_modules/range-parser/index.js"(exports, module) {
     "use strict";
     module.exports = rangeParser;
-    function rangeParser(size, str2, options) {
-      if (typeof str2 !== "string") {
+    function rangeParser(size, str3, options) {
+      if (typeof str3 !== "string") {
         throw new TypeError("argument str must be a string");
       }
-      var index = str2.indexOf("=");
+      var index = str3.indexOf("=");
       if (index === -1) {
         return -2;
       }
-      var arr = str2.slice(index + 1).split(",");
+      var arr = str3.slice(index + 1).split(",");
       var ranges = [];
-      ranges.type = str2.slice(0, index);
+      ranges.type = str3.slice(0, index);
       for (var i2 = 0; i2 < arr.length; i2++) {
         var indexOf = arr[i2].indexOf("-");
         if (indexOf === -1) {
@@ -22026,8 +22026,8 @@ var require_range_parser = __commonJS({
       }
       return options && options.combine ? combineRanges(ranges) : ranges;
     }
-    function parsePos(str2) {
-      if (/^\d+$/.test(str2)) return Number(str2);
+    function parsePos(str3) {
+      if (/^\d+$/.test(str3)) return Number(str3);
       return NaN;
     }
     function combineRanges(ranges) {
@@ -22286,8 +22286,8 @@ var require_content_disposition = __commonJS({
       }
       return string;
     }
-    function decodefield(str2) {
-      const match = EXT_VALUE_REGEXP.exec(str2);
+    function decodefield(str3) {
+      const match = EXT_VALUE_REGEXP.exec(str3);
       if (!match) {
         throw new TypeError("invalid extended field value");
       }
@@ -22366,12 +22366,12 @@ var require_content_disposition = __commonJS({
       return "%" + String(char).charCodeAt(0).toString(16).toUpperCase();
     }
     function qstring(val) {
-      var str2 = String(val);
-      return '"' + str2.replace(QUOTE_REGEXP, "\\$1") + '"';
+      var str3 = String(val);
+      return '"' + str3.replace(QUOTE_REGEXP, "\\$1") + '"';
     }
     function ustring(val) {
-      var str2 = String(val);
-      var encoded = encodeURIComponent(str2).replace(ENCODE_URL_ATTR_CHAR_REGEXP, pencode);
+      var str3 = String(val);
+      var encoded = encodeURIComponent(str3).replace(ENCODE_URL_ATTR_CHAR_REGEXP, pencode);
       return "UTF-8''" + encoded;
     }
     function ContentDisposition(type, parameters) {
@@ -22399,26 +22399,26 @@ var require_content_disposition = __commonJS({
       code >= 65 && code <= 70 || // A-F
       code >= 97 && code <= 102;
     }
-    function hasHexEscape(str2) {
-      const maxIndex = str2.length - 3;
+    function hasHexEscape(str3) {
+      const maxIndex = str3.length - 3;
       let lastIndex = -1;
-      while ((lastIndex = str2.indexOf("%", lastIndex + 1)) !== -1 && lastIndex <= maxIndex) {
-        if (isHexDigit2(str2[lastIndex + 1]) && isHexDigit2(str2[lastIndex + 2])) {
+      while ((lastIndex = str3.indexOf("%", lastIndex + 1)) !== -1 && lastIndex <= maxIndex) {
+        if (isHexDigit2(str3[lastIndex + 1]) && isHexDigit2(str3[lastIndex + 2])) {
           return true;
         }
       }
       return false;
     }
-    function decodeHexEscapes(str2) {
-      const firstEscape = str2.indexOf("%");
-      if (firstEscape === -1) return str2;
-      let result = str2.slice(0, firstEscape);
-      for (let idx = firstEscape; idx < str2.length; idx++) {
-        if (str2[idx] === "%" && idx + 2 < str2.length && isHexDigit2(str2[idx + 1]) && isHexDigit2(str2[idx + 2])) {
-          result += String.fromCharCode(Number.parseInt(str2[idx + 1] + str2[idx + 2], 16));
+    function decodeHexEscapes(str3) {
+      const firstEscape = str3.indexOf("%");
+      if (firstEscape === -1) return str3;
+      let result = str3.slice(0, firstEscape);
+      for (let idx = firstEscape; idx < str3.length; idx++) {
+        if (str3[idx] === "%" && idx + 2 < str3.length && isHexDigit2(str3[idx + 1]) && isHexDigit2(str3[idx + 2])) {
+          result += String.fromCharCode(Number.parseInt(str3[idx + 1] + str3[idx + 2], 16));
           idx += 2;
         } else {
-          result += str2[idx];
+          result += str3[idx];
         }
       }
       return result;
@@ -22456,54 +22456,54 @@ var require_cookie = __commonJS({
     var cookieValueRegExp = /^("?)[\u0021\u0023-\u002B\u002D-\u003A\u003C-\u005B\u005D-\u007E]*\1$/;
     var domainValueRegExp = /^([.]?[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)([.][a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;
     var pathValueRegExp = /^[\u0020-\u003A\u003D-\u007E]*$/;
-    function parse2(str2, opt) {
-      if (typeof str2 !== "string") {
+    function parse2(str3, opt) {
+      if (typeof str3 !== "string") {
         throw new TypeError("argument str must be a string");
       }
       var obj = {};
-      var len = str2.length;
+      var len = str3.length;
       if (len < 2) return obj;
       var dec = opt && opt.decode || decode3;
       var index = 0;
       var eqIdx = 0;
       var endIdx = 0;
       do {
-        eqIdx = str2.indexOf("=", index);
+        eqIdx = str3.indexOf("=", index);
         if (eqIdx === -1) break;
-        endIdx = str2.indexOf(";", index);
+        endIdx = str3.indexOf(";", index);
         if (endIdx === -1) {
           endIdx = len;
         } else if (eqIdx > endIdx) {
-          index = str2.lastIndexOf(";", eqIdx - 1) + 1;
+          index = str3.lastIndexOf(";", eqIdx - 1) + 1;
           continue;
         }
-        var keyStartIdx = startIndex(str2, index, eqIdx);
-        var keyEndIdx = endIndex(str2, eqIdx, keyStartIdx);
-        var key = str2.slice(keyStartIdx, keyEndIdx);
+        var keyStartIdx = startIndex(str3, index, eqIdx);
+        var keyEndIdx = endIndex(str3, eqIdx, keyStartIdx);
+        var key = str3.slice(keyStartIdx, keyEndIdx);
         if (!__hasOwnProperty.call(obj, key)) {
-          var valStartIdx = startIndex(str2, eqIdx + 1, endIdx);
-          var valEndIdx = endIndex(str2, endIdx, valStartIdx);
-          if (str2.charCodeAt(valStartIdx) === 34 && str2.charCodeAt(valEndIdx - 1) === 34) {
+          var valStartIdx = startIndex(str3, eqIdx + 1, endIdx);
+          var valEndIdx = endIndex(str3, endIdx, valStartIdx);
+          if (str3.charCodeAt(valStartIdx) === 34 && str3.charCodeAt(valEndIdx - 1) === 34) {
             valStartIdx++;
             valEndIdx--;
           }
-          var val = str2.slice(valStartIdx, valEndIdx);
+          var val = str3.slice(valStartIdx, valEndIdx);
           obj[key] = tryDecode(val, dec);
         }
         index = endIdx + 1;
       } while (index < len);
       return obj;
     }
-    function startIndex(str2, index, max) {
+    function startIndex(str3, index, max) {
       do {
-        var code = str2.charCodeAt(index);
+        var code = str3.charCodeAt(index);
         if (code !== 32 && code !== 9) return index;
       } while (++index < max);
       return max;
     }
-    function endIndex(str2, index, min) {
+    function endIndex(str3, index, min) {
       while (index > min) {
-        var code = str2.charCodeAt(--index);
+        var code = str3.charCodeAt(--index);
         if (code !== 32 && code !== 9) return index + 1;
       }
       return min;
@@ -22520,54 +22520,54 @@ var require_cookie = __commonJS({
       if (!cookieValueRegExp.test(value)) {
         throw new TypeError("argument val is invalid");
       }
-      var str2 = name2 + "=" + value;
-      if (!opt) return str2;
+      var str3 = name2 + "=" + value;
+      if (!opt) return str3;
       if (null != opt.maxAge) {
         var maxAge = Math.floor(opt.maxAge);
         if (!isFinite(maxAge)) {
           throw new TypeError("option maxAge is invalid");
         }
-        str2 += "; Max-Age=" + maxAge;
+        str3 += "; Max-Age=" + maxAge;
       }
       if (opt.domain) {
         if (!domainValueRegExp.test(opt.domain)) {
           throw new TypeError("option domain is invalid");
         }
-        str2 += "; Domain=" + opt.domain;
+        str3 += "; Domain=" + opt.domain;
       }
       if (opt.path) {
         if (!pathValueRegExp.test(opt.path)) {
           throw new TypeError("option path is invalid");
         }
-        str2 += "; Path=" + opt.path;
+        str3 += "; Path=" + opt.path;
       }
       if (opt.expires) {
         var expires = opt.expires;
         if (!isDate(expires) || isNaN(expires.valueOf())) {
           throw new TypeError("option expires is invalid");
         }
-        str2 += "; Expires=" + expires.toUTCString();
+        str3 += "; Expires=" + expires.toUTCString();
       }
       if (opt.httpOnly) {
-        str2 += "; HttpOnly";
+        str3 += "; HttpOnly";
       }
       if (opt.secure) {
-        str2 += "; Secure";
+        str3 += "; Secure";
       }
       if (opt.partitioned) {
-        str2 += "; Partitioned";
+        str3 += "; Partitioned";
       }
       if (opt.priority) {
         var priority = typeof opt.priority === "string" ? opt.priority.toLowerCase() : opt.priority;
         switch (priority) {
           case "low":
-            str2 += "; Priority=Low";
+            str3 += "; Priority=Low";
             break;
           case "medium":
-            str2 += "; Priority=Medium";
+            str3 += "; Priority=Medium";
             break;
           case "high":
-            str2 += "; Priority=High";
+            str3 += "; Priority=High";
             break;
           default:
             throw new TypeError("option priority is invalid");
@@ -22577,34 +22577,34 @@ var require_cookie = __commonJS({
         var sameSite = typeof opt.sameSite === "string" ? opt.sameSite.toLowerCase() : opt.sameSite;
         switch (sameSite) {
           case true:
-            str2 += "; SameSite=Strict";
+            str3 += "; SameSite=Strict";
             break;
           case "lax":
-            str2 += "; SameSite=Lax";
+            str3 += "; SameSite=Lax";
             break;
           case "strict":
-            str2 += "; SameSite=Strict";
+            str3 += "; SameSite=Strict";
             break;
           case "none":
-            str2 += "; SameSite=None";
+            str3 += "; SameSite=None";
             break;
           default:
             throw new TypeError("option sameSite is invalid");
         }
       }
-      return str2;
+      return str3;
     }
-    function decode3(str2) {
-      return str2.indexOf("%") !== -1 ? decodeURIComponent(str2) : str2;
+    function decode3(str3) {
+      return str3.indexOf("%") !== -1 ? decodeURIComponent(str3) : str3;
     }
     function isDate(val) {
       return __toString.call(val) === "[object Date]";
     }
-    function tryDecode(str2, decode4) {
+    function tryDecode(str3, decode4) {
       try {
-        return decode4(str2);
+        return decode4(str3);
       } catch (e2) {
-        return str2;
+        return str3;
       }
     }
   }
@@ -23003,13 +23003,13 @@ var require_send = __commonJS({
         res.removeHeader(header);
       }
     }
-    function collapseLeadingSlashes(str2) {
-      for (var i2 = 0; i2 < str2.length; i2++) {
-        if (str2[i2] !== "/") {
+    function collapseLeadingSlashes(str3) {
+      for (var i2 = 0; i2 < str3.length; i2++) {
+        if (str3[i2] !== "/") {
           break;
         }
       }
-      return i2 > 1 ? "/" + str2.substr(i2) : str2;
+      return i2 > 1 ? "/" + str3.substr(i2) : str3;
     }
     function containsDotFile(parts) {
       for (var i2 = 0; i2 < parts.length; i2++) {
@@ -23056,12 +23056,12 @@ var require_send = __commonJS({
       var timestamp = date && Date.parse(date);
       return typeof timestamp === "number" ? timestamp : NaN;
     }
-    function parseTokenList(str2) {
+    function parseTokenList(str3) {
       var end = 0;
       var list = [];
       var start = 0;
-      for (var i2 = 0, len = str2.length; i2 < len; i2++) {
-        switch (str2.charCodeAt(i2)) {
+      for (var i2 = 0, len = str3.length; i2 < len; i2++) {
+        switch (str3.charCodeAt(i2)) {
           case 32:
             if (start === end) {
               start = end = i2 + 1;
@@ -23069,7 +23069,7 @@ var require_send = __commonJS({
             break;
           case 44:
             if (start !== end) {
-              list.push(str2.substring(start, end));
+              list.push(str3.substring(start, end));
             }
             start = end = i2 + 1;
             break;
@@ -23079,7 +23079,7 @@ var require_send = __commonJS({
         }
       }
       if (start !== end) {
-        list.push(str2.substring(start, end));
+        list.push(str3.substring(start, end));
       }
       return list;
     }
@@ -23543,9 +23543,9 @@ var require_response = __commonJS({
         opts = {};
       }
       opts._locals = self2.locals;
-      done = done || function(err, str2) {
+      done = done || function(err, str3) {
         if (err) return req.next(err);
-        self2.send(str2);
+        self2.send(str3);
       };
       app.render(view, opts, done);
     };
@@ -23701,13 +23701,13 @@ var require_serve_static = __commonJS({
         stream.pipe(res);
       };
     }
-    function collapseLeadingSlashes(str2) {
-      for (var i2 = 0; i2 < str2.length; i2++) {
-        if (str2.charCodeAt(i2) !== 47) {
+    function collapseLeadingSlashes(str3) {
+      for (var i2 = 0; i2 < str3.length; i2++) {
+        if (str3.charCodeAt(i2) !== 47) {
           break;
         }
       }
-      return i2 > 1 ? "/" + str2.substr(i2) : str2;
+      return i2 > 1 ? "/" + str3.substr(i2) : str3;
     }
     function createHtmlDocument(title, body) {
       return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<title>' + title + "</title>\n</head>\n<body>\n<pre>" + body + "</pre>\n</body>\n</html>\n";
@@ -23748,7 +23748,7 @@ var require_express = __commonJS({
     var EventEmitter7 = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router10 = require_router();
+    var Router11 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication2;
@@ -23770,8 +23770,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router10.Route;
-    exports.Router = Router10;
+    exports.Route = Router11.Route;
+    exports.Router = Router11;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -34891,20 +34891,20 @@ var require_utils4 = __commonJS({
       }
       return config2;
     }
-    var escapeIdentifier2 = function(str2) {
-      return '"' + str2.replace(/"/g, '""') + '"';
+    var escapeIdentifier2 = function(str3) {
+      return '"' + str3.replace(/"/g, '""') + '"';
     };
-    var escapeLiteral2 = function(str2) {
+    var escapeLiteral2 = function(str3) {
       let hasBackslash = false;
       let escaped = "'";
-      if (str2 == null) {
+      if (str3 == null) {
         return "''";
       }
-      if (typeof str2 !== "string") {
+      if (typeof str3 !== "string") {
         return "''";
       }
-      for (let i2 = 0; i2 < str2.length; i2++) {
-        const c2 = str2[i2];
+      for (let i2 = 0; i2 < str3.length; i2++) {
+        const c2 = str3[i2];
         if (c2 === "'") {
           escaped += c2 + c2;
         } else if (c2 === "\\") {
@@ -35319,22 +35319,22 @@ var require_type_overrides = __commonJS({
 var require_pg_connection_string = __commonJS({
   "node_modules/.pnpm/pg-connection-string@2.14.0/node_modules/pg-connection-string/index.js"(exports, module) {
     "use strict";
-    function parse2(str2, options = {}) {
-      if (str2.charAt(0) === "/") {
-        const config3 = str2.split(" ");
+    function parse2(str3, options = {}) {
+      if (str3.charAt(0) === "/") {
+        const config3 = str3.split(" ");
         return { host: config3[0], database: config3[1] };
       }
       const config2 = /* @__PURE__ */ Object.create(null);
       let result;
       let dummyHost = false;
-      if (/ |%[^a-f0-9]|%[a-f0-9][^a-f0-9]/i.test(str2)) {
-        str2 = encodeURI(str2).replace(/%25(\d\d)/g, "%$1");
+      if (/ |%[^a-f0-9]|%[a-f0-9][^a-f0-9]/i.test(str3)) {
+        str3 = encodeURI(str3).replace(/%25(\d\d)/g, "%$1");
       }
       try {
         try {
-          result = new URL(str2, "postgres://base");
+          result = new URL(str3, "postgres://base");
         } catch (e2) {
-          result = new URL(str2.replace("@/", "@___DUMMY___/"), "postgres://base");
+          result = new URL(str3.replace("@/", "@___DUMMY___/"), "postgres://base");
           dummyHost = true;
         }
       } catch (err) {
@@ -35480,8 +35480,8 @@ var require_pg_connection_string = __commonJS({
       }, /* @__PURE__ */ Object.create(null));
       return poolConfig;
     }
-    function parseIntoClientConfig(str2) {
-      return toClientConfig(parse2(str2));
+    function parseIntoClientConfig(str3) {
+      return toClientConfig(parse2(str3));
     }
     function deprecatedSslModeWarning(sslmode) {
       if (!deprecatedSslModeWarning.warned && typeof process !== "undefined" && process.emitWarning) {
@@ -37902,11 +37902,11 @@ var require_client = __commonJS({
       // escapeIdentifier and escapeLiteral moved to utility functions & exported
       // on PG
       // re-exported here for backwards compatibility
-      escapeIdentifier(str2) {
-        return utils.escapeIdentifier(str2);
+      escapeIdentifier(str3) {
+        return utils.escapeIdentifier(str3);
       }
-      escapeLiteral(str2) {
-        return utils.escapeLiteral(str2);
+      escapeLiteral(str3) {
+        return utils.escapeLiteral(str3);
       }
       _pulseQueryQueue() {
         if (this.pipeline) {
@@ -39091,6 +39091,7 @@ CREATE TABLE IF NOT EXISTS users (
   verified        INTEGER NOT NULL DEFAULT 0,
   verification_token TEXT,
   suspended       INTEGER NOT NULL DEFAULT 0,
+  role            TEXT NOT NULL DEFAULT 'member',
   goal_default    INTEGER NOT NULL DEFAULT 20,
   timezone        TEXT NOT NULL DEFAULT 'Africa/Lagos',
   created_at      TEXT NOT NULL,
@@ -39523,6 +39524,105 @@ CREATE TABLE IF NOT EXISTS cv_reviews (
 );
 CREATE INDEX IF NOT EXISTS ix_reviews_cv ON cv_reviews(cv_id, created_at DESC);
 
+/* \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 Higher As \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+ * Vocational professionals, the work they show, the credentials they submit
+ * and the reviews customers leave. Verification is a state machine, never a
+ * side effect of uploading a file: a credential starts 'pending' and only an
+ * admin review can move it to 'verified' or 'rejected'.
+ */
+CREATE TABLE IF NOT EXISTS pro_profiles (
+  id               TEXT PRIMARY KEY,
+  user_id          TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  display_name     TEXT NOT NULL,
+  trade            TEXT NOT NULL,
+  headline         TEXT,
+  summary          TEXT NOT NULL DEFAULT '',
+  city             TEXT,
+  service_area     TEXT,
+  years_experience INTEGER,
+  phone            TEXT,
+  whatsapp         TEXT,
+  website          TEXT,
+  available        INTEGER NOT NULL DEFAULT 1,
+  day_rate_min     INTEGER,
+  day_rate_max     INTEGER,
+  currency         TEXT NOT NULL DEFAULT 'NGN',
+  created_at       TEXT NOT NULL,
+  updated_at       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_pro_trade ON pro_profiles(trade, city);
+
+CREATE TABLE IF NOT EXISTS pro_posts (
+  id          TEXT PRIMARY KEY,
+  pro_id      TEXT NOT NULL REFERENCES pro_profiles(id) ON DELETE CASCADE,
+  title       TEXT NOT NULL,
+  body        TEXT NOT NULL DEFAULT '',
+  kind        TEXT NOT NULL DEFAULT 'work',        -- work | service
+  image_url   TEXT,
+  tags        TEXT NOT NULL DEFAULT '[]',
+  auto_summary TEXT,                               -- extractive, built only from this post
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_pro_posts_pro ON pro_posts(pro_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS pro_credentials (
+  id            TEXT PRIMARY KEY,
+  pro_id        TEXT NOT NULL REFERENCES pro_profiles(id) ON DELETE CASCADE,
+  kind          TEXT NOT NULL,                     -- licence | certificate | training | registration
+  title         TEXT NOT NULL,
+  issuer        TEXT,
+  reference     TEXT,
+  issued_on     TEXT,
+  expires_on    TEXT,
+  document_name TEXT,
+  document_b64  TEXT,                              -- private evidence, never in a public payload
+  status        TEXT NOT NULL DEFAULT 'pending',   -- pending | verified | rejected | expired
+  review_note   TEXT,
+  reviewed_by   TEXT,
+  reviewed_at   TEXT,
+  created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_pro_creds_pro ON pro_credentials(pro_id);
+CREATE INDEX IF NOT EXISTS ix_pro_creds_status ON pro_credentials(status);
+
+CREATE TABLE IF NOT EXISTS pro_engagements (
+  id           TEXT PRIMARY KEY,
+  pro_id       TEXT NOT NULL REFERENCES pro_profiles(id) ON DELETE CASCADE,
+  customer_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title        TEXT NOT NULL,
+  detail       TEXT,
+  completed_at TEXT,
+  confirmed_at TEXT,                               -- the professional vouches the job happened
+  created_at   TEXT NOT NULL,
+  UNIQUE (pro_id, customer_id, title)
+);
+
+CREATE TABLE IF NOT EXISTS pro_reviews (
+  id             TEXT PRIMARY KEY,
+  pro_id         TEXT NOT NULL REFERENCES pro_profiles(id) ON DELETE CASCADE,
+  engagement_id  TEXT REFERENCES pro_engagements(id) ON DELETE SET NULL,
+  customer_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  customer_name  TEXT NOT NULL,
+  rating         INTEGER NOT NULL,
+  body           TEXT NOT NULL,
+  verified       INTEGER NOT NULL DEFAULT 0,
+  response       TEXT,
+  responded_at   TEXT,
+  dispute_status TEXT NOT NULL DEFAULT 'none',     -- none | open | upheld | dismissed
+  dispute_reason TEXT,
+  hidden         INTEGER NOT NULL DEFAULT 0,       -- only an upheld moderation outcome hides a review
+  created_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_pro_reviews_pro ON pro_reviews(pro_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS ix_pro_reviews_customer ON pro_reviews(customer_id);
+
+CREATE TABLE IF NOT EXISTS saved_pros (
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  pro_id     TEXT NOT NULL REFERENCES pro_profiles(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, pro_id)
+);
+
 CREATE TABLE IF NOT EXISTS logcluster_pages (
   slug          TEXT PRIMARY KEY,
   country       TEXT NOT NULL,
@@ -39707,7 +39807,9 @@ var init_db = __esm({
       // publishing: a CV is private until its owner says otherwise, and a published
       // one can carry an ownership line at the foot of the page
       { table: "cvs", column: "public", ddl: "ALTER TABLE cvs ADD COLUMN public INTEGER NOT NULL DEFAULT 0" },
-      { table: "cvs", column: "copyright", ddl: "ALTER TABLE cvs ADD COLUMN copyright TEXT" }
+      { table: "cvs", column: "copyright", ddl: "ALTER TABLE cvs ADD COLUMN copyright TEXT" },
+      // Higher As: credential review needs a scoped role, not a second account system
+      { table: "users", column: "role", ddl: "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'member'" }
     ];
     BOOT_SQL = [
       // pre-existing databases: the old index was global (source, external_id), which
@@ -39754,7 +39856,7 @@ function errorHandler(err, _req, res, _next) {
   console.error("[jams] unhandled error:", err);
   return fail(res, 500, "Internal server error", { code: "INTERNAL", detail: String(err?.message ?? err) });
 }
-var AppError, unauthenticated, invalidCredentials, notFound, conflict, validation, rateLimited;
+var AppError, unauthenticated, invalidCredentials, notFound, conflict, forbidden, validation, rateLimited;
 var init_errors2 = __esm({
   "src/core/errors.ts"() {
     "use strict";
@@ -39777,6 +39879,7 @@ var init_errors2 = __esm({
     invalidCredentials = () => new AppError("INVALID_CREDENTIALS", 401, "Invalid email or password");
     notFound = (what = "Resource") => new AppError("NOT_FOUND", 404, `${what} not found`);
     conflict = (msg, code = "ALREADY_EXISTS") => new AppError(code, 409, msg);
+    forbidden = (code, msg) => new AppError(code, 403, msg);
     validation = (msg, fields) => new AppError("VALIDATION_ERROR", 422, msg, null, { fields });
     rateLimited = (retryAfter, msg = "Too many requests") => new AppError("RATE_LIMITED", 429, msg, `Retry in ${retryAfter}s`, { retry_after: retryAfter });
   }
@@ -40093,11 +40196,11 @@ function legacyParse(input, parseQueryString, whatwgError, slashesDenoteHost) {
   result.password = legacyAuth && legacyAuth.length ? legacyAuth.join(":") : null;
   return result;
 }
-function safeDecode(str2) {
+function safeDecode(str3) {
   try {
-    return decodeURIComponent(str2);
+    return decodeURIComponent(str3);
   } catch (_err) {
-    return str2;
+    return str3;
   }
 }
 function normalizeHostname(raw, href2) {
@@ -41073,10 +41176,10 @@ var init_shared = __esm({
         });
       });
     };
-    parseConnectionUrl = (str2) => {
-      str2 = str2 || "";
+    parseConnectionUrl = (str3) => {
+      str3 = str3 || "";
       const options = {};
-      const url = parse(str2, true);
+      const url = parse(str3, true);
       switch (url.protocol) {
         case "smtp:":
           options.secure = false;
@@ -41240,11 +41343,11 @@ var init_shared = __esm({
       });
       return target;
     };
-    encodeXText = (str2) => {
-      if (!/[^\x21-\x2A\x2C-\x3C\x3E-\x7E]/.test(str2)) {
-        return str2;
+    encodeXText = (str3) => {
+      if (!/[^\x21-\x2A\x2C-\x3C\x3E-\x7E]/.test(str3)) {
+        return str3;
       }
-      const buf = Buffer.from(str2);
+      const buf = Buffer.from(str3);
       let result = "";
       for (let i2 = 0, len = buf.length; i2 < len; i2++) {
         const c2 = buf[i2];
@@ -43375,18 +43478,18 @@ function encode2(buffer) {
   }
   return buffer.toString("base64");
 }
-function wrap(str2, lineLength) {
-  str2 = (str2 || "").toString();
+function wrap(str3, lineLength) {
+  str3 = (str3 || "").toString();
   lineLength = Math.max(Number(lineLength) || 76, 1);
-  if (str2.length <= lineLength) {
-    return str2;
+  if (str3.length <= lineLength) {
+    return str3;
   }
   const result = [];
   let pos = 0;
   const chunkLength = lineLength * 1024;
   const wrapRegex = new RegExp(".{" + lineLength + "}", "g");
-  while (pos < str2.length) {
-    const wrappedLines = str2.substr(pos, chunkLength).replace(wrapRegex, "$&\r\n").trim();
+  while (pos < str3.length) {
+    const wrappedLines = str3.substr(pos, chunkLength).replace(wrapRegex, "$&\r\n").trim();
     result.push(wrappedLines);
     pos += chunkLength;
   }
@@ -43486,19 +43589,19 @@ function encode3(buffer) {
   }
   return result;
 }
-function wrap2(str2, lineLength) {
-  str2 = (str2 || "").toString();
+function wrap2(str3, lineLength) {
+  str3 = (str3 || "").toString();
   lineLength = Math.max(Number(lineLength) || 76, MIN_LINE_LENGTH);
-  if (str2.length <= lineLength) {
-    return str2;
+  if (str3.length <= lineLength) {
+    return str3;
   }
   let pos = 0;
-  const len = str2.length;
+  const len = str3.length;
   let match, code, line;
   const lineMargin = Math.floor(lineLength / 3);
   let result = "";
   while (pos < len) {
-    line = str2.substr(pos, lineLength);
+    line = str3.substr(pos, lineLength);
     if (match = line.match(/\r\n/)) {
       line = line.substr(0, match.index + match[0].length);
       result += line;
@@ -43534,7 +43637,7 @@ function wrap2(str2, lineLength) {
       }
     }
     if (!line.length) {
-      line = str2.substr(pos, lineLength);
+      line = str3.substr(pos, lineLength);
     }
     if (pos + line.length < len && line.substr(-1) !== "\n") {
       if (line.length === lineLength && line.match(/[=][\da-f]{2}$/i)) {
@@ -43641,11 +43744,11 @@ function isPlainText(value, isParam) {
 function quoteString(value) {
   return '"' + (value || "").toString().replace(/["\\]/g, "\\$&") + '"';
 }
-function hasLongerLines(str2, lineLength) {
-  if (str2.length > 128 * 1024) {
+function hasLongerLines(str3, lineLength) {
+  if (str3.length > 128 * 1024) {
     return true;
   }
-  return new RegExp("^.{" + (lineLength + 1) + ",}", "m").test(str2);
+  return new RegExp("^.{" + (lineLength + 1) + ",}", "m").test(str3);
 }
 function encodeWord(data, mimeWordEncoding, maxLength) {
   mimeWordEncoding = (mimeWordEncoding || "Q").toString().toUpperCase().trim().charAt(0);
@@ -43757,9 +43860,9 @@ function buildHeaderParam(key, data, maxLength) {
         }
       ];
     }
-    encodedStr = encodedStr.replace(new RegExp(".{" + maxLength + "}", "g"), (str2) => {
+    encodedStr = encodedStr.replace(new RegExp(".{" + maxLength + "}", "g"), (str3) => {
       list.push({
-        line: str2
+        line: str3
       });
       return "";
     });
@@ -43839,7 +43942,7 @@ function buildHeaderParam(key, data, maxLength) {
     value: item.line
   }));
 }
-function parseHeaderValue(str2) {
+function parseHeaderValue(str3) {
   const response = {
     value: "",
     params: {}
@@ -43855,8 +43958,8 @@ function parseHeaderValue(str2) {
   let quote = false;
   let escaped = false;
   let chr;
-  for (let i2 = 0, len = str2.length; i2 < len; i2++) {
-    chr = str2.charAt(i2);
+  for (let i2 = 0, len = str3.length; i2 < len; i2++) {
+    chr = str3.charAt(i2);
     if (type === "key") {
       if (chr === "=") {
         key = value.trim().toLowerCase();
@@ -43947,15 +44050,15 @@ function detectExtension2(mimeType) {
 function detectMimeType2(extension) {
   return detectMimeType(extension);
 }
-function foldLines(str2, lineLength, afterSpace) {
-  str2 = (str2 || "").toString();
+function foldLines(str3, lineLength, afterSpace) {
+  str3 = (str3 || "").toString();
   lineLength = lineLength || 76;
   let pos = 0;
-  const len = str2.length;
+  const len = str3.length;
   let result = "";
   let line, match;
   while (pos < len) {
-    line = str2.substr(pos, lineLength);
+    line = str3.substr(pos, lineLength);
     if (line.length < lineLength) {
       result += line;
       break;
@@ -43967,7 +44070,7 @@ function foldLines(str2, lineLength, afterSpace) {
       continue;
     } else if ((match = line.match(/(\s+)[^\s]*$/)) && match[0].length - (afterSpace ? (match[1] || "").length : 0) < line.length) {
       line = line.substr(0, line.length - (match[0].length - (afterSpace ? (match[1] || "").length : 0)));
-    } else if (match = str2.substr(pos + line.length).match(/^[^\s]+(\s*)/)) {
+    } else if (match = str3.substr(pos + line.length).match(/^[^\s]+(\s*)/)) {
       line = line + match[0].substr(0, match[0].length - (!afterSpace ? (match[1] || "").length : 0));
     }
     result += line;
@@ -43978,20 +44081,20 @@ function foldLines(str2, lineLength, afterSpace) {
   }
   return result;
 }
-function splitMimeEncodedString(str2, maxlen) {
+function splitMimeEncodedString(str3, maxlen) {
   const lines2 = [];
   let curLine, fallbackLine, match, chr, done;
   maxlen = Math.max(maxlen || 0, 12);
-  while (str2.length) {
-    curLine = str2.substr(0, maxlen);
+  while (str3.length) {
+    curLine = str3.substr(0, maxlen);
     if (match = curLine.match(/[=][0-9A-F]?$/i)) {
       curLine = curLine.substr(0, match.index);
     }
-    fallbackLine = curLine.length ? curLine : str2.substr(0, maxlen);
+    fallbackLine = curLine.length ? curLine : str3.substr(0, maxlen);
     done = false;
     while (!done && curLine.length) {
       done = true;
-      if (match = str2.substr(curLine.length).match(/^[=]([0-9A-F]{2})/i)) {
+      if (match = str3.substr(curLine.length).match(/^[=]([0-9A-F]{2})/i)) {
         chr = parseInt(match[1], 16);
         if (chr < 194 && chr > 127) {
           curLine = curLine.substr(0, curLine.length - 3);
@@ -44003,7 +44106,7 @@ function splitMimeEncodedString(str2, maxlen) {
       curLine = fallbackLine;
     }
     lines2.push(curLine);
-    str2 = str2.substr(curLine.length);
+    str3 = str3.substr(curLine.length);
   }
   return lines2;
 }
@@ -44022,14 +44125,14 @@ function encodeURICharComponent(chr) {
   }
   return res;
 }
-function safeEncodeURIComponent(str2) {
-  str2 = (str2 || "").toString();
+function safeEncodeURIComponent(str3) {
+  str3 = (str3 || "").toString();
   try {
-    str2 = encodeURIComponent(str2);
+    str3 = encodeURIComponent(str3);
   } catch (_E) {
-    str2 = encodeURIComponent(Buffer.from(str2, "utf-8").toString("utf-8"));
+    str3 = encodeURIComponent(Buffer.from(str3, "utf-8").toString("utf-8"));
   }
-  return str2.replace(/[\x00-\x1F *'()<>@,;:\\"[\]?=\u007F-\uFFFF]/g, (chr) => encodeURICharComponent(chr));
+  return str3.replace(/[\x00-\x1F *'()<>@,;:\\"[\]?=\u007F-\uFFFF]/g, (chr) => encodeURICharComponent(chr));
 }
 var init_mime_funcs = __esm({
   "node_modules/.pnpm/nodemailer@10.0.12/node_modules/nodemailer/dist/esm/mime-funcs/index.js"() {
@@ -44297,13 +44400,13 @@ function _handleAddress(tokens, depth) {
   }
   return addresses;
 }
-function addressparser(str2, options) {
+function addressparser(str3, options) {
   options = options || {};
   const depth = options._depth || 0;
   if (depth > MAX_NESTED_GROUP_DEPTH) {
     return [];
   }
-  const tokenizer = new Tokenizer(str2);
+  const tokenizer = new Tokenizer(str3);
   const tokens = tokenizer.tokenize();
   const addresses = [];
   let address = [];
@@ -44363,8 +44466,8 @@ var init_addressparser = __esm({
     LOOSE_ADDR_SPEC = /^[^@\s]+@\S+$/;
     LOOSE_TEXT_ADDR = /\s*\b[^@\s]+@[^\s]+\b\s*/y;
     Tokenizer = class {
-      constructor(str2) {
-        this.str = (str2 || "").toString();
+      constructor(str3) {
+        this.str = (str3 || "").toString();
         this.operatorCurrent = "";
         this.operatorExpecting = "";
         this.node = null;
@@ -45535,7 +45638,7 @@ var init_mime_node = __esm({
           case "References":
             value = [].concat.apply([], [].concat(value || "").map((elm) => {
               elm = (elm || "").toString().replace(/\r?\n|\r/g, " ").replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "").trim();
-              return elm.replace(/<[^>]*>/g, (str2) => str2.replace(/\s/g, "")).split(/\s+/);
+              return elm.replace(/<[^>]*>/g, (str3) => str3.replace(/\s/g, "")).split(/\s+/);
             })).map((elm) => {
               if (elm.charAt(0) !== "<") {
                 elm = "<" + elm;
@@ -47606,15 +47709,15 @@ import tls2 from "node:tls";
 import os2 from "node:os";
 import crypto7 from "node:crypto";
 import { PassThrough as PassThrough4 } from "node:stream";
-function decodeServerResponse(str2) {
-  if (!str2) {
-    return str2;
+function decodeServerResponse(str3) {
+  if (!str3) {
+    return str3;
   }
-  const utf8 = Buffer.from(str2, "binary").toString("utf8");
-  return utf8.includes("\uFFFD") ? str2 : utf8;
+  const utf8 = Buffer.from(str3, "binary").toString("utf8");
+  return utf8.includes("\uFFFD") ? str3 : utf8;
 }
-function isPartialResponse(str2) {
-  return isPartialLine(str2.slice(str2.lastIndexOf("\n") + 1));
+function isPartialResponse(str3) {
+  return isPartialLine(str3.slice(str3.lastIndexOf("\n") + 1));
 }
 function isPartialLine(line) {
   return /^\d+-/.test(line);
@@ -47985,21 +48088,21 @@ var init_smtp_connection = __esm({
                 done = callbackPromise(resolve4, reject2);
               });
             }
-            this._responseActions.push((str2) => {
-              lastResponse = str2;
-              let codes = str2.match(/^(\d+)(?:\s(\d+\.\d+\.\d+))?\s/);
+            this._responseActions.push((str3) => {
+              lastResponse = str3;
+              let codes = str3.match(/^(\d+)(?:\s(\d+\.\d+\.\d+))?\s/);
               let data = {
                 command: cmd,
-                response: str2
+                response: str3
               };
               if (codes) {
                 data.status = Number(codes[1]) || 0;
                 if (codes[2]) {
                   data.code = codes[2];
                 }
-                data.text = str2.substr(codes[0].length);
+                data.text = str3.substr(codes[0].length);
               } else {
-                data.text = str2;
+                data.text = str3;
                 data.status = 0;
               }
               done(null, data);
@@ -48027,14 +48130,14 @@ var init_smtp_connection = __esm({
             this._handleXOauth2Token(false, callback);
             return;
           case "LOGIN":
-            this._responseActions.push((str2) => {
-              this._actionAUTH_LOGIN_USER(str2, callback);
+            this._responseActions.push((str3) => {
+              this._actionAUTH_LOGIN_USER(str3, callback);
             });
             this._sendCommand("AUTH LOGIN");
             return;
           case "PLAIN":
-            this._responseActions.push((str2) => {
-              this._actionAUTHComplete(str2, callback);
+            this._responseActions.push((str3) => {
+              this._actionAUTHComplete(str3, callback);
             });
             this._sendCommand(
               "AUTH PLAIN " + Buffer.from(
@@ -48053,8 +48156,8 @@ var init_smtp_connection = __esm({
             );
             return;
           case "CRAM-MD5":
-            this._responseActions.push((str2) => {
-              this._actionAUTH_CRAM_MD5(str2, callback);
+            this._responseActions.push((str3) => {
+              this._actionAUTH_CRAM_MD5(str3, callback);
             });
             this._sendCommand("AUTH CRAM-MD5");
             return;
@@ -48116,7 +48219,7 @@ var init_smtp_connection = __esm({
             return callback(err);
           }
           const envelopeTime = Date.now();
-          const stream = this._createSendStream((err2, str2) => {
+          const stream = this._createSendStream((err2, str3) => {
             if (err2) {
               return callback(err2);
             }
@@ -48124,7 +48227,7 @@ var init_smtp_connection = __esm({
             result.envelopeTime = envelopeTime - startTime;
             result.messageTime = Date.now() - envelopeTime;
             result.messageSize = stream.outByteCount;
-            result.response = str2;
+            result.response = str3;
             return callback(null, result);
           });
           if (typeof message.pipe === "function") {
@@ -48146,9 +48249,9 @@ var init_smtp_connection = __esm({
           return callback(this._formatError(isDestroyedMessage, "ECONNECTION", false, "API"));
         }
         this._sendCommand("RSET");
-        this._responseActions.push((str2) => {
-          if (str2.charAt(0) !== "2") {
-            return callback(this._formatError("Could not reset session state. response=" + str2, "EPROTOCOL", str2, "RSET"));
+        this._responseActions.push((str3) => {
+          if (str3.charAt(0) !== "2") {
+            return callback(this._formatError("Could not reset session state. response=" + str3, "EPROTOCOL", str3, "RSET"));
           }
           this._envelope = false;
           return callback(null, true);
@@ -48437,18 +48540,18 @@ var init_smtp_connection = __esm({
           this._responseQueue.unshift(raw);
           return;
         }
-        const str2 = this.lastServerResponse = decodeServerResponse(raw);
+        const str3 = this.lastServerResponse = decodeServerResponse(raw);
         if (this.options.debug || this.options.transactionLog) {
           this.logger.debug({
             tnx: "server"
-          }, str2.replace(/\r?\n$/, ""));
+          }, str3.replace(/\r?\n$/, ""));
         }
         const action = this._responseActions.shift();
         if (typeof action === "function") {
-          action.call(this, str2);
+          action.call(this, str3);
           setImmediate(() => this._processResponse());
         } else {
-          return this._onError(new Error("Unexpected Response"), "EPROTOCOL", str2, "CONN");
+          return this._onError(new Error("Unexpected Response"), "EPROTOCOL", str3, "CONN");
         }
       }
       /**
@@ -48458,7 +48561,7 @@ var init_smtp_connection = __esm({
        * @param logStr Optional string to be used for logging instead of the actual string
        * @internal
        */
-      _sendCommand(str2, logStr) {
+      _sendCommand(str3, logStr) {
         if (this._destroyed) {
           return;
         }
@@ -48469,9 +48572,9 @@ var init_smtp_connection = __esm({
         if (this.options.debug || this.options.transactionLog) {
           this.logger.debug({
             tnx: "client"
-          }, (logStr || str2 || "").toString().replace(/\r?\n$/, ""));
+          }, (logStr || str3 || "").toString().replace(/\r?\n$/, ""));
         }
-        socket.write(Buffer.from(str2 + "\r\n", "utf-8"));
+        socket.write(Buffer.from(str3 + "\r\n", "utf-8"));
       }
       /**
        * Initiates a new message by submitting envelope data, starting with
@@ -48525,8 +48628,8 @@ var init_smtp_connection = __esm({
             return callback(this._formatError("Server does not support REQUIRETLS extension (RFC 8689)", "EREQUIRETLS", false, "MAIL FROM"));
           }
         }
-        this._responseActions.push((str2) => {
-          this._actionMAIL(str2, callback);
+        this._responseActions.push((str3) => {
+          this._actionMAIL(str3, callback);
         });
         if (useSmtpUtf8 && this._supportedExtensions.includes("SMTPUTF8")) {
           args.push("SMTPUTF8");
@@ -48619,13 +48722,13 @@ var init_smtp_connection = __esm({
         if (this.options.lmtp) {
           envelope.accepted.forEach((recipient, i2) => {
             const final = i2 === envelope.accepted.length - 1;
-            this._responseActions.push((str2) => {
-              this._actionLMTPStream(recipient, final, str2, callback);
+            this._responseActions.push((str3) => {
+              this._actionLMTPStream(recipient, final, str3, callback);
             });
           });
         } else {
-          this._responseActions.push((str2) => {
-            this._actionSMTPStream(str2, callback);
+          this._responseActions.push((str3) => {
+            this._actionSMTPStream(str3, callback);
           });
         }
         this._currentDataStream = dataStream;
@@ -48665,10 +48768,10 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionGreeting(str2) {
+      _actionGreeting(str3) {
         clearTimeout(this._greetingTimeout);
-        if (str2.substr(0, 3) !== "220") {
-          this._onError(new Error("Invalid greeting. response=" + str2), "EPROTOCOL", str2, "CONN");
+        if (str3.substr(0, 3) !== "220") {
+          this._onError(new Error("Invalid greeting. response=" + str3), "EPROTOCOL", str3, "CONN");
           return;
         }
         if (this.options.lmtp) {
@@ -48686,12 +48789,12 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionLHLO(str2) {
-        if (str2.charAt(0) !== "2") {
-          this._onError(new Error("Invalid LHLO. response=" + str2), "EPROTOCOL", str2, "LHLO");
+      _actionLHLO(str3) {
+        if (str3.charAt(0) !== "2") {
+          this._onError(new Error("Invalid LHLO. response=" + str3), "EPROTOCOL", str3, "LHLO");
           return;
         }
-        this._actionEHLO(str2);
+        this._actionEHLO(str3);
       }
       /**
        * Handles server response for EHLO command. If it yielded in
@@ -48702,58 +48805,58 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionEHLO(str2) {
+      _actionEHLO(str3) {
         let match;
-        if (str2.substr(0, 3) === "421") {
-          this._onError(new Error("Server terminates connection. response=" + str2), "ECONNECTION", str2, "EHLO");
+        if (str3.substr(0, 3) === "421") {
+          this._onError(new Error("Server terminates connection. response=" + str3), "ECONNECTION", str3, "EHLO");
           return;
         }
-        if (str2.charAt(0) !== "2") {
+        if (str3.charAt(0) !== "2") {
           if (this.options.requireTLS) {
-            this._onError(new Error("EHLO failed but HELO does not support required STARTTLS. response=" + str2), "ECONNECTION", str2, "EHLO");
+            this._onError(new Error("EHLO failed but HELO does not support required STARTTLS. response=" + str3), "ECONNECTION", str3, "EHLO");
             return;
           }
           this._responseActions.push(this._actionHELO);
           this._sendCommand("HELO " + this.name);
           return;
         }
-        this._ehloLines = str2.split(/\r?\n/).map((line) => line.replace(/^\d+[ -]/, "").trim()).filter((line) => line).slice(1);
-        if (!this.secure && !this.options.ignoreTLS && (/[ -]STARTTLS\b/im.test(str2) || this.options.requireTLS)) {
+        this._ehloLines = str3.split(/\r?\n/).map((line) => line.replace(/^\d+[ -]/, "").trim()).filter((line) => line).slice(1);
+        if (!this.secure && !this.options.ignoreTLS && (/[ -]STARTTLS\b/im.test(str3) || this.options.requireTLS)) {
           this._sendCommand("STARTTLS");
           this._responseActions.push(this._actionSTARTTLS);
           return;
         }
-        if (/[ -]SMTPUTF8\b/im.test(str2)) {
+        if (/[ -]SMTPUTF8\b/im.test(str3)) {
           this._supportedExtensions.push("SMTPUTF8");
         }
-        if (/[ -]DSN\b/im.test(str2)) {
+        if (/[ -]DSN\b/im.test(str3)) {
           this._supportedExtensions.push("DSN");
         }
-        if (/[ -]8BITMIME\b/im.test(str2)) {
+        if (/[ -]8BITMIME\b/im.test(str3)) {
           this._supportedExtensions.push("8BITMIME");
         }
-        if (/[ -]REQUIRETLS\b/im.test(str2)) {
+        if (/[ -]REQUIRETLS\b/im.test(str3)) {
           this._supportedExtensions.push("REQUIRETLS");
         }
-        if (/[ -]PIPELINING\b/im.test(str2)) {
+        if (/[ -]PIPELINING\b/im.test(str3)) {
           this._supportedExtensions.push("PIPELINING");
         }
-        if (/[ -]AUTH\b/i.test(str2)) {
+        if (/[ -]AUTH\b/i.test(str3)) {
           this.allowsAuth = true;
         }
-        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)PLAIN/i.test(str2)) {
+        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)PLAIN/i.test(str3)) {
           this._supportedAuth.push("PLAIN");
         }
-        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)LOGIN/i.test(str2)) {
+        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)LOGIN/i.test(str3)) {
           this._supportedAuth.push("LOGIN");
         }
-        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)CRAM-MD5/i.test(str2)) {
+        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)CRAM-MD5/i.test(str3)) {
           this._supportedAuth.push("CRAM-MD5");
         }
-        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)XOAUTH2/i.test(str2)) {
+        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)XOAUTH2/i.test(str3)) {
           this._supportedAuth.push("XOAUTH2");
         }
-        if (match = str2.match(/[ -]SIZE(?:[ \t]+(\d+))?/im)) {
+        if (match = str3.match(/[ -]SIZE(?:[ \t]+(\d+))?/im)) {
           this._supportedExtensions.push("SIZE");
           this._maxAllowedSize = Number(match[1]) || 0;
         }
@@ -48766,9 +48869,9 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionHELO(str2) {
-        if (str2.charAt(0) !== "2") {
-          this._onError(new Error("Invalid HELO. response=" + str2), "EPROTOCOL", str2, "HELO");
+      _actionHELO(str3) {
+        if (str3.charAt(0) !== "2") {
+          this._onError(new Error("Invalid HELO. response=" + str3), "EPROTOCOL", str3, "HELO");
           return;
         }
         this.allowsAuth = true;
@@ -48782,8 +48885,8 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionSTARTTLS(str2) {
-        if (str2.charAt(0) !== "2") {
+      _actionSTARTTLS(str3) {
+        if (str3.charAt(0) !== "2") {
           if (this.options.opportunisticTLS) {
             this.logger.info({
               tnx: "smtp"
@@ -48791,7 +48894,7 @@ var init_smtp_connection = __esm({
             this.emit("connect");
             return;
           }
-          this._onError(new Error("Error upgrading connection with STARTTLS"), "ETLS", str2, "STARTTLS");
+          this._onError(new Error("Error upgrading connection with STARTTLS"), "ETLS", str3, "STARTTLS");
           return;
         }
         this._upgradeConnection((err, secured) => {
@@ -48825,13 +48928,13 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionAUTH_LOGIN_USER(str2, callback) {
-        if (!/^334[ -]/.test(str2)) {
-          callback(this._formatError('Invalid login sequence while waiting for "334 VXNlcm5hbWU6"', "EAUTH", str2, "AUTH LOGIN"));
+      _actionAUTH_LOGIN_USER(str3, callback) {
+        if (!/^334[ -]/.test(str3)) {
+          callback(this._formatError('Invalid login sequence while waiting for "334 VXNlcm5hbWU6"', "EAUTH", str3, "AUTH LOGIN"));
           return;
         }
-        this._responseActions.push((str3) => {
-          this._actionAUTH_LOGIN_PASS(str3, callback);
+        this._responseActions.push((str4) => {
+          this._actionAUTH_LOGIN_PASS(str4, callback);
         });
         this._sendCommand(Buffer.from(this._auth.credentials.user + "", "utf-8").toString("base64"));
       }
@@ -48845,17 +48948,17 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionAUTH_CRAM_MD5(str2, callback) {
-        const challengeMatch = str2.match(/^334\s+(.+)$/);
+      _actionAUTH_CRAM_MD5(str3, callback) {
+        const challengeMatch = str3.match(/^334\s+(.+)$/);
         if (!challengeMatch) {
-          return callback(this._formatError("Invalid login sequence while waiting for server challenge string", "EAUTH", str2, "AUTH CRAM-MD5"));
+          return callback(this._formatError("Invalid login sequence while waiting for server challenge string", "EAUTH", str3, "AUTH CRAM-MD5"));
         }
         const base64decoded = Buffer.from(challengeMatch[1], "base64").toString("ascii");
         const hmacMD5 = crypto7.createHmac("md5", this._auth.credentials.pass);
         hmacMD5.update(base64decoded);
         const prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
-        this._responseActions.push((str3) => {
-          this._actionAUTH_CRAM_MD5_PASS(str3, callback);
+        this._responseActions.push((str4) => {
+          this._actionAUTH_CRAM_MD5_PASS(str4, callback);
         });
         this._sendCommand(
           Buffer.from(prepended).toString("base64"),
@@ -48870,9 +48973,9 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionAUTH_CRAM_MD5_PASS(str2, callback) {
-        if (!str2.match(/^235\s+/)) {
-          return callback(this._formatError('Invalid login sequence while waiting for "235"', "EAUTH", str2, "AUTH CRAM-MD5"));
+      _actionAUTH_CRAM_MD5_PASS(str3, callback) {
+        if (!str3.match(/^235\s+/)) {
+          return callback(this._formatError('Invalid login sequence while waiting for "235"', "EAUTH", str3, "AUTH CRAM-MD5"));
         }
         this.logger.info({
           tnx: "smtp",
@@ -48891,12 +48994,12 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionAUTH_LOGIN_PASS(str2, callback) {
-        if (!/^334[ -]/.test(str2)) {
-          return callback(this._formatError('Invalid login sequence while waiting for "334 UGFzc3dvcmQ6"', "EAUTH", str2, "AUTH LOGIN"));
+      _actionAUTH_LOGIN_PASS(str3, callback) {
+        if (!/^334[ -]/.test(str3)) {
+          return callback(this._formatError('Invalid login sequence while waiting for "334 UGFzc3dvcmQ6"', "EAUTH", str3, "AUTH LOGIN"));
         }
-        this._responseActions.push((str3) => {
-          this._actionAUTHComplete(str3, callback);
+        this._responseActions.push((str4) => {
+          this._actionAUTHComplete(str4, callback);
         });
         this._sendCommand(
           Buffer.from((this._auth.credentials.pass || "").toString(), "utf-8").toString("base64"),
@@ -48911,15 +49014,15 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionAUTHComplete(str2, isRetry, callback) {
+      _actionAUTHComplete(str3, isRetry, callback) {
         if (!callback && typeof isRetry === "function") {
           callback = isRetry;
           isRetry = false;
         }
-        if (str2.substr(0, 3) === "334") {
-          this._responseActions.push((str3) => {
+        if (str3.substr(0, 3) === "334") {
+          this._responseActions.push((str4) => {
             if (isRetry || this._authMethod !== "XOAUTH2") {
-              this._actionAUTHComplete(str3, true, callback);
+              this._actionAUTHComplete(str4, true, callback);
             } else {
               setImmediate(() => this._handleXOauth2Token(true, callback));
             }
@@ -48927,14 +49030,14 @@ var init_smtp_connection = __esm({
           this._sendCommand("");
           return;
         }
-        if (str2.charAt(0) !== "2") {
+        if (str3.charAt(0) !== "2") {
           this.logger.info({
             tnx: "smtp",
             username: this._auth.user,
             action: "authfail",
             method: this._authMethod
           }, "User %s failed to authenticate", JSON.stringify(this._auth.user));
-          return callback(this._formatError("Invalid login", "EAUTH", str2, "AUTH " + this._authMethod));
+          return callback(this._formatError("Invalid login", "EAUTH", str3, "AUTH " + this._authMethod));
         }
         this.logger.info({
           tnx: "smtp",
@@ -48951,11 +49054,11 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionMAIL(str2, callback) {
+      _actionMAIL(str3, callback) {
         const envelope = this._envelope;
-        if (Number(str2.charAt(0)) !== 2) {
-          const message = this._usingSmtpUtf8 && /^550 /.test(str2) && /[\x80-\uFFFF]/.test(envelope.from) ? "Internationalized mailbox name not allowed" : "Mail command failed";
-          return callback(this._formatError(message, "EENVELOPE", str2, "MAIL FROM"));
+        if (Number(str3.charAt(0)) !== 2) {
+          const message = this._usingSmtpUtf8 && /^550 /.test(str3) && /[\x80-\uFFFF]/.test(envelope.from) ? "Internationalized mailbox name not allowed" : "Mail command failed";
+          return callback(this._formatError(message, "EENVELOPE", str3, "MAIL FROM"));
         }
         if (!envelope.rcptQueue.length) {
           return callback(this._formatError("Can't send mail - no recipients defined", "EENVELOPE", false, "API"));
@@ -48965,8 +49068,8 @@ var init_smtp_connection = __esm({
         do {
           const curRecipient = envelope.rcptQueue.shift();
           this._recipientQueue.push(curRecipient);
-          this._responseActions.push((str3) => {
-            this._actionRCPT(str3, callback);
+          this._responseActions.push((str4) => {
+            this._actionRCPT(str4, callback);
           });
           this._sendCommand("RCPT TO:<" + curRecipient + ">" + this._getDsnRcptToArgs());
         } while (usePipelining && envelope.rcptQueue.length);
@@ -48977,14 +49080,14 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionRCPT(str2, callback) {
+      _actionRCPT(str3, callback) {
         const envelope = this._envelope;
         let err;
         const curRecipient = this._recipientQueue.shift();
-        if (Number(str2.charAt(0)) !== 2) {
-          const message = this._usingSmtpUtf8 && /^553 /.test(str2) && /[\x80-\uFFFF]/.test(curRecipient) ? "Internationalized mailbox name not allowed" : "Recipient command failed";
+        if (Number(str3.charAt(0)) !== 2) {
+          const message = this._usingSmtpUtf8 && /^553 /.test(str3) && /[\x80-\uFFFF]/.test(curRecipient) ? "Internationalized mailbox name not allowed" : "Recipient command failed";
           envelope.rejected.push(curRecipient);
-          err = this._formatError(message, "EENVELOPE", str2, "RCPT TO");
+          err = this._formatError(message, "EENVELOPE", str3, "RCPT TO");
           err.recipient = curRecipient;
           envelope.rejectedErrors.push(err);
         } else {
@@ -48992,13 +49095,13 @@ var init_smtp_connection = __esm({
         }
         if (!envelope.rcptQueue.length && !this._recipientQueue.length) {
           if (envelope.rejected.length < envelope.to.length) {
-            this._responseActions.push((str3) => {
-              this._actionDATA(str3, callback);
+            this._responseActions.push((str4) => {
+              this._actionDATA(str4, callback);
             });
             this._sendCommand("DATA");
           } else {
             const deferred = envelope.rejectedErrors.find((rejectedErr) => rejectedErr.responseCode && rejectedErr.responseCode < 500);
-            const reply = deferred?.response ?? str2;
+            const reply = deferred?.response ?? str3;
             err = this._formatError("Can't send mail - all recipients were rejected", "EENVELOPE", reply, "RCPT TO");
             err.rejected = envelope.rejected;
             err.rejectedErrors = envelope.rejectedErrors;
@@ -49007,8 +49110,8 @@ var init_smtp_connection = __esm({
         } else if (envelope.rcptQueue.length) {
           const nextRecipient = envelope.rcptQueue.shift();
           this._recipientQueue.push(nextRecipient);
-          this._responseActions.push((str3) => {
-            this._actionRCPT(str3, callback);
+          this._responseActions.push((str4) => {
+            this._actionRCPT(str4, callback);
           });
           this._sendCommand("RCPT TO:<" + nextRecipient + ">" + this._getDsnRcptToArgs());
         }
@@ -49019,10 +49122,10 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionDATA(str2, callback) {
+      _actionDATA(str3, callback) {
         const envelope = this._envelope;
-        if (!/^[23]/.test(str2)) {
-          return callback(this._formatError("Data command failed", "EENVELOPE", str2, "DATA"));
+        if (!/^[23]/.test(str3)) {
+          return callback(this._formatError("Data command failed", "EENVELOPE", str3, "DATA"));
         }
         const response = {
           accepted: envelope.accepted,
@@ -49043,11 +49146,11 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionSMTPStream(str2, callback) {
-        if (Number(str2.charAt(0)) !== 2) {
-          return callback(this._formatError("Message failed", "EMESSAGE", str2, "DATA"));
+      _actionSMTPStream(str3, callback) {
+        if (Number(str3.charAt(0)) !== 2) {
+          return callback(this._formatError("Message failed", "EMESSAGE", str3, "DATA"));
         }
-        return callback(null, str2);
+        return callback(null, str3);
       }
       /**
        * Handle response for a DATA stream
@@ -49059,11 +49162,11 @@ var init_smtp_connection = __esm({
        * @param str Message from the server
        * @internal
        */
-      _actionLMTPStream(recipient, final, str2, callback) {
+      _actionLMTPStream(recipient, final, str3, callback) {
         const envelope = this._envelope;
         let err;
-        if (Number(str2.charAt(0)) !== 2) {
-          err = this._formatError("Message failed for recipient " + recipient, "EMESSAGE", str2, "DATA");
+        if (Number(str3.charAt(0)) !== 2) {
+          err = this._formatError("Message failed for recipient " + recipient, "EMESSAGE", str3, "DATA");
           err.recipient = recipient;
           envelope.rejected.push(recipient);
           envelope.rejectedErrors.push(err);
@@ -49074,7 +49177,7 @@ var init_smtp_connection = __esm({
           }
         }
         if (final) {
-          return callback(null, str2);
+          return callback(null, str3);
         }
       }
       /** @internal */
@@ -49089,8 +49192,8 @@ var init_smtp_connection = __esm({
             }, "User %s failed to authenticate", JSON.stringify(this._auth.user));
             return callback(this._formatError(err, "EAUTH", false, "AUTH XOAUTH2"));
           }
-          this._responseActions.push((str2) => {
-            this._actionAUTHComplete(str2, isRetry, callback);
+          this._responseActions.push((str3) => {
+            this._actionAUTHComplete(str3, isRetry, callback);
           });
           this._sendCommand(
             "AUTH XOAUTH2 " + this._auth.oauth2.buildXOAuth2Token(accessToken),
@@ -51975,6 +52078,7 @@ var init_auth_service = __esm({
       id: u2.id,
       email: u2.email,
       verified: !!u2.verified,
+      role: String(u2.role ?? "member"),
       goal_default: u2.goal_default,
       timezone: u2.timezone,
       created_at: u2.created_at
@@ -99488,6 +99592,36 @@ async function countsFor(userId, from, to2) {
   const response_rate = cohort.sent ? Number((cohort.replied / cohort.sent * 100).toFixed(1)) : 0;
   return { ...row, sent, response_rate };
 }
+async function pipeline(userId) {
+  const rows = await all("SELECT status, COUNT(*) AS n FROM applications WHERE user_id = ? GROUP BY status", userId);
+  const counts = {};
+  let total = 0;
+  for (const r2 of rows) {
+    counts[String(r2.status)] = Number(r2.n);
+    total += Number(r2.n);
+  }
+  const due = await get(
+    `SELECT COUNT(*) AS n FROM applications
+      WHERE user_id = ? AND next_action_at IS NOT NULL AND next_action_at <= ?
+        AND status NOT IN ('rejected', 'withdrawn', 'offer')`,
+    userId,
+    (/* @__PURE__ */ new Date()).toISOString()
+  );
+  const lastActivity = await get("SELECT MAX(COALESCE(applied_at, created_at)) AS last FROM applications WHERE user_id = ?", userId);
+  return {
+    total,
+    counts,
+    drafts: Number(counts.saved ?? 0),
+    sent: total - Number(counts.saved ?? 0),
+    waiting: ["applied", "viewed", "screen"].reduce((n2, s2) => n2 + Number(counts[s2] ?? 0), 0),
+    interviewing: Number(counts.interview ?? 0),
+    offers: Number(counts.offer ?? 0),
+    rejections: Number(counts.rejected ?? 0),
+    ghosted: Number(counts.ghosted ?? 0),
+    follow_ups_due: Number(due?.n ?? 0),
+    last_activity: lastActivity?.last ?? null
+  };
+}
 async function summary(userId, period = "week") {
   const tz = await tzOf2(userId);
   const { from, to: to2, prevFrom, prevTo } = periodRange(period, tz);
@@ -99664,6 +99798,13 @@ var init_analytics = __esm({
     analyticsRouter.use(requireAuth);
     limiter2 = rateLimit("analytics", 120, 6e4);
     periodSchema = external_exports.object({ period: external_exports.enum(["day", "week", "month", "year"]).default("week") });
+    analyticsRouter.get("/pipeline", limiter2, async (req, res, next) => {
+      try {
+        ok(res, "Pipeline retrieved", await pipeline(req.userId));
+      } catch (e2) {
+        next(e2);
+      }
+    });
     analyticsRouter.get("/summary", limiter2, async (req, res, next) => {
       try {
         const { period } = periodSchema.parse(req.query);
@@ -99951,12 +100092,881 @@ var init_network = __esm({
   }
 });
 
+// src/services/higher-as.service.ts
+function effectiveCredentialStatus(row) {
+  if (row.status === "verified" && row.expires_on && String(row.expires_on) < today2()) return "expired";
+  return row.status;
+}
+function publicCredential(row) {
+  return {
+    id: row.id,
+    kind: row.kind,
+    title: row.title,
+    issuer: row.issuer ?? null,
+    reference: row.reference ?? null,
+    issued_on: row.issued_on ?? null,
+    expires_on: row.expires_on ?? null,
+    status: effectiveCredentialStatus(row),
+    reviewed_at: row.reviewed_at ?? null,
+    review_note: row.review_note ?? null
+  };
+}
+function autoSummary(title, body, tags, trade) {
+  const label = TRADE_LABEL[trade] ?? "Trade professional";
+  const first = String(body ?? "").replace(/\s+/g, " ").split(/(?<=[.!?])\s/)[0]?.trim();
+  const core = first && first.length > 12 ? first : String(title ?? "").trim();
+  const skills = tags.slice(0, 3).join(", ");
+  const tail = skills ? ` Focus: ${skills}.` : "";
+  const text = `${label}. ${core}`.replace(/\.\./g, ".").trim();
+  return `${text.slice(0, 220)}${text.length > 220 ? "\u2026" : ""}${tail}`.slice(0, 320);
+}
+function isAdmin(user) {
+  if (!user) return false;
+  if (String(user.role ?? "member") === "admin") return true;
+  const list = String(process.env.ADMIN_EMAILS ?? "").split(",").map((s2) => s2.trim().toLowerCase()).filter(Boolean);
+  return list.includes(String(user.email ?? "").toLowerCase());
+}
+async function requireAdmin(userId) {
+  const user = await get("SELECT id, email, role FROM users WHERE id = ?", userId);
+  if (!user) throw notFound("User");
+  if (!isAdmin(user)) throw forbidden("FORBIDDEN", "Only a platform reviewer can verify credentials or moderate reviews");
+  return user;
+}
+async function profileIdentity(userId) {
+  const row = await get("SELECT identity FROM profiles WHERE user_id = ?", userId);
+  const id = parseJson(row?.identity, {});
+  return {
+    name: String(id.full_name ?? id.name ?? "").trim(),
+    location: String(id.location ?? "").trim()
+  };
+}
+async function proRow(proId) {
+  const row = await get("SELECT * FROM pro_profiles WHERE id = ?", proId);
+  if (!row) throw notFound("Professional");
+  return row;
+}
+async function ratingFor(proIds) {
+  if (!proIds.length) return /* @__PURE__ */ new Map();
+  const rows = await all(
+    `SELECT pro_id, rating, verified FROM pro_reviews WHERE hidden = 0 AND pro_id IN (${proIds.map(() => "?").join(",")})`,
+    ...proIds
+  );
+  const map2 = /* @__PURE__ */ new Map();
+  for (const id of proIds) {
+    const mine = rows.filter((r2) => r2.pro_id === id);
+    const count = mine.length;
+    const avg = count ? Math.round(mine.reduce((n2, r2) => n2 + r2.rating, 0) / count * 10) / 10 : null;
+    map2.set(id, {
+      avg,
+      count,
+      verified: mine.filter((r2) => r2.verified).length,
+      distribution: [5, 4, 3, 2, 1].map((star) => ({ star, count: mine.filter((r2) => r2.rating === star).length }))
+    });
+  }
+  return map2;
+}
+async function credentialsFor(proIds) {
+  if (!proIds.length) return /* @__PURE__ */ new Map();
+  const rows = await all(
+    `SELECT pro_id, status, expires_on FROM pro_credentials WHERE pro_id IN (${proIds.map(() => "?").join(",")})`,
+    ...proIds
+  );
+  const map2 = /* @__PURE__ */ new Map();
+  for (const id of proIds) {
+    const mine = rows.filter((r2) => r2.pro_id === id).map((r2) => ({ ...r2, status: effectiveCredentialStatus(r2) }));
+    map2.set(id, {
+      verified: mine.filter((r2) => r2.status === "verified").length,
+      pending: mine.filter((r2) => r2.status === "pending").length,
+      total: mine.length
+    });
+  }
+  return map2;
+}
+async function listFeed(userId, filters = {}) {
+  const viewer = await profileIdentity(userId);
+  const pros = await all("SELECT * FROM pro_profiles");
+  const ids = pros.map((p2) => p2.id);
+  const ratings = await ratingFor(ids);
+  const creds = await credentialsFor(ids);
+  const savedRows = await all("SELECT pro_id FROM saved_pros WHERE user_id = ?", userId);
+  const saved = new Set(savedRows.map((r2) => r2.pro_id));
+  const posts = await all("SELECT * FROM pro_posts ORDER BY created_at DESC");
+  const visibleReviews = await all("SELECT pro_id, body, created_at FROM pro_reviews WHERE hidden = 0 ORDER BY created_at DESC");
+  const q2 = String(filters.q ?? "").toLowerCase().trim();
+  const city = String(filters.city ?? "").toLowerCase().trim();
+  const trade = String(filters.trade ?? "").toLowerCase().trim();
+  const minRating = Number(filters.min_rating ?? 0) || 0;
+  const wantVerified = filters.verified === "true";
+  const wantAvailable = filters.available === "true";
+  const items = pros.map((p2) => {
+    const rating = ratings.get(p2.id) ?? { avg: null, count: 0, verified: 0, distribution: [] };
+    const cred = creds.get(p2.id) ?? { verified: 0, pending: 0, total: 0 };
+    const post = posts.find((x2) => x2.pro_id === p2.id) ?? null;
+    const tags = post ? parseJson(post.tags, []) : [];
+    const hay = [p2.display_name, p2.headline, p2.summary, p2.city, p2.service_area, TRADE_LABEL[p2.trade], post?.title, post?.body, tags.join(" ")].filter(Boolean).join(" ").toLowerCase();
+    const reasons = [];
+    let score = 0;
+    if (viewer.location && p2.city && p2.city.toLowerCase() === viewer.location.toLowerCase()) {
+      score += 30;
+      reasons.push(`works in ${p2.city}`);
+    }
+    if (cred.verified > 0) {
+      score += Math.min(30, cred.verified * 15);
+      reasons.push(`${cred.verified} verified credential${cred.verified === 1 ? "" : "s"}`);
+    }
+    if (rating.count) {
+      score += Math.round((rating.avg ?? 0) * 5);
+      reasons.push(`${rating.avg} from ${rating.count} review${rating.count === 1 ? "" : "s"}`);
+    }
+    if (rating.verified) {
+      score += Math.min(20, rating.verified * 5);
+      reasons.push(`${rating.verified} verified engagement review${rating.verified === 1 ? "" : "s"}`);
+    }
+    if (p2.available) score += 8;
+    if (post && daysAgo(post.created_at) <= 30) {
+      score += 10;
+      reasons.push("posted recently");
+    }
+    if (saved.has(p2.id)) score += 6;
+    if (!p2.summary) score -= 6;
+    return { p: p2, post, tags, rating, cred, hay, score, reasons };
+  }).filter(({ p: p2, hay, rating, cred }) => {
+    if (q2 && !hay.includes(q2)) return false;
+    if (trade && p2.trade !== trade) return false;
+    if (city && !`${p2.city ?? ""} ${p2.service_area ?? ""}`.toLowerCase().includes(city)) return false;
+    if (minRating && (rating.avg ?? 0) < minRating) return false;
+    if (wantVerified && cred.verified === 0) return false;
+    if (wantAvailable && !p2.available) return false;
+    if (filters.saved === "true" && !saved.has(p2.id)) return false;
+    return true;
+  }).sort((a2, b2) => {
+    if (filters.sort === "rating") return (b2.rating.avg ?? 0) - (a2.rating.avg ?? 0) || b2.rating.count - a2.rating.count;
+    if (filters.sort === "recent") return String(b2.post?.created_at ?? "").localeCompare(String(a2.post?.created_at ?? ""));
+    if (filters.sort === "experience") return (b2.p.years_experience ?? 0) - (a2.p.years_experience ?? 0);
+    return b2.score - a2.score;
+  }).slice(0, Math.max(1, Math.min(60, filters.limit ?? 30)));
+  const facet = (fn2) => {
+    const out = {};
+    for (const it2 of items) {
+      const key = fn2(it2);
+      if (!key) continue;
+      out[key] = (out[key] ?? 0) + 1;
+    }
+    return out;
+  };
+  return {
+    items: items.map(({ p: p2, post, tags, rating, cred, reasons, score }) => ({
+      id: p2.id,
+      user_id: p2.user_id,
+      display_name: p2.display_name,
+      trade: p2.trade,
+      trade_label: TRADE_LABEL[p2.trade] ?? p2.trade,
+      headline: p2.headline,
+      summary: p2.summary,
+      city: p2.city,
+      service_area: p2.service_area,
+      years_experience: p2.years_experience,
+      available: !!p2.available,
+      day_rate_min: p2.day_rate_min,
+      day_rate_max: p2.day_rate_max,
+      currency: p2.currency,
+      rating,
+      credentials: cred,
+      latest_post: post ? {
+        id: post.id,
+        title: post.title,
+        body: post.body,
+        kind: post.kind,
+        image_url: post.image_url,
+        tags,
+        auto_summary: post.auto_summary,
+        created_at: post.created_at
+      } : null,
+      saved: saved.has(p2.id),
+      is_owner: p2.user_id === userId,
+      match: { score: Math.min(100, Math.max(0, score)), reasons }
+    })),
+    total: items.length,
+    facets: {
+      trade: facet((x2) => x2.p.trade),
+      city: facet((x2) => x2.p.city)
+    },
+    trades: TRADES,
+    viewer: { city: viewer.location, saved: saved.size },
+    reviews: visibleReviews.filter((r2) => items.some((it2) => it2.p.id === r2.pro_id)).slice(0, 6).map((r2) => ({ pro_id: r2.pro_id, body: r2.body, created_at: r2.created_at }))
+  };
+}
+async function getPro(userId, proId) {
+  const p2 = await proRow(proId);
+  const user = await get("SELECT email, role FROM users WHERE id = ?", userId);
+  const admin = isAdmin(user);
+  const isOwner = p2.user_id === userId;
+  const rating = (await ratingFor([proId])).get(proId);
+  const creds = await all("SELECT * FROM pro_credentials WHERE pro_id = ? ORDER BY created_at DESC", proId);
+  const posts = await all("SELECT * FROM pro_posts WHERE pro_id = ? ORDER BY created_at DESC", proId);
+  const reviewRows = await all("SELECT * FROM pro_reviews WHERE pro_id = ? ORDER BY created_at DESC", proId);
+  const savedRow = await get("SELECT 1 FROM saved_pros WHERE user_id = ? AND pro_id = ?", userId, proId);
+  const myReview = reviewRows.find((r2) => r2.customer_id === userId) ?? null;
+  const engagements = await all(
+    "SELECT * FROM pro_engagements WHERE pro_id = ? AND customer_id = ? AND confirmed_at IS NOT NULL AND completed_at IS NOT NULL ORDER BY completed_at DESC",
+    proId,
+    userId
+  );
+  const openEngagement = engagements.find((e2) => !reviewRows.some((r2) => r2.engagement_id === e2.id)) ?? null;
+  return {
+    id: p2.id,
+    user_id: p2.user_id,
+    display_name: p2.display_name,
+    trade: p2.trade,
+    trade_label: TRADE_LABEL[p2.trade] ?? p2.trade,
+    headline: p2.headline,
+    summary: p2.summary,
+    city: p2.city,
+    service_area: p2.service_area,
+    years_experience: p2.years_experience,
+    available: !!p2.available,
+    day_rate_min: p2.day_rate_min,
+    day_rate_max: p2.day_rate_max,
+    currency: p2.currency,
+    website: p2.website ?? null,
+    has_contact: Boolean(p2.phone || p2.whatsapp),
+    rating: rating ?? { avg: null, count: 0, verified: 0, distribution: [] },
+    credentials: creds.map((c2) => isOwner || admin ? { ...publicCredential(c2), document_name: c2.document_name ?? null } : publicCredential(c2)),
+    posts: posts.map((x2) => ({
+      id: x2.id,
+      title: x2.title,
+      body: x2.body,
+      kind: x2.kind,
+      image_url: x2.image_url,
+      tags: parseJson(x2.tags, []),
+      auto_summary: x2.auto_summary,
+      created_at: x2.created_at
+    })),
+    reviews: reviewRows.filter((r2) => !r2.hidden || isOwner || admin).map((r2) => ({
+      id: r2.id,
+      customer_name: r2.customer_name,
+      rating: r2.rating,
+      body: r2.body,
+      verified: !!r2.verified,
+      engagement_id: r2.engagement_id,
+      response: r2.response,
+      responded_at: r2.responded_at,
+      dispute_status: r2.dispute_status,
+      dispute_reason: isOwner || admin ? r2.dispute_reason : null,
+      hidden: !!r2.hidden,
+      created_at: r2.created_at
+    })),
+    saved: !!savedRow,
+    is_owner: isOwner,
+    can_review: !!openEngagement && !myReview,
+    reviewable_engagement: openEngagement ? { id: openEngagement.id, title: openEngagement.title } : null,
+    my_review: myReview ? { id: myReview.id, rating: myReview.rating, body: myReview.body } : null,
+    is_admin: admin
+  };
+}
+async function proContact(userId, proId) {
+  const p2 = await proRow(proId);
+  const viewer = await get("SELECT role FROM users WHERE id = ?", userId);
+  if (!viewer) throw notFound("User");
+  return {
+    display_name: p2.display_name,
+    phone: p2.phone ?? null,
+    whatsapp: p2.whatsapp ?? null,
+    website: p2.website ?? null,
+    city: p2.city ?? null,
+    service_area: p2.service_area ?? null,
+    note: "Shared by the professional. JAMS has not verified this number."
+  };
+}
+async function upsertMyPro(userId, body) {
+  if (!slugExists(body.trade)) throw validation("Pick a trade from the list", { trade: "unknown trade" });
+  if (body.day_rate_min != null && body.day_rate_max != null && body.day_rate_min > body.day_rate_max) {
+    throw validation("Minimum rate cannot be above the maximum");
+  }
+  const existing = await get("SELECT * FROM pro_profiles WHERE user_id = ?", userId);
+  const now = nowIso();
+  const values = [
+    String(body.display_name).trim().slice(0, 120),
+    body.trade,
+    body.headline?.trim().slice(0, 160) ?? null,
+    String(body.summary ?? "").trim().slice(0, 2e3),
+    body.city?.trim().slice(0, 120) ?? null,
+    body.service_area?.trim().slice(0, 160) ?? null,
+    body.years_experience ?? null,
+    // A blank field clears the number rather than keeping a stale one.
+    body.phone?.trim() || null,
+    body.whatsapp?.trim() || null,
+    body.website?.trim() || null,
+    body.available === false ? 0 : 1,
+    body.day_rate_min ?? null,
+    body.day_rate_max ?? null,
+    body.currency?.slice(0, 8) || "NGN"
+  ];
+  if (existing) {
+    await run(
+      `UPDATE pro_profiles SET display_name = ?, trade = ?, headline = ?, summary = ?, city = ?, service_area = ?,
+       years_experience = ?, phone = ?, whatsapp = ?, website = ?, available = ?, day_rate_min = ?, day_rate_max = ?,
+       currency = ?, updated_at = ? WHERE id = ?`,
+      ...values,
+      now,
+      existing.id
+    );
+    return getPro(userId, existing.id);
+  }
+  const id = newId();
+  await run(
+    `INSERT INTO pro_profiles (id, user_id, display_name, trade, headline, summary, city, service_area, years_experience,
+      phone, whatsapp, website, available, day_rate_min, day_rate_max, currency, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    id,
+    userId,
+    ...values,
+    now,
+    now
+  );
+  return getPro(userId, id);
+}
+async function myPro(userId) {
+  const p2 = await get("SELECT * FROM pro_profiles WHERE user_id = ?", userId);
+  if (!p2) return { profile: null, trades: TRADES, credentials: [], posts: [], reviews: [], engagements: [] };
+  const [creds, posts, reviews, engagements] = await Promise.all([
+    all("SELECT * FROM pro_credentials WHERE pro_id = ? ORDER BY created_at DESC", p2.id),
+    all("SELECT * FROM pro_posts WHERE pro_id = ? ORDER BY created_at DESC", p2.id),
+    all("SELECT * FROM pro_reviews WHERE pro_id = ? ORDER BY created_at DESC", p2.id),
+    all("SELECT * FROM pro_engagements WHERE pro_id = ? ORDER BY created_at DESC", p2.id)
+  ]);
+  return {
+    profile: await getPro(userId, p2.id),
+    trades: TRADES,
+    credentials: creds.map((c2) => ({ ...publicCredential(c2), document_name: c2.document_name ?? null })),
+    posts: posts.map((x2) => ({ id: x2.id, title: x2.title, body: x2.body, kind: x2.kind, image_url: x2.image_url, tags: parseJson(x2.tags, []), auto_summary: x2.auto_summary, created_at: x2.created_at })),
+    reviews: reviews.map((r2) => ({
+      id: r2.id,
+      customer_name: r2.customer_name,
+      rating: r2.rating,
+      body: r2.body,
+      verified: !!r2.verified,
+      response: r2.response,
+      responded_at: r2.responded_at,
+      dispute_status: r2.dispute_status,
+      dispute_reason: r2.dispute_reason,
+      hidden: !!r2.hidden,
+      created_at: r2.created_at
+    })),
+    engagements: engagements.map((e2) => ({
+      id: e2.id,
+      title: e2.title,
+      detail: e2.detail,
+      completed_at: e2.completed_at,
+      confirmed_at: e2.confirmed_at,
+      created_at: e2.created_at,
+      awaiting_confirm: !e2.confirmed_at
+    }))
+  };
+}
+async function createPost(userId, body) {
+  const p2 = await get("SELECT * FROM pro_profiles WHERE user_id = ?", userId);
+  if (!p2) throw validation("Create your professional profile before posting work");
+  const title = String(body.title ?? "").trim();
+  if (title.length < 3) throw validation("Give the post a title");
+  const text = String(body.body ?? "").trim().slice(0, 4e3);
+  const tags = (body.tags ?? []).map((t2) => String(t2).trim()).filter(Boolean).slice(0, 8);
+  const id = newId();
+  await run(
+    `INSERT INTO pro_posts (id, pro_id, title, body, kind, image_url, tags, auto_summary, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    id,
+    p2.id,
+    title.slice(0, 180),
+    text,
+    body.kind === "service" ? "service" : "work",
+    body.image_url?.trim() || null,
+    JSON.stringify(tags),
+    autoSummary(title, text, tags, p2.trade),
+    nowIso()
+  );
+  return get("SELECT * FROM pro_posts WHERE id = ?", id);
+}
+async function deletePost(userId, postId) {
+  const row = await get(
+    "SELECT p.* FROM pro_posts p JOIN pro_profiles pr ON pr.id = p.pro_id WHERE p.id = ? AND pr.user_id = ?",
+    postId,
+    userId
+  );
+  if (!row) throw notFound("Post");
+  await run("DELETE FROM pro_posts WHERE id = ?", postId);
+  return { deleted: true };
+}
+async function submitCredential(userId, body) {
+  const p2 = await get("SELECT * FROM pro_profiles WHERE user_id = ?", userId);
+  if (!p2) throw validation("Create your professional profile before submitting a credential");
+  const kind = ["licence", "certificate", "training", "registration"].includes(body.kind) ? body.kind : "certificate";
+  const title = String(body.title ?? "").trim();
+  if (title.length < 3) throw validation("Name the credential");
+  if (body.document_b64 && body.document_b64.length > 6e6) {
+    throw new AppError("FILE_TOO_LARGE", 413, "That document is over 4 MB, compress the scan and try again");
+  }
+  const id = newId();
+  await run(
+    `INSERT INTO pro_credentials (id, pro_id, kind, title, issuer, reference, issued_on, expires_on, document_name, document_b64, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+    id,
+    p2.id,
+    kind,
+    title.slice(0, 180),
+    body.issuer?.trim().slice(0, 160) || null,
+    body.reference?.trim().slice(0, 120) || null,
+    body.issued_on || null,
+    body.expires_on || null,
+    body.document_name?.trim().slice(0, 200) || null,
+    body.document_b64 || null,
+    nowIso()
+  );
+  const row = await get("SELECT * FROM pro_credentials WHERE id = ?", id);
+  return { ...publicCredential(row), document_name: row.document_name };
+}
+async function credentialQueue(userId) {
+  await requireAdmin(userId);
+  const rows = await all(
+    `SELECT c.*, p.display_name, p.trade FROM pro_credentials c JOIN pro_profiles p ON p.id = c.pro_id
+     WHERE c.status = 'pending' ORDER BY c.created_at ASC`
+  );
+  return {
+    items: rows.map((r2) => ({
+      ...publicCredential(r2),
+      pro_id: r2.pro_id,
+      pro_name: r2.display_name,
+      trade: r2.trade,
+      trade_label: TRADE_LABEL[r2.trade] ?? r2.trade,
+      document_name: r2.document_name ?? null,
+      has_document: !!r2.document_b64,
+      submitted_at: r2.created_at
+    }))
+  };
+}
+async function reviewCredential(userId, credentialId, decision, note) {
+  const admin = await requireAdmin(userId);
+  const row = await get("SELECT * FROM pro_credentials WHERE id = ?", credentialId);
+  if (!row) throw notFound("Credential");
+  await run(
+    "UPDATE pro_credentials SET status = ?, review_note = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ?",
+    decision,
+    note?.trim().slice(0, 500) || null,
+    String(admin.email ?? admin.id),
+    nowIso(),
+    credentialId
+  );
+  return { id: credentialId, status: decision };
+}
+async function credentialDocument(userId, credentialId) {
+  await requireAdmin(userId);
+  const row = await get("SELECT document_name, document_b64 FROM pro_credentials WHERE id = ?", credentialId);
+  if (!row?.document_b64) throw notFound("Document");
+  return { filename: row.document_name ?? "credential", b64: row.document_b64 };
+}
+async function createEngagement(userId, proId, body) {
+  const p2 = await proRow(proId);
+  if (p2.user_id === userId) throw validation("You cannot book your own service");
+  const title = String(body.title ?? "").trim();
+  if (title.length < 3) throw validation("Describe the job");
+  const existing = await get("SELECT id FROM pro_engagements WHERE pro_id = ? AND customer_id = ? AND title = ?", proId, userId, title);
+  if (existing) throw conflict("This job is already recorded with this professional");
+  const id = newId();
+  await run(
+    `INSERT INTO pro_engagements (id, pro_id, customer_id, title, detail, completed_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    id,
+    proId,
+    userId,
+    title.slice(0, 180),
+    body.detail?.trim().slice(0, 1200) || null,
+    body.completed_at || nowIso(),
+    nowIso()
+  );
+  return get("SELECT * FROM pro_engagements WHERE id = ?", id);
+}
+async function confirmEngagement(userId, engagementId) {
+  const row = await get(
+    "SELECT e.* FROM pro_engagements e JOIN pro_profiles p ON p.id = e.pro_id WHERE e.id = ? AND p.user_id = ?",
+    engagementId,
+    userId
+  );
+  if (!row) throw notFound("Engagement");
+  if (row.confirmed_at) throw conflict("This job is already confirmed");
+  await run("UPDATE pro_engagements SET confirmed_at = ?, completed_at = COALESCE(completed_at, ?) WHERE id = ?", nowIso(), nowIso(), engagementId);
+  return { id: engagementId, confirmed: true };
+}
+async function createReview(userId, proId, body) {
+  const p2 = await proRow(proId);
+  if (p2.user_id === userId) throw forbidden("FORBIDDEN", "You cannot review your own professional profile");
+  const rating = Math.round(Number(body.rating));
+  if (!(rating >= 1 && rating <= 5)) throw validation("Rating must be between 1 and 5");
+  const text = String(body.body ?? "").trim();
+  if (text.length < 10) throw validation("Write at least a sentence - \u201Cgood\u201D does not help anyone");
+  if (text.length > 3e3) throw validation("Keep the review under 3000 characters");
+  let verified = 0;
+  let engagementId = null;
+  if (body.engagement_id) {
+    const engagement = await get(
+      "SELECT * FROM pro_engagements WHERE id = ? AND pro_id = ? AND customer_id = ?",
+      body.engagement_id,
+      proId,
+      userId
+    );
+    if (!engagement) throw notFound("Engagement");
+    if (!engagement.confirmed_at) throw validation("The professional has not confirmed this job yet, so it cannot count as verified");
+    engagementId = engagement.id;
+    verified = 1;
+  }
+  const identity = await profileIdentity(userId);
+  const name2 = identity.name || "A JAMS member";
+  const existing = await get("SELECT * FROM pro_reviews WHERE pro_id = ? AND customer_id = ?", proId, userId);
+  if (existing) {
+    await run(
+      "UPDATE pro_reviews SET rating = ?, body = ?, verified = ?, engagement_id = COALESCE(?, engagement_id) WHERE id = ?",
+      rating,
+      text,
+      existing.verified || verified,
+      engagementId,
+      existing.id
+    );
+    return { id: existing.id, updated: true };
+  }
+  const id = newId();
+  await run(
+    `INSERT INTO pro_reviews (id, pro_id, engagement_id, customer_id, customer_name, rating, body, verified, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    id,
+    proId,
+    engagementId,
+    userId,
+    name2.slice(0, 120),
+    rating,
+    text,
+    verified,
+    nowIso()
+  );
+  return { id, verified: !!verified };
+}
+async function respondToReview(userId, reviewId, response) {
+  const row = await get(
+    "SELECT r.*, p.user_id AS owner_id FROM pro_reviews r JOIN pro_profiles p ON p.id = r.pro_id WHERE r.id = ?",
+    reviewId
+  );
+  if (!row) throw notFound("Review");
+  if (row.owner_id !== userId) throw forbidden("FORBIDDEN", "Only the professional being reviewed can respond");
+  const text = String(response ?? "").trim();
+  if (text.length < 2) throw validation("Write a response first");
+  if (text.length > 1500) throw validation("Keep the response under 1500 characters");
+  await run("UPDATE pro_reviews SET response = ?, responded_at = ? WHERE id = ?", text, nowIso(), reviewId);
+  return { id: reviewId, responded: true };
+}
+async function disputeReview(userId, reviewId, reason) {
+  const row = await get(
+    "SELECT r.*, p.user_id AS owner_id FROM pro_reviews r JOIN pro_profiles p ON p.id = r.pro_id WHERE r.id = ?",
+    reviewId
+  );
+  if (!row) throw notFound("Review");
+  if (row.owner_id !== userId) throw forbidden("FORBIDDEN", "Only the professional being reviewed can request moderation");
+  const text = String(reason ?? "").trim();
+  if (text.length < 10) throw validation("Explain what is wrong with the review");
+  if (row.dispute_status === "open") throw conflict("This review is already in the moderation queue");
+  await run("UPDATE pro_reviews SET dispute_status = 'open', dispute_reason = ? WHERE id = ?", text.slice(0, 1e3), reviewId);
+  return { id: reviewId, dispute_status: "open" };
+}
+async function moderationQueue(userId) {
+  await requireAdmin(userId);
+  const rows = await all(
+    `SELECT r.*, p.display_name, p.trade FROM pro_reviews r JOIN pro_profiles p ON p.id = r.pro_id
+     WHERE r.dispute_status = 'open' ORDER BY r.created_at ASC`
+  );
+  return {
+    items: rows.map((r2) => ({
+      id: r2.id,
+      pro_name: r2.display_name,
+      trade_label: TRADE_LABEL[r2.trade] ?? r2.trade,
+      customer_name: r2.customer_name,
+      rating: r2.rating,
+      body: r2.body,
+      verified: !!r2.verified,
+      dispute_reason: r2.dispute_reason,
+      response: r2.response,
+      created_at: r2.created_at
+    }))
+  };
+}
+async function moderateReview(userId, reviewId, outcome, note) {
+  await requireAdmin(userId);
+  const row = await get("SELECT * FROM pro_reviews WHERE id = ?", reviewId);
+  if (!row) throw notFound("Review");
+  if (row.dispute_status !== "open") throw conflict("This review is not awaiting moderation");
+  await run(
+    "UPDATE pro_reviews SET dispute_status = ?, hidden = ?, response = COALESCE(response, ?) WHERE id = ?",
+    outcome,
+    outcome === "upheld" ? 1 : 0,
+    note?.trim() ? `Moderation note: ${note.trim().slice(0, 400)}` : null,
+    reviewId
+  );
+  return { id: reviewId, outcome };
+}
+async function toggleSaved(userId, proId) {
+  await proRow(proId);
+  const row = await get("SELECT 1 FROM saved_pros WHERE user_id = ? AND pro_id = ?", userId, proId);
+  if (row) {
+    await run("DELETE FROM saved_pros WHERE user_id = ? AND pro_id = ?", userId, proId);
+    return { saved: false };
+  }
+  await run("INSERT INTO saved_pros (user_id, pro_id, created_at) VALUES (?, ?, ?)", userId, proId, nowIso());
+  return { saved: true };
+}
+var TRADES, TRADE_LABEL, daysAgo, today2, slugExists;
+var init_higher_as_service = __esm({
+  "src/services/higher-as.service.ts"() {
+    "use strict";
+    init_db();
+    init_errors2();
+    init_id();
+    TRADES = [
+      { slug: "mechanic", label: "Mechanic" },
+      { slug: "plumber", label: "Plumber" },
+      { slug: "electrician", label: "Electrician" },
+      { slug: "welder", label: "Welder" },
+      { slug: "machine_operator", label: "Machine operator" },
+      { slug: "oil_and_gas", label: "Oil and gas" },
+      { slug: "carpenter", label: "Carpenter" },
+      { slug: "mason", label: "Mason" },
+      { slug: "tailor", label: "Tailor" },
+      { slug: "auto_body", label: "Auto body" },
+      { slug: "hvac", label: "HVAC technician" },
+      { slug: "solar", label: "Solar installer" }
+    ];
+    TRADE_LABEL = Object.fromEntries(TRADES.map((t2) => [t2.slug, t2.label]));
+    daysAgo = (iso) => {
+      if (!iso) return Number.POSITIVE_INFINITY;
+      return (Date.now() - new Date(iso).getTime()) / 864e5;
+    };
+    today2 = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    slugExists = (v2) => TRADES.some((t2) => t2.slug === v2);
+  }
+});
+
+// src/routes/higher-as.ts
+var import_express9, str2, higherAsRouter, profileSchema2, postSchema, credentialSchema;
+var init_higher_as = __esm({
+  "src/routes/higher-as.ts"() {
+    "use strict";
+    import_express9 = __toESM(require_express2(), 1);
+    init_zod();
+    init_envelope();
+    init_security();
+    init_higher_as_service();
+    str2 = (v2) => typeof v2 === "string" && v2.trim() ? v2.trim() : void 0;
+    higherAsRouter = (0, import_express9.Router)();
+    higherAsRouter.use(requireAuth);
+    higherAsRouter.get("/feed", async (req, res, next) => {
+      try {
+        const q2 = req.query;
+        ok(
+          res,
+          "Vocational feed retrieved",
+          await listFeed(req.userId, {
+            q: str2(q2.q),
+            trade: str2(q2.trade),
+            city: str2(q2.city),
+            verified: str2(q2.verified),
+            available: str2(q2.available),
+            min_rating: str2(q2.min_rating),
+            sort: str2(q2.sort),
+            saved: str2(q2.saved),
+            limit: Number(q2.limit) || void 0
+          })
+        );
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    higherAsRouter.get("/trades", (_req, res) => ok(res, "Trades", { items: TRADES }));
+    higherAsRouter.get("/me", async (req, res, next) => {
+      try {
+        ok(res, "Your professional workspace", await myPro(req.userId));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    profileSchema2 = external_exports.object({
+      display_name: external_exports.string().min(2).max(120),
+      trade: external_exports.string().min(2).max(40),
+      headline: external_exports.string().max(160).optional(),
+      summary: external_exports.string().max(2e3).optional(),
+      city: external_exports.string().max(120).optional(),
+      service_area: external_exports.string().max(160).optional(),
+      years_experience: external_exports.number().int().min(0).max(70).optional(),
+      phone: external_exports.string().max(40).optional(),
+      whatsapp: external_exports.string().max(40).optional(),
+      website: external_exports.string().max(300).optional(),
+      available: external_exports.boolean().optional(),
+      day_rate_min: external_exports.number().int().nonnegative().optional(),
+      day_rate_max: external_exports.number().int().nonnegative().optional(),
+      currency: external_exports.string().max(8).optional()
+    });
+    higherAsRouter.put("/me", async (req, res, next) => {
+      try {
+        const body = profileSchema2.parse(req.body ?? {});
+        ok(res, "Professional profile saved", await upsertMyPro(req.userId, body));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    higherAsRouter.get("/pros/:id", async (req, res, next) => {
+      try {
+        ok(res, "Professional retrieved", await getPro(req.userId, String(req.params.id)));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    higherAsRouter.get("/pros/:id/contact", async (req, res, next) => {
+      try {
+        const data = await proContact(req.userId, String(req.params.id));
+        res.setHeader("Cache-Control", "private, no-store");
+        ok(res, "Contact details", data);
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    higherAsRouter.post("/pros/:id/save", async (req, res, next) => {
+      try {
+        ok(res, "Saved", await toggleSaved(req.userId, String(req.params.id)));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    postSchema = external_exports.object({
+      title: external_exports.string().min(3).max(180),
+      body: external_exports.string().max(4e3).optional(),
+      kind: external_exports.enum(["work", "service"]).optional(),
+      image_url: external_exports.string().max(600).optional(),
+      tags: external_exports.array(external_exports.string().max(40)).max(8).optional()
+    });
+    higherAsRouter.post("/posts", async (req, res, next) => {
+      try {
+        const body = postSchema.parse(req.body ?? {});
+        ok(res, "Post published", await createPost(req.userId, body), 201);
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    higherAsRouter.delete("/posts/:id", async (req, res, next) => {
+      try {
+        ok(res, "Post removed", await deletePost(req.userId, String(req.params.id)));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    credentialSchema = external_exports.object({
+      kind: external_exports.enum(["licence", "certificate", "training", "registration"]).optional().default("certificate"),
+      title: external_exports.string().min(3).max(180),
+      issuer: external_exports.string().max(160).optional(),
+      reference: external_exports.string().max(120).optional(),
+      issued_on: external_exports.string().max(30).optional(),
+      expires_on: external_exports.string().max(30).optional(),
+      document_name: external_exports.string().max(200).optional(),
+      document_b64: external_exports.string().optional()
+    });
+    higherAsRouter.post("/credentials", async (req, res, next) => {
+      try {
+        const body = credentialSchema.parse(req.body ?? {});
+        ok(res, "Credential submitted for review", await submitCredential(req.userId, body), 201);
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    higherAsRouter.get("/credentials/queue", async (req, res, next) => {
+      try {
+        ok(res, "Credentials awaiting review", await credentialQueue(req.userId));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    higherAsRouter.get("/credentials/:id/document", async (req, res, next) => {
+      try {
+        const data = await credentialDocument(req.userId, String(req.params.id));
+        res.setHeader("Cache-Control", "private, no-store");
+        ok(res, "Credential document", data);
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    higherAsRouter.post("/credentials/:id/review", async (req, res, next) => {
+      try {
+        const body = external_exports.object({ decision: external_exports.enum(["verified", "rejected"]), note: external_exports.string().max(500).optional() }).parse(req.body ?? {});
+        ok(res, "Credential reviewed", await reviewCredential(req.userId, String(req.params.id), body.decision, body.note));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    higherAsRouter.post("/pros/:id/engagements", async (req, res, next) => {
+      try {
+        const body = external_exports.object({ title: external_exports.string().min(3).max(180), detail: external_exports.string().max(1200).optional(), completed_at: external_exports.string().max(40).optional() }).parse(req.body ?? {});
+        ok(res, "Job recorded", await createEngagement(req.userId, String(req.params.id), body), 201);
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    higherAsRouter.post("/engagements/:id/confirm", async (req, res, next) => {
+      try {
+        ok(res, "Job confirmed", await confirmEngagement(req.userId, String(req.params.id)));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    higherAsRouter.post("/pros/:id/reviews", async (req, res, next) => {
+      try {
+        const body = external_exports.object({ rating: external_exports.number().int().min(1).max(5), body: external_exports.string().min(10).max(3e3), engagement_id: external_exports.string().optional() }).parse(req.body ?? {});
+        ok(res, "Review saved", await createReview(req.userId, String(req.params.id), body), 201);
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    higherAsRouter.post("/reviews/:id/response", async (req, res, next) => {
+      try {
+        const body = external_exports.object({ response: external_exports.string().min(2).max(1500) }).parse(req.body ?? {});
+        ok(res, "Response published", await respondToReview(req.userId, String(req.params.id), body.response));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    higherAsRouter.post("/reviews/:id/dispute", async (req, res, next) => {
+      try {
+        const body = external_exports.object({ reason: external_exports.string().min(10).max(1e3) }).parse(req.body ?? {});
+        ok(res, "Sent for moderation", await disputeReview(req.userId, String(req.params.id), body.reason));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    higherAsRouter.get("/moderation", async (req, res, next) => {
+      try {
+        ok(res, "Moderation queue", await moderationQueue(req.userId));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+    higherAsRouter.post("/reviews/:id/moderate", async (req, res, next) => {
+      try {
+        const body = external_exports.object({ outcome: external_exports.enum(["upheld", "dismissed"]), note: external_exports.string().max(400).optional() }).parse(req.body ?? {});
+        ok(res, "Review moderated", await moderateReview(req.userId, String(req.params.id), body.outcome, body.note));
+      } catch (e2) {
+        next(e2);
+      }
+    });
+  }
+});
+
 // src/routes/index.ts
-var import_express9, apiRouter, apiIndex;
+var import_express10, apiRouter, apiIndex;
 var init_routes = __esm({
   "src/routes/index.ts"() {
     "use strict";
-    import_express9 = __toESM(require_express2(), 1);
+    import_express10 = __toESM(require_express2(), 1);
     init_envelope();
     init_auth();
     init_core();
@@ -99966,6 +100976,7 @@ var init_routes = __esm({
     init_outreach();
     init_analytics();
     init_network();
+    init_higher_as();
     init_ingest();
     init_zod();
     init_security();
@@ -99973,20 +100984,21 @@ var init_routes = __esm({
     init_streak_service();
     init_db();
     init_config();
-    apiRouter = (0, import_express9.Router)();
+    apiRouter = (0, import_express10.Router)();
     apiRouter.get("/healthz", (_req, res) => ok(res, "ok", { status: "up", mode: process.env.MODE ?? "local", driver, time: (/* @__PURE__ */ new Date()).toISOString() }));
     apiIndex = () => ({
       name: "JAMS API",
       version: "0.1.0",
       mode: config.mode,
       base: "/api/v1",
-      endpoints: ["/auth", "/profile", "/people", "/hirers", "/events", "/cvs", "/templates", "/jobs", "/searches", "/applications", "/companies", "/pitch-targets", "/capture", "/autofill", "/outreach", "/mailboxes", "/inbox", "/analytics", "/streaks", "/goals", "/export", "/tracking", "/sources"]
+      endpoints: ["/auth", "/profile", "/people", "/hirers", "/higher-as", "/events", "/cvs", "/templates", "/jobs", "/searches", "/applications", "/companies", "/pitch-targets", "/capture", "/autofill", "/outreach", "/mailboxes", "/inbox", "/analytics", "/streaks", "/goals", "/export", "/tracking", "/sources"]
     });
     apiRouter.get("/", (_req, res) => res.json(apiIndex()));
     apiRouter.use("/auth", authRouter);
     apiRouter.use("/profile", profileRouter);
     apiRouter.use("/people", peopleRouter);
     apiRouter.use("/hirers", hirersRouter);
+    apiRouter.use("/higher-as", higherAsRouter);
     apiRouter.use("/events", eventsRouter);
     apiRouter.use("/cvs", cvRouter);
     apiRouter.use("/templates", templateRouter);
@@ -100039,7 +101051,7 @@ __export(app_exports, {
   createApp: () => createApp
 });
 function createApp() {
-  const app = (0, import_express10.default)();
+  const app = (0, import_express11.default)();
   app.disable("x-powered-by");
   if (process.env.VERCEL && config.jwtSecret === "dev-secret-change-me") {
     console.warn("[jams] JWT_SECRET is not set, falling back to the well-known dev secret. Set JWT_SECRET on the deployment.");
@@ -100052,7 +101064,7 @@ function createApp() {
       credentials: config.webOrigin !== "*"
     })
   );
-  app.use(import_express10.default.json({ limit: "8mb" }));
+  app.use(import_express11.default.json({ limit: "8mb" }));
   app.use(requestContext);
   startRateLimitSweeper();
   app.use("/api/v1", apiRouter);
@@ -100061,11 +101073,11 @@ function createApp() {
   app.use(errorHandler);
   return app;
 }
-var import_express10, import_cors;
+var import_express11, import_cors;
 var init_app = __esm({
   "src/app.ts"() {
     "use strict";
-    import_express10 = __toESM(require_express2(), 1);
+    import_express11 = __toESM(require_express2(), 1);
     import_cors = __toESM(require_lib3(), 1);
     init_routes();
     init_errors2();

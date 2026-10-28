@@ -12,6 +12,14 @@ analyticsRouter.use(requireAuth);
 const limiter = rateLimit("analytics", 120, 60_000);
 const periodSchema = z.object({ period: z.enum(["day", "week", "month", "year"]).default("week") });
 
+analyticsRouter.get("/pipeline", limiter, async (req: AuthedRequest, res, next) => {
+  try {
+    ok(res, "Pipeline retrieved", await analytics.pipeline(req.userId!));
+  } catch (e) {
+    next(e);
+  }
+});
+
 analyticsRouter.get("/summary", limiter, async (req: AuthedRequest, res, next) => {
   try {
     const { period } = periodSchema.parse(req.query);

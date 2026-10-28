@@ -48,6 +48,42 @@ async function countsFor(userId: string, from: string, to: string) {
   return { ...row, sent, response_rate };
 }
 
+/**
+ * Tracker headline: how the pipeline is distributed right now, plus what needs a
+ * follow-up today. This is deliberately not period-bound - a board that hides the
+ * applications you have not sent yet is not a source of truth.
+ */
+export async function pipeline(userId: string) {
+  const rows = await all<any>("SELECT status, COUNT(*) AS n FROM applications WHERE user_id = ? GROUP BY status", userId);
+  const counts: Record<string, number> = {};
+  let total = 0;
+  for (const r of rows) {
+    counts[String(r.status)] = Number(r.n);
+    total += Number(r.n);
+  }
+  const due = await get<any>(
+    `SELECT COUNT(*) AS n FROM applications
+      WHERE user_id = ? AND next_action_at IS NOT NULL AND next_action_at <= ?
+        AND status NOT IN ('rejected', 'withdrawn', 'offer')`,
+    userId,
+    new Date().toISOString()
+  );
+  const lastActivity = await get<any>("SELECT MAX(COALESCE(applied_at, created_at)) AS last FROM applications WHERE user_id = ?", userId);
+  return {
+    total,
+    counts,
+    drafts: Number(counts.saved ?? 0),
+    sent: total - Number(counts.saved ?? 0),
+    waiting: ["applied", "viewed", "screen"].reduce((n, s) => n + Number(counts[s] ?? 0), 0),
+    interviewing: Number(counts.interview ?? 0),
+    offers: Number(counts.offer ?? 0),
+    rejections: Number(counts.rejected ?? 0),
+    ghosted: Number(counts.ghosted ?? 0),
+    follow_ups_due: Number(due?.n ?? 0),
+    last_activity: lastActivity?.last ?? null,
+  };
+}
+
 /** KPI wall payload (§33.3), value + prev + delta in one round-trip (§37.4). */
 export async function summary(userId: string, period: Period = "week") {
   const tz = await tzOf(userId);

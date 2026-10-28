@@ -10,6 +10,8 @@ export interface PublicUser {
   id: string;
   email: string;
   verified: boolean;
+  /** member | moderator | admin - drives the reviewer entry points in the UI */
+  role: string;
   goal_default: number;
   timezone: string;
   created_at: string;
@@ -19,6 +21,7 @@ const publicUser = (u: any): PublicUser => ({
   id: u.id,
   email: u.email,
   verified: !!u.verified,
+  role: String(u.role ?? "member"),
   goal_default: u.goal_default,
   timezone: u.timezone,
   created_at: u.created_at,

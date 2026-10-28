@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
   verified        INTEGER NOT NULL DEFAULT 0,
   verification_token TEXT,
   suspended       INTEGER NOT NULL DEFAULT 0,
+  role            TEXT NOT NULL DEFAULT 'member',
   goal_default    INTEGER NOT NULL DEFAULT 20,
   timezone        TEXT NOT NULL DEFAULT 'Africa/Lagos',
   created_at      TEXT NOT NULL,
@@ -447,6 +448,105 @@ CREATE TABLE IF NOT EXISTS cv_reviews (
   UNIQUE (cv_id, reviewer_id)
 );
 CREATE INDEX IF NOT EXISTS ix_reviews_cv ON cv_reviews(cv_id, created_at DESC);
+
+/* ─────────────────────────── Higher As ─────────────────────────────────
+ * Vocational professionals, the work they show, the credentials they submit
+ * and the reviews customers leave. Verification is a state machine, never a
+ * side effect of uploading a file: a credential starts 'pending' and only an
+ * admin review can move it to 'verified' or 'rejected'.
+ */
+CREATE TABLE IF NOT EXISTS pro_profiles (
+  id               TEXT PRIMARY KEY,
+  user_id          TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  display_name     TEXT NOT NULL,
+  trade            TEXT NOT NULL,
+  headline         TEXT,
+  summary          TEXT NOT NULL DEFAULT '',
+  city             TEXT,
+  service_area     TEXT,
+  years_experience INTEGER,
+  phone            TEXT,
+  whatsapp         TEXT,
+  website          TEXT,
+  available        INTEGER NOT NULL DEFAULT 1,
+  day_rate_min     INTEGER,
+  day_rate_max     INTEGER,
+  currency         TEXT NOT NULL DEFAULT 'NGN',
+  created_at       TEXT NOT NULL,
+  updated_at       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_pro_trade ON pro_profiles(trade, city);
+
+CREATE TABLE IF NOT EXISTS pro_posts (
+  id          TEXT PRIMARY KEY,
+  pro_id      TEXT NOT NULL REFERENCES pro_profiles(id) ON DELETE CASCADE,
+  title       TEXT NOT NULL,
+  body        TEXT NOT NULL DEFAULT '',
+  kind        TEXT NOT NULL DEFAULT 'work',        -- work | service
+  image_url   TEXT,
+  tags        TEXT NOT NULL DEFAULT '[]',
+  auto_summary TEXT,                               -- extractive, built only from this post
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_pro_posts_pro ON pro_posts(pro_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS pro_credentials (
+  id            TEXT PRIMARY KEY,
+  pro_id        TEXT NOT NULL REFERENCES pro_profiles(id) ON DELETE CASCADE,
+  kind          TEXT NOT NULL,                     -- licence | certificate | training | registration
+  title         TEXT NOT NULL,
+  issuer        TEXT,
+  reference     TEXT,
+  issued_on     TEXT,
+  expires_on    TEXT,
+  document_name TEXT,
+  document_b64  TEXT,                              -- private evidence, never in a public payload
+  status        TEXT NOT NULL DEFAULT 'pending',   -- pending | verified | rejected | expired
+  review_note   TEXT,
+  reviewed_by   TEXT,
+  reviewed_at   TEXT,
+  created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_pro_creds_pro ON pro_credentials(pro_id);
+CREATE INDEX IF NOT EXISTS ix_pro_creds_status ON pro_credentials(status);
+
+CREATE TABLE IF NOT EXISTS pro_engagements (
+  id           TEXT PRIMARY KEY,
+  pro_id       TEXT NOT NULL REFERENCES pro_profiles(id) ON DELETE CASCADE,
+  customer_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title        TEXT NOT NULL,
+  detail       TEXT,
+  completed_at TEXT,
+  confirmed_at TEXT,                               -- the professional vouches the job happened
+  created_at   TEXT NOT NULL,
+  UNIQUE (pro_id, customer_id, title)
+);
+
+CREATE TABLE IF NOT EXISTS pro_reviews (
+  id             TEXT PRIMARY KEY,
+  pro_id         TEXT NOT NULL REFERENCES pro_profiles(id) ON DELETE CASCADE,
+  engagement_id  TEXT REFERENCES pro_engagements(id) ON DELETE SET NULL,
+  customer_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  customer_name  TEXT NOT NULL,
+  rating         INTEGER NOT NULL,
+  body           TEXT NOT NULL,
+  verified       INTEGER NOT NULL DEFAULT 0,
+  response       TEXT,
+  responded_at   TEXT,
+  dispute_status TEXT NOT NULL DEFAULT 'none',     -- none | open | upheld | dismissed
+  dispute_reason TEXT,
+  hidden         INTEGER NOT NULL DEFAULT 0,       -- only an upheld moderation outcome hides a review
+  created_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_pro_reviews_pro ON pro_reviews(pro_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS ix_pro_reviews_customer ON pro_reviews(customer_id);
+
+CREATE TABLE IF NOT EXISTS saved_pros (
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  pro_id     TEXT NOT NULL REFERENCES pro_profiles(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, pro_id)
+);
 
 CREATE TABLE IF NOT EXISTS logcluster_pages (
   slug          TEXT PRIMARY KEY,
